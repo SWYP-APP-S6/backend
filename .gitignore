@@ -38,3 +38,12 @@ out/
 
 ### macOS ###
 .DS_Store
+
+### Claude Code (harness는 커밋, 로컬/런타임은 제외) ###
+.claude/settings.local.json
+.claude/worktrees/
+.claude/checkpoints/
+.claude/mailbox/
+.claude/scheduled_tasks.json
+.claude/scheduled_tasks.lock
+.claude/**/.state/

@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# commit-msg hook — strip AI attribution trailers so commits stay solo-authored.
+#
+# The commit convention (CLAUDE.md) forbids AI trailers; this enforces it mechanically:
+# even if a tool auto-adds a `Co-Authored-By` / `Reviewed-by` line for Claude/Anthropic,
+# it is removed here before the commit is recorded. Human co-authors are left untouched.
+# Always exits 0 — it never blocks a commit, only cleans the message.
+#
+# Activated via `git config core.hooksPath .githooks` (run once per clone).
+
+set -u
+msg="$1"
+[ -f "$msg" ] || exit 0
+
+tmp="$(mktemp)"
+# Drop trailer lines that attribute the commit to Claude/Anthropic (case-insensitive).
+grep -viE '^(Co-Authored-By|Reviewed-by):.*(claude|anthropic)' "$msg" > "$tmp" || true
+
+# Defensive: only write back if stripping left a non-empty message.
+if [ -s "$tmp" ]; then
+  mv "$tmp" "$msg"
+else
+  rm -f "$tmp"
+fi
+
+exit 0
