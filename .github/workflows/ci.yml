@@ -1,0 +1,29 @@
+name: CI
+
+# Every PR to main, and every push to main. Feature work integrates via PR; main also receives
+# direct pushes (e.g. the harness bootstrap), so both paths are gated by the same build.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: gradle
+
+      # `./gradlew build` compiles, runs tests, and assembles the jar. Tests boot a real MySQL via
+      # Testcontainers (@ServiceConnection) — the ubuntu runner provides the Docker daemon they need.
+      - run: ./gradlew build --no-daemon

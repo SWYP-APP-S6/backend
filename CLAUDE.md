@@ -80,6 +80,17 @@ Spring Security 의존성만 있고 설정은 아직 없다(TBD). 인증/인가 
   순수 추가 nullable 컬럼은 1단계로 안전.
 - 영속성 관심사는 `repository`와 service의 `@Transactional` 경계 안에 가둔다.
 
+## Tests
+
+- JUnit 5. 테스트는 **Testcontainers로 실제 MySQL**에 대해 실행한다 —
+  `TestcontainersConfiguration`의 `@ServiceConnection` MySQL 컨테이너를 `@SpringBootTest`가 부팅 시
+  띄운다(H2 방언 불일치 회피). **테스트 실행에 Docker가 필요**하다.
+- `./gradlew build` — 컴파일 + 테스트 + 패키징 (로컬 게이트, 규칙 6).
+- `./gradlew bootTestRun` — 앱을 임시 MySQL 컨테이너로 로컬 실행(`TestBackendApplication`). 실제
+  MySQL 미설치 상태로 굴려볼 때.
+- **CI** (`.github/workflows/ci.yml`): PR·main push마다 `./gradlew build`. Docker가 있는 ubuntu
+  러너에서 Testcontainers가 동작한다.
+
 ## Issue management
 
 - GitHub Issues (`SWYP-APP-S6/backend`).
