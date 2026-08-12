@@ -34,6 +34,9 @@ SWYP 앱의 백엔드 REST API 서버. (프로덕트 한 줄 설명은 확정되
   - feature 간 접근은 상대 feature의 **`service`를 통해서만** — 남의 `repository`를 직접 호출하지 않는다.
   - **`@Entity`는 controller 경계를 넘지 않는다** — 요청/응답은 DTO. 엔티티↔DTO 매핑은 service.
   - `@Transactional`은 **service 계층**에 둔다.
+- **DTO는 `record`가 기본** — 요청/응답 및 대부분의 계층 간 전달 객체는 불변 값이라 `record`로 둔다
+  (Jackson이 record 직렬화/역직렬화를 네이티브 지원). `class`는 **가변 누적·상속·프레임워크가
+  클래스를 요구할 때**만 예외로 쓴다. 레퍼런스: `PingResponse`.
 - **레퍼런스 구현**: `com.swyp.backend.ping` (controller→service→dto + `@WebMvcTest` 슬라이스
   테스트)이 이 컨벤션의 walking skeleton이다. 새 feature는 이 형태를 복사해 시작한다.
 
