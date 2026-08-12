@@ -16,13 +16,13 @@ SWYP 앱의 백엔드 REST API 서버. (프로덕트 한 줄 설명은 확정되
   불변 DTO는 Lombok이 아니라 `record`(아래 Architecture). 규칙 12의 명시적 예외(규칙 12 참조).
 - 스키마 마이그레이션: **Flyway** (`spring-boot-starter-flyway` + `org.flywaydb:flyway-database-postgresql`).
   자세한 규약은 아래 Database 섹션.
-- **도입 예정 (Phase 2, 코드가 생기면)**: ArchUnit(레이어 경계) · Spotless(포맷) ·
-  Checkstyle(스타일). 미리 다 깔지 않는다 — 마찰이 생기면 그때 추가.
+- **ArchUnit**: 레이어 경계를 테스트로 강제(`ArchitectureTest`). Java 25 바이트코드 파싱 위해 **1.5.0+** 필요.
+- **도입 예정 (Phase 2)**: Spotless(포맷) · Checkstyle(스타일). 미리 안 깔고 마찰 생기면 추가.
 
 ## Architecture
 
 팀 합의된 현행 컨벤션. 팀 논의로 바뀌면 규칙 17에 따라 이 파일을 같은 세션에 갱신하고,
-(Phase 2 도입 후) ArchUnit 규칙도 함께 맞춘다.
+`ArchitectureTest`(ArchUnit) 규칙도 함께 맞춘다.
 
 - **Package-by-feature + 레이어 서브패키지**: `com.swyp.backend.<feature>` (예: `.admin`, `.ping`) 아래
   존재하는 레이어를 각각 서브패키지로 둔다 — `controller` / `service` / `repository` / `entity` / `dto`.
@@ -31,7 +31,7 @@ SWYP 앱의 백엔드 REST API 서버. (프로덕트 한 줄 설명은 확정되
 - **감사 타임스탬프**: 엔티티는 `BaseTimeEntity`(`@MappedSuperclass`)를 상속해 `createdAt`/`updatedAt`을
   얻는다. 값은 **Spring Data JPA Auditing**이 채운다(`JpaAuditingConfig`의 `@EnableJpaAuditing`).
   DB default/trigger가 아니므로 **쓰기는 JPA를 통해야** 채워진다(현재 앱이 유일 writer).
-- **레이어 경계** (Phase 2에서 ArchUnit이 강제; 지금은 규약):
+- **레이어 경계** (`ArchitectureTest`(ArchUnit)가 빌드에서 강제):
   - `controller → service → repository` 단방향. controller가 repository를 직접 호출하지 않는다.
   - **`repository`만 JPA 영속성 API**(`JpaRepository`/`EntityManager`)에 접근한다. service·controller는
     엔티티 영속성 API를 직접 쓰지 않는다.
@@ -48,7 +48,7 @@ SWYP 앱의 백엔드 REST API 서버. (프로덕트 한 줄 설명은 확정되
   (`implements ApiCode`)에 소유**한다(제네릭만 `common.response.ErrorCode` — global→feature 역결합 회피).
   `GlobalExceptionHandler`는 `ResponseEntityExceptionHandler`를 상속해 **프레임워크 클라이언트 에러**
   (잘못된 메서드 405·깨진 JSON 400·미디어타입 415 등)도 올바른 status로 envelope화한다(그 경우 `code`는
-  HTTP status명). `@Valid` 검증 실패 핸들러는 준비돼 있고 `spring-boot-starter-validation` 추가 시 활성화.
+  HTTP status명). `@Valid`/Bean Validation 실패는 `VALIDATION_FAILED`(fieldErrors)로 매핑된다(활성화됨).
   (`com.swyp.backend.common.response`/`.common.exception`, 레퍼런스: `PingController`.)
 - **레퍼런스 구현**: `com.swyp.backend.ping` (controller→service→dto + `@WebMvcTest` 슬라이스
   테스트)이 이 컨벤션의 walking skeleton이다. 새 feature는 이 형태를 복사해 시작한다.
@@ -58,7 +58,9 @@ SWYP 앱의 백엔드 REST API 서버. (프로덕트 한 줄 설명은 확정되
 
 ## Auth
 
-Spring Security 의존성만 있고 설정은 아직 없다(TBD). 인증/인가 모델이 정해지면 여기에 기록한다.
+인증/인가 모델은 아직 **TBD**. 임시로 `common.SecurityConfig`가 **모든 요청 permitAll**(stateless,
+CSRF/basic/form off)로 두어 pre-auth 단계에서 앱이 열려 있다(기본 Security 잠금으로 `/ping`이 401 나던 것
+방지). 모델이 정해지면 이 config를 실제 authn/authz로 교체하고 여기에 기록한다.
 
 ## Workflow (rules)
 

@@ -11,8 +11,8 @@ paths:
   상태코드가 필요하면 `ResponseEntity.status(...).body(ApiResponse.of(...))`.
 - 에러는 **던지기만** 한다: `throw new BusinessException(ApiCode)`. 응답 포맷/상태 매핑은
   `GlobalExceptionHandler`가 담당(직접 에러 응답 조립 금지).
-- 요청 검증: Request DTO에 Bean Validation + 파라미터에 `@Valid`
-  (`spring-boot-starter-validation` 도입 시 활성).
+- 요청 검증: Request DTO에 Bean Validation(`@NotBlank` 등) + 파라미터/바디에 `@Valid`.
+  실패는 자동으로 `VALIDATION_FAILED`(fieldErrors) envelope로 매핑된다.
 - REST 경로: `POST /xxx` · `GET /xxx` · `GET /xxx/{id}` · `PUT|PATCH /xxx/{id}` · `DELETE /xxx/{id}`.
 - 요청/응답 타입은 **DTO만** — `@Entity`를 노출하지 않는다.
 - 인증 주체 접근(현재 사용자 등)은 auth 도입 후(지금 TBD). 레퍼런스: `com.swyp.backend.ping.PingController`.
