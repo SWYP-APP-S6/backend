@@ -1,17 +1,16 @@
 services:
-  mysql:
-    image: mysql:8.4
+  postgres:
+    image: postgres:17
     environment:
-      MYSQL_DATABASE: swyp
-      MYSQL_USER: swyp
-      MYSQL_PASSWORD: swyp
-      MYSQL_ROOT_PASSWORD: root
+      POSTGRES_DB: swyp
+      POSTGRES_USER: swyp
+      POSTGRES_PASSWORD: swyp
     ports:
-      - "3306:3306"
+      - "5432:5432"
     volumes:
-      - mysql-data:/var/lib/mysql
+      - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
+      test: ["CMD-SHELL", "pg_isready -U swyp -d swyp"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -31,24 +30,24 @@ services:
   # 전체 스택을 도커로 띄울 때만 사용: `docker compose --profile app up`.
   # profile을 걸어 두어 기본 `docker compose up` 및 bootRun의 docker-compose 자동관리에서는
   # 제외된다(앱이 자기 자신을 기동하는 순환 방지). 앱 컨테이너는 developmentOnly 모듈이 jar에
-  # 없으므로 아래 env로 서비스명(mysql/redis)에 직접 연결한다.
+  # 없으므로 아래 env로 서비스명(postgres/redis)에 직접 연결한다.
   app:
     profiles: ["app"]
     build: .
     ports:
       - "8080:8080"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/swyp
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/swyp
       SPRING_DATASOURCE_USERNAME: swyp
       SPRING_DATASOURCE_PASSWORD: swyp
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: "6379"
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
 
 volumes:
-  mysql-data:
+  postgres-data:
   redis-data:

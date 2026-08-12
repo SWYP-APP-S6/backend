@@ -7,7 +7,7 @@ SWYP 앱의 백엔드 REST API 서버. (프로덕트 한 줄 설명은 확정되
 ## Stack
 
 - Java 25 (LTS) · Spring Boot 4.1 · Gradle (Kotlin DSL, `build.gradle.kts`)
-- Spring Web MVC · Spring Data JPA · Spring Security · MySQL (`mysql-connector-j`)
+- Spring Web MVC · Spring Data JPA · Spring Security · PostgreSQL (`org.postgresql:postgresql`)
 - JUnit 5 (`./gradlew test`)
 - Base package `com.swyp.backend`
 - **도입 예정 (Phase 2, 코드가 생기면)**: Flyway(마이그레이션) · ArchUnit(레이어 경계) ·
@@ -84,22 +84,22 @@ Spring Security 의존성만 있고 설정은 아직 없다(TBD). 인증/인가 
 
 ## Local development
 
-- **인프라는 Docker Compose로**: `compose.yaml`의 `mysql`(8.4) + `redis`(7). **Docker 실행 필요.**
-- `./gradlew bootRun` — `spring-boot-docker-compose`(developmentOnly)가 compose의 mysql+redis를
+- **인프라는 Docker Compose로**: `compose.yaml`의 `postgres`(17) + `redis`(7). **Docker 실행 필요.**
+- `./gradlew bootRun` — `spring-boot-docker-compose`(developmentOnly)가 compose의 postgres+redis를
   **자동 기동·연결**(ServiceConnection). 수동 DB 설치 불필요. 연결 설정을 손으로 적지 않는다.
-- **전체 스택을 도커로**: `docker compose --profile app up` — mysql+redis+앱(멀티스테이지
+- **전체 스택을 도커로**: `docker compose --profile app up` — postgres+redis+앱(멀티스테이지
   `Dockerfile`, temurin 25). `app`은 profile이 걸려 기본 기동/자동관리에서 제외된다(순환 방지);
-  앱 컨테이너는 서비스명(`mysql`/`redis`)으로 env 연결한다.
+  앱 컨테이너는 서비스명(`postgres`/`redis`)으로 env 연결한다.
 - Redis 클라이언트는 `spring-boot-starter-data-redis`, 속성 접두는 `spring.data.redis.*`.
 
 ## Tests
 
-- JUnit 5. 테스트는 **Testcontainers로 실제 MySQL**에 대해 실행한다 —
-  `TestcontainersConfiguration`의 `@ServiceConnection` MySQL 컨테이너를 `@SpringBootTest`가 부팅 시
+- JUnit 5. 테스트는 **Testcontainers로 실제 PostgreSQL**에 대해 실행한다 —
+  `TestcontainersConfiguration`의 `@ServiceConnection` PostgreSQL 컨테이너를 `@SpringBootTest`가 부팅 시
   띄운다(H2 방언 불일치 회피). **테스트 실행에 Docker가 필요**하다.
 - `./gradlew build` — 컴파일 + 테스트 + 패키징 (로컬 게이트, 규칙 6).
-- `./gradlew bootTestRun` — 앱을 임시 MySQL 컨테이너로 로컬 실행(`TestBackendApplication`). 실제
-  MySQL 미설치 상태로 굴려볼 때.
+- `./gradlew bootTestRun` — 앱을 임시 PostgreSQL 컨테이너로 로컬 실행(`TestBackendApplication`). 실제
+  PostgreSQL 미설치 상태로 굴려볼 때.
 - **CI** (`.github/workflows/ci.yml`): PR·main push마다 `./gradlew build`. Docker가 있는 ubuntu
   러너에서 Testcontainers가 동작한다.
 
