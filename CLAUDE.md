@@ -10,6 +10,10 @@ SWYP 앱의 백엔드 REST API 서버. (프로덕트 한 줄 설명은 확정되
 - Spring Web MVC · Spring Data JPA · Spring Security · PostgreSQL (`org.postgresql:postgresql`)
 - JUnit 5 (`./gradlew test`)
 - Base package `com.swyp.backend`
+- **Lombok** — 엔티티 보일러플레이트용. 엔티티엔 **`@Getter` + `@NoArgsConstructor(access = PROTECTED)`만**
+  쓴다. **금지**: `@Data`·전면 `@Setter`·기본 `@EqualsAndHashCode`(JPA에서 양방향 무한재귀·lazy 트리거·
+  가변 hashCode 버그원). `@Builder`를 쓰면 초기화 컬렉션 필드에 `@Builder.Default` 필수(없으면 null).
+  불변 DTO는 Lombok이 아니라 `record`(아래 Architecture). 규칙 12의 명시적 예외(규칙 12 참조).
 - 스키마 마이그레이션: **Flyway** (`spring-boot-starter-flyway` + `org.flywaydb:flyway-database-postgresql`).
   자세한 규약은 아래 Database 섹션.
 - **도입 예정 (Phase 2, 코드가 생기면)**: ArchUnit(레이어 경계) · Spotless(포맷) ·
@@ -68,7 +72,9 @@ Spring Security 의존성만 있고 설정은 아직 없다(TBD). 인증/인가 
 11. **외부 API/프레임워크 기능을 건드리기 전 공식 문서를 확인한다**(Spring, Spring Data JPA,
     Spring Security 등). 기억/추측에 의존하지 않는다.
 12. **라이브러리 채택은 런타임 동작 근거로만 정당화한다** — "코드가 줄어듦/DX 좋음"은 근거가
-    아니다. 손으로 짠 것과 런타임 동작이 같으면 도입하지 않는다.
+    아니다. 손으로 짠 것과 런타임 동작이 같으면 도입하지 않는다. **(예외: Lombok — 런타임
+    의존성이 아니라 컴파일타임 코드생성기라 이 규칙의 대상이 아니며, 팀이 보일러플레이트 감소
+    편익을 받아들여 도입 결정(2026-08-12). 사용 범위는 Stack의 Lombok 규약을 따른다.)**
 13. **버그 픽스는 버그 클래스 제거까지 제안한다** — 회귀 테스트, ArchUnit 규칙, 타입/제약으로
     같은 부류를 원천 차단할 수 있는지. 픽스가 먼저, 예방은 후속(사소하면 같은 세션에).
 14. **추상화 정직성**: 패턴/알고리즘 이름을 빌렸으면 런타임 의미가 그 계약과 실제로 일치해야

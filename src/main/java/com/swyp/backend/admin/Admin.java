@@ -10,6 +10,9 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
 
@@ -20,8 +23,10 @@ import org.hibernate.annotations.SQLRestriction;
  * <p>Soft delete: {@code delete(..)} sets {@code deleted_at} instead of removing the row
  * ({@code @SQLDelete}), and {@code @SQLRestriction} hides deleted rows from all queries.
  */
+@Getter
 @Entity
 @Table(name = "admins")
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @SQLDelete(sql = "update admins set deleted_at = now() where id = ?")
 @SQLRestriction("deleted_at is null")
 public class Admin extends BaseTimeEntity {
@@ -42,32 +47,9 @@ public class Admin extends BaseTimeEntity {
 
 	private Instant deletedAt;
 
-	protected Admin() {
-	}
-
 	public Admin(String email, String name, AdminType type) {
 		this.email = email;
 		this.name = name;
 		this.type = type;
-	}
-
-	public Long getId() {
-		return id;
-	}
-
-	public String getEmail() {
-		return email;
-	}
-
-	public String getName() {
-		return name;
-	}
-
-	public AdminType getType() {
-		return type;
-	}
-
-	public Instant getDeletedAt() {
-		return deletedAt;
 	}
 }
