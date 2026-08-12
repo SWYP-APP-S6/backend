@@ -1,3 +1,8 @@
 /gradlew text eol=lf
 *.bat text eol=crlf
 *.jar binary
+
+# Exclude tooling/harness from GitHub language stats (Linguist) — this is a Java/Spring
+# project, but the Claude Code harness (a Python hook) and git hooks would otherwise skew it.
+.claude/** linguist-vendored
+.githooks/** linguist-vendored
