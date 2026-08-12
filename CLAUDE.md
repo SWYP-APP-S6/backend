@@ -52,6 +52,9 @@ SWYP 앱의 백엔드 REST API 서버. (프로덕트 한 줄 설명은 확정되
   (`com.swyp.backend.common.response`/`.common.exception`, 레퍼런스: `PingController`.)
 - **레퍼런스 구현**: `com.swyp.backend.ping` (controller→service→dto + `@WebMvcTest` 슬라이스
   테스트)이 이 컨벤션의 walking skeleton이다. 새 feature는 이 형태를 복사해 시작한다.
+- **레이어별 상세 작성 규칙**은 `.claude/rules/{entity,repository,service,controller,dto}.md`에
+  path-scoped로 있다 — 해당 레이어 파일을 작성/수정할 때만 자동 로드된다(파일명 접미사·`dto/`·`domain/`
+  글로브 기준). 이 CLAUDE.md는 **전역 규약**, `rules/`는 **레이어별 체크리스트**. 둘이 모순되면 이 파일 갱신.
 
 ## Auth
 
