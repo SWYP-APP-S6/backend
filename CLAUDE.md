@@ -101,54 +101,23 @@ Spring Security 의존성만 있고 설정은 아직 없다(TBD). 인증/인가 
 
 ## Database
 
-- 스키마 마이그레이션은 **Flyway**로 한다: `src/main/resources/db/migration/`에 순차 SQL 파일.
-  - **파일명 = `V0000__<desc>.sql`** — `V` 접두사(versioned 표시; `R__` repeatable·콜백과 구분,
-    비우면 Flyway 파싱 버그) + **4자리 zero-pad 정수**(`V0000`, `V0001`, … → `ls` 사전식 정렬이
-    실행 순서와 일치) + `__`(더블 언더스코어 구분자; 설명의 snake_case `_`와 충돌 방지).
-  - 버전은 **평탄한 정수만** 쓴다(소수점 서브버전 금지). `<desc>`는 영어 snake_case.
-- **`ddl-auto=validate`**: Flyway가 스키마 단일 소유자. Hibernate는 엔티티↔스키마 검증만 하고
-  절대 스키마를 만들거나 바꾸지 않는다. 엔티티와 마이그레이션이 어긋나면 부팅 실패(테스트가 CI에서 잡음).
-- **이미 적용된 마이그레이션 파일은 절대 수정하지 않는다.** 스키마 변경은 항상 새 `V` 파일.
-  (Flyway 체크섬이 이를 강제한다.)
-- **파괴적 변경(컬럼/테이블 삭제, 타입 축소, NOT NULL 강화)은 expand→contract 2단계로 나눈다.**
-  먼저 추가(expand)하고 배포해 구/신 코드가 공존 가능하게 한 뒤, 아무도 안 읽을 때 제거(contract).
-  순수 추가 nullable 컬럼은 1단계로 안전.
-- **시간 타입은 의미로 고른다** (컬럼 타입이 의도를 인코딩 — 이 규칙을 지키면 DDL만 봐도 성질이 읽힌다):
-  - **절대·기록·계산된 순간** → `java.time.Instant` + `timestamptz`. 예: `created_at`/`updated_at`,
-    `deleted_at`, 로그·발송 시각, `now()+7d`로 계산한 만료.
-  - **사람이 벽시계로 정한 시각** → `java.time.LocalDateTime` + `timestamp`(without tz). 예: 예약
-    시간, 영업시간, 이벤트 시작시각. 미래 벽시계를 UTC instant로 굳히면 TZ 규칙 변경 시 벽시계가
-    밀려 사용자 의도("7시")가 깨진다 → 벽시계는 벽시계로 저장한다.
-  - 기준은 "audit vs business"가 **아니라** "절대 순간 vs 벽시계 의도"다 — 쿠폰 만료처럼 *계산된*
-    순간은 비즈니스 필드여도 `Instant`.
-  - **가정**: 모든 `LocalDateTime`은 KST(단일 리전; 한국은 DST 없어 안전). 멀티리전 도입 시
-    zone id를 함께 저장하거나 `ZonedDateTime`으로 승격한다.
-- **소프트 삭제**(쓰는 테이블에 한해): `deleted_at timestamptz` nullable 컬럼 + Hibernate
-  `@SQLDelete`(delete→`update ... set deleted_at = now()`) + `@SQLRestriction("deleted_at is null")`.
-  유니크 컬럼은 **부분 유니크 인덱스**(`unique (...) where deleted_at is null`)로 재등록을 허용한다.
-  (레퍼런스: `com.swyp.backend.admin.Admin`.) 소프트삭제는 전 테이블 강제가 아니라 필요한 테이블만.
+- 스키마는 **Flyway** 순차 마이그레이션(`src/main/resources/db/migration/`, 파일명 `V0000__<desc>.sql`)
+  으로만 바꾼다. **`ddl-auto=validate`** — Flyway가 스키마 단일 소유자, Hibernate는 검증만.
+- 마이그레이션 작성 상세(네이밍·불변성·expand→contract)는 `.claude/rules/database.md`(마이그레이션 파일
+  작성 시 자동 로드). **시간 타입·소프트 삭제** 규약은 `.claude/rules/entity.md`.
 - 영속성 관심사는 `repository`와 service의 `@Transactional` 경계 안에 가둔다.
 
 ## Local development
 
-- **인프라는 Docker Compose로**: `compose.yaml`의 `postgres`(17) + `redis`(7). **Docker 실행 필요.**
-- `./gradlew bootRun` — `spring-boot-docker-compose`(developmentOnly)가 compose의 postgres+redis를
-  **자동 기동·연결**(ServiceConnection). 수동 DB 설치 불필요. 연결 설정을 손으로 적지 않는다.
-- **전체 스택을 도커로**: `docker compose --profile app up` — postgres+redis+앱(멀티스테이지
-  `Dockerfile`, temurin 25). `app`은 profile이 걸려 기본 기동/자동관리에서 제외된다(순환 방지);
-  앱 컨테이너는 서비스명(`postgres`/`redis`)으로 env 연결한다.
-- Redis 클라이언트는 `spring-boot-starter-data-redis`, 속성 접두는 `spring.data.redis.*`.
+- 로컬 실행·인프라(Docker Compose, `./gradlew bootRun`, 전체 스택 도커, `bootTestRun`, Redis 접두)는
+  `.claude/docs/local-development.md` 참고. (**로컬 실행엔 Docker 필요.**)
 
 ## Tests
 
-- JUnit 5. 테스트는 **Testcontainers로 실제 PostgreSQL**에 대해 실행한다 —
-  `TestcontainersConfiguration`의 `@ServiceConnection` PostgreSQL 컨테이너를 `@SpringBootTest`가 부팅 시
-  띄운다(H2 방언 불일치 회피). **테스트 실행에 Docker가 필요**하다.
-- `./gradlew build` — 컴파일 + 테스트 + 패키징 (로컬 게이트, 규칙 6).
-- `./gradlew bootTestRun` — 앱을 임시 PostgreSQL 컨테이너로 로컬 실행(`TestBackendApplication`). 실제
-  PostgreSQL 미설치 상태로 굴려볼 때.
-- **CI** (`.github/workflows/ci.yml`): PR·main push마다 `./gradlew build`. Docker가 있는 ubuntu
-  러너에서 Testcontainers가 동작한다.
+- JUnit 5 + **Testcontainers 실제 PostgreSQL**(Docker 필요). `./gradlew build` = 컴파일+테스트 로컬 게이트(규칙 6).
+- **CI** (`.github/workflows/ci.yml`): PR·main push마다 `./gradlew build`(Docker ubuntu 러너에서 Testcontainers 동작).
+- 테스트 작성 상세(슬라이스 선택·standaloneSetup·Boot 4.1 애노테이션 패키지)는 `.claude/rules/testing.md`
+  (`src/test/**` 작성 시 자동 로드).
 
 ## Issue management
 
