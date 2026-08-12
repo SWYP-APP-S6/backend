@@ -92,6 +92,16 @@ Spring Security 의존성만 있고 설정은 아직 없다(TBD). 인증/인가 
 - **파괴적 변경(컬럼/테이블 삭제, 타입 축소, NOT NULL 강화)은 expand→contract 2단계로 나눈다.**
   먼저 추가(expand)하고 배포해 구/신 코드가 공존 가능하게 한 뒤, 아무도 안 읽을 때 제거(contract).
   순수 추가 nullable 컬럼은 1단계로 안전.
+- **시간 타입은 의미로 고른다** (컬럼 타입이 의도를 인코딩 — 이 규칙을 지키면 DDL만 봐도 성질이 읽힌다):
+  - **절대·기록·계산된 순간** → `java.time.Instant` + `timestamptz`. 예: `created_at`/`updated_at`,
+    `deleted_at`, 로그·발송 시각, `now()+7d`로 계산한 만료.
+  - **사람이 벽시계로 정한 시각** → `java.time.LocalDateTime` + `timestamp`(without tz). 예: 예약
+    시간, 영업시간, 이벤트 시작시각. 미래 벽시계를 UTC instant로 굳히면 TZ 규칙 변경 시 벽시계가
+    밀려 사용자 의도("7시")가 깨진다 → 벽시계는 벽시계로 저장한다.
+  - 기준은 "audit vs business"가 **아니라** "절대 순간 vs 벽시계 의도"다 — 쿠폰 만료처럼 *계산된*
+    순간은 비즈니스 필드여도 `Instant`.
+  - **가정**: 모든 `LocalDateTime`은 KST(단일 리전; 한국은 DST 없어 안전). 멀티리전 도입 시
+    zone id를 함께 저장하거나 `ZonedDateTime`으로 승격한다.
 - **소프트 삭제**(쓰는 테이블에 한해): `deleted_at timestamptz` nullable 컬럼 + Hibernate
   `@SQLDelete`(delete→`update ... set deleted_at = now()`) + `@SQLRestriction("deleted_at is null")`.
   유니크 컬럼은 **부분 유니크 인덱스**(`unique (...) where deleted_at is null`)로 재등록을 허용한다.
