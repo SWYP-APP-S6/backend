@@ -29,6 +29,7 @@ class PingControllerTest {
 	void ping_returnsPong() throws Exception {
 		mockMvc.perform(get("/ping"))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.message").value("pong"));
+			.andExpect(jsonPath("$.code").value("OK"))
+			.andExpect(jsonPath("$.data.message").value("pong"));
 	}
 }

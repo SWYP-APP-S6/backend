@@ -41,6 +41,15 @@ SWYP 앱의 백엔드 REST API 서버. (프로덕트 한 줄 설명은 확정되
 - **DTO는 `record`가 기본** — 요청/응답 및 대부분의 계층 간 전달 객체는 불변 값이라 `record`로 둔다
   (Jackson이 record 직렬화/역직렬화를 네이티브 지원). `class`는 **가변 누적·상속·프레임워크가
   클래스를 요구할 때**만 예외로 쓴다. 레퍼런스: `PingResponse`.
+- **API 응답은 표준 envelope로 통일**: 성공 = `ApiResponse<T>{status,code,message,data}`(`SuccessCode`),
+  실패 = `ErrorResponse{status,code,message,fieldErrors}`를 `@RestControllerAdvice`
+  (`GlobalExceptionHandler`)가 생성. 컨트롤러가 성공을 envelope로 감싼다. 비즈니스 예외는
+  **`BusinessException(ApiCode)` 하나**로 던지고, **에러 코드는 각 feature가 자기 enum
+  (`implements ApiCode`)에 소유**한다(제네릭만 `common.response.ErrorCode` — global→feature 역결합 회피).
+  `GlobalExceptionHandler`는 `ResponseEntityExceptionHandler`를 상속해 **프레임워크 클라이언트 에러**
+  (잘못된 메서드 405·깨진 JSON 400·미디어타입 415 등)도 올바른 status로 envelope화한다(그 경우 `code`는
+  HTTP status명). `@Valid` 검증 실패 핸들러는 준비돼 있고 `spring-boot-starter-validation` 추가 시 활성화.
+  (`com.swyp.backend.common.response`/`.common.exception`, 레퍼런스: `PingController`.)
 - **레퍼런스 구현**: `com.swyp.backend.ping` (controller→service→dto + `@WebMvcTest` 슬라이스
   테스트)이 이 컨벤션의 walking skeleton이다. 새 feature는 이 형태를 복사해 시작한다.
 
