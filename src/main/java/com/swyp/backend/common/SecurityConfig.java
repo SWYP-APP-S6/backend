@@ -1,5 +1,7 @@
 package com.swyp.backend.common;
 
+import com.swyp.backend.common.security.JwtProperties;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -17,6 +19,7 @@ import org.springframework.security.web.SecurityFilterChain;
  * flip to {@code anyRequest().authenticated()} and permit only genuinely public paths.
  */
 @Configuration
+@EnableConfigurationProperties(JwtProperties.class)
 @EnableWebSecurity
 public class SecurityConfig {
 
