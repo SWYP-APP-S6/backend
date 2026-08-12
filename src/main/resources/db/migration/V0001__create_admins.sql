@@ -3,6 +3,7 @@ create table admins (
     email      varchar(255) not null,
     name       varchar(255) not null,
     type       varchar(20)  not null check (type in ('SUPER', 'MANAGER', 'DEVELOPER')),
+    password   varchar(255) not null,
     created_at timestamptz  not null,
     updated_at timestamptz  not null,
     deleted_at timestamptz

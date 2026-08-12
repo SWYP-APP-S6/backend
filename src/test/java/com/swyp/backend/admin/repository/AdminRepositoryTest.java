@@ -28,7 +28,7 @@ class AdminRepositoryTest {
 
 	@Test
 	void save_populatesAuditTimestamps() {
-		Admin saved = adminRepository.save(new Admin("alice@swyp.com", "Alice", AdminType.SUPER));
+		Admin saved = adminRepository.save(new Admin("alice@swyp.com", "Alice", AdminType.SUPER, "hash"));
 
 		assertThat(saved.getCreatedAt()).isNotNull();
 		assertThat(saved.getUpdatedAt()).isNotNull();
@@ -36,7 +36,7 @@ class AdminRepositoryTest {
 
 	@Test
 	void softDelete_hidesRowFromQueries() {
-		Admin admin = adminRepository.save(new Admin("sam@swyp.com", "Sam", AdminType.MANAGER));
+		Admin admin = adminRepository.save(new Admin("sam@swyp.com", "Sam", AdminType.MANAGER, "hash"));
 
 		adminRepository.delete(admin);
 		adminRepository.flush();
@@ -46,11 +46,11 @@ class AdminRepositoryTest {
 
 	@Test
 	void email_isReusableAfterSoftDelete() {
-		Admin first = adminRepository.save(new Admin("dup@swyp.com", "First", AdminType.DEVELOPER));
+		Admin first = adminRepository.save(new Admin("dup@swyp.com", "First", AdminType.DEVELOPER, "hash"));
 		adminRepository.delete(first);
 		adminRepository.flush();
 
-		Admin second = adminRepository.save(new Admin("dup@swyp.com", "Second", AdminType.DEVELOPER));
+		Admin second = adminRepository.save(new Admin("dup@swyp.com", "Second", AdminType.DEVELOPER, "hash"));
 		adminRepository.flush();
 
 		assertThat(second.getId()).isNotNull();

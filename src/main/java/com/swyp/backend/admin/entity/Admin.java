@@ -17,8 +17,8 @@ import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
 
 /**
- * Admin identity and role record. Authentication (how an admin proves who they are) is out of scope
- * for now — this holds identity + role only.
+ * Admin identity, role, and login credential. {@code password} stores a BCrypt hash (encoding is done
+ * in the auth service, never here); admins authenticate with email + password (no social login).
  *
  * <p>Soft delete: {@code delete(..)} sets {@code deleted_at} instead of removing the row
  * ({@code @SQLDelete}), and {@code @SQLRestriction} hides deleted rows from all queries.
@@ -45,11 +45,16 @@ public class Admin extends BaseTimeEntity {
 	@Column(nullable = false, length = 20)
 	private AdminType type;
 
+	/** BCrypt hash — never a plaintext password. */
+	@Column(nullable = false, length = 255)
+	private String password;
+
 	private Instant deletedAt;
 
-	public Admin(String email, String name, AdminType type) {
+	public Admin(String email, String name, AdminType type, String password) {
 		this.email = email;
 		this.name = name;
 		this.type = type;
+		this.password = password;
 	}
 }
