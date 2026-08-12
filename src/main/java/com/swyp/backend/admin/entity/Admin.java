@@ -1,4 +1,4 @@
-package com.swyp.backend.admin;
+package com.swyp.backend.admin.entity;
 
 import com.swyp.backend.common.BaseTimeEntity;
 import jakarta.persistence.Column;

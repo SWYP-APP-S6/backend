@@ -1,5 +1,6 @@
-package com.swyp.backend.admin;
+package com.swyp.backend.admin.repository;
 
+import com.swyp.backend.admin.entity.Admin;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 

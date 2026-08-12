@@ -24,8 +24,8 @@ SWYP 앱의 백엔드 REST API 서버. (프로덕트 한 줄 설명은 확정되
 팀 합의된 현행 컨벤션. 팀 논의로 바뀌면 규칙 17에 따라 이 파일을 같은 세션에 갱신하고,
 (Phase 2 도입 후) ArchUnit 규칙도 함께 맞춘다.
 
-- **Package-by-feature**: `com.swyp.backend.<feature>` (예: `.user`, `.auth`) — 각 feature 안에
-  필요에 따라 `controller` / `service` / `repository` / `domain` / `dto`.
+- **Package-by-feature + 레이어 서브패키지**: `com.swyp.backend.<feature>` (예: `.admin`, `.ping`) 아래
+  존재하는 레이어를 각각 서브패키지로 둔다 — `controller` / `service` / `repository` / `entity` / `dto`.
 - **`com.swyp.backend.common`**: feature가 아닌 **여러 feature가 공유하는 타입**만 둔다
   (예: `BaseTimeEntity`, `JpaAuditingConfig`). 특정 feature 것은 여기 넣지 않는다.
 - **감사 타임스탬프**: 엔티티는 `BaseTimeEntity`(`@MappedSuperclass`)를 상속해 `createdAt`/`updatedAt`을

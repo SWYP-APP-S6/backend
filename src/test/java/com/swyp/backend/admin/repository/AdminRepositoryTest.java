@@ -1,8 +1,10 @@
-package com.swyp.backend.admin;
+package com.swyp.backend.admin.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.swyp.backend.TestcontainersConfiguration;
+import com.swyp.backend.admin.entity.Admin;
+import com.swyp.backend.admin.entity.AdminType;
 import com.swyp.backend.common.JpaAuditingConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

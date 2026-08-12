@@ -1,4 +1,4 @@
-package com.swyp.backend.admin;
+package com.swyp.backend.admin.entity;
 
 /**
  * Admin role. Persisted as the enum name via {@code @Enumerated(STRING)}; the {@code admins.type}
