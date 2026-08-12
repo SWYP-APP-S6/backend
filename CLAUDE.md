@@ -58,9 +58,14 @@ SWYP 앱의 백엔드 REST API 서버. (프로덕트 한 줄 설명은 확정되
 
 ## Auth
 
-인증/인가 모델은 아직 **TBD**. 임시로 `common.SecurityConfig`가 **모든 요청 permitAll**(stateless,
-CSRF/basic/form off)로 두어 pre-auth 단계에서 앱이 열려 있다(기본 Security 잠금으로 `/ping`이 401 나던 것
-방지). 모델이 정해지면 이 config를 실제 authn/authz로 교체하고 여기에 기록한다.
+- **admin(백오피스)**: email+password(BCrypt) → **JWT access(무상태) + rotating refresh(Redis)**.
+  엔드포인트 `/admin/auth/{login,refresh,logout}`(public), 그 외는 bearer access 토큰 필요. 구성:
+  `common.SecurityConfig`(STATELESS·JWT 필터·`RestAuthenticationEntryPoint`가 401을 error envelope로),
+  `common.security.*`(`JwtTokenProvider`·`RefreshTokenService`·`JwtProperties`·`JwtAuthenticationFilter`).
+  역할 = `ROLE_<AdminType>`(SUPER/MANAGER/DEVELOPER). 시드 SUPER admin은 V0001(DEV ONLY, 프로덕션 전 교체).
+- **앱 유저(소비자·판매자)**: 아직 미구현 — 위 auth 인프라 재사용 예정. **소셜 로그인은 나중**(기능 개발 후).
+- 토큰 정책: access/refresh TTL은 `jwt.*`(application.properties), secret은 `JWT_SECRET` env(dev 기본값 커밋).
+  refresh는 Redis에 저장·회전(1회용)·로그아웃 시 폐기.
 
 ## Workflow (rules)
 
