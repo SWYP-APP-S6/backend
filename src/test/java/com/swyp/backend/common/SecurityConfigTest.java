@@ -32,4 +32,9 @@ class SecurityConfigTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.message").value("pong"));
 	}
+
+	@Test
+	void openApiDocs_isPublic() throws Exception {
+		mockMvc.perform(get("/v3/api-docs")).andExpect(status().isOk());
+	}
 }

@@ -31,6 +31,11 @@ public class SecurityConfig {
 		"/admin/auth/login",
 		"/admin/auth/refresh",
 		"/admin/auth/logout",
+		// API docs — consider restricting to non-prod before deploying.
+		"/v3/api-docs",
+		"/v3/api-docs/**",
+		"/swagger-ui/**",
+		"/swagger-ui.html",
 	};
 
 	@Bean

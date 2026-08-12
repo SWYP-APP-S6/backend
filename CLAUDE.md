@@ -17,6 +17,7 @@ SWYP 앱의 백엔드 REST API 서버. (프로덕트 한 줄 설명은 확정되
 - 스키마 마이그레이션: **Flyway** (`spring-boot-starter-flyway` + `org.flywaydb:flyway-database-postgresql`).
   자세한 규약은 아래 Database 섹션.
 - **ArchUnit**: 레이어 경계를 테스트로 강제(`ArchitectureTest`). Java 25 바이트코드 파싱 위해 **1.5.0+** 필요.
+- **API 문서**: springdoc-openapi (`/swagger-ui`, `/v3/api-docs`). **Boot 4 → springdoc 3.x**(2.x는 Boot 3용). 인증은 `bearerAuth` 스킴.
 - **도입 예정 (Phase 2)**: Spotless(포맷) · Checkstyle(스타일). 미리 안 깔고 마찰 생기면 추가.
 
 ## Architecture
