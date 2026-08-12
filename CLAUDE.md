@@ -82,6 +82,16 @@ Spring Security 의존성만 있고 설정은 아직 없다(TBD). 인증/인가 
   순수 추가 nullable 컬럼은 1단계로 안전.
 - 영속성 관심사는 `repository`와 service의 `@Transactional` 경계 안에 가둔다.
 
+## Local development
+
+- **인프라는 Docker Compose로**: `compose.yaml`의 `mysql`(8.4) + `redis`(7). **Docker 실행 필요.**
+- `./gradlew bootRun` — `spring-boot-docker-compose`(developmentOnly)가 compose의 mysql+redis를
+  **자동 기동·연결**(ServiceConnection). 수동 DB 설치 불필요. 연결 설정을 손으로 적지 않는다.
+- **전체 스택을 도커로**: `docker compose --profile app up` — mysql+redis+앱(멀티스테이지
+  `Dockerfile`, temurin 25). `app`은 profile이 걸려 기본 기동/자동관리에서 제외된다(순환 방지);
+  앱 컨테이너는 서비스명(`mysql`/`redis`)으로 env 연결한다.
+- Redis 클라이언트는 `spring-boot-starter-data-redis`, 속성 접두는 `spring.data.redis.*`.
+
 ## Tests
 
 - JUnit 5. 테스트는 **Testcontainers로 실제 MySQL**에 대해 실행한다 —

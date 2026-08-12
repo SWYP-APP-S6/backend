@@ -1,0 +1,9 @@
+# Keep the Docker build context small: only the wrapper, build files, and src are needed.
+.git
+.gradle
+build
+.idea
+.vscode
+.claude
+.githooks
+*.md
