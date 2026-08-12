@@ -10,8 +10,10 @@ SWYP 앱의 백엔드 REST API 서버. (프로덕트 한 줄 설명은 확정되
 - Spring Web MVC · Spring Data JPA · Spring Security · PostgreSQL (`org.postgresql:postgresql`)
 - JUnit 5 (`./gradlew test`)
 - Base package `com.swyp.backend`
-- **도입 예정 (Phase 2, 코드가 생기면)**: Flyway(마이그레이션) · ArchUnit(레이어 경계) ·
-  Spotless(포맷) · Checkstyle(스타일). 미리 다 깔지 않는다 — 마찰이 생기면 그때 추가.
+- 스키마 마이그레이션: **Flyway** (`spring-boot-starter-flyway` + `org.flywaydb:flyway-database-postgresql`).
+  자세한 규약은 아래 Database 섹션.
+- **도입 예정 (Phase 2, 코드가 생기면)**: ArchUnit(레이어 경계) · Spotless(포맷) ·
+  Checkstyle(스타일). 미리 다 깔지 않는다 — 마찰이 생기면 그때 추가.
 
 ## Architecture
 
@@ -73,8 +75,13 @@ Spring Security 의존성만 있고 설정은 아직 없다(TBD). 인증/인가 
 
 ## Database
 
-- 스키마 마이그레이션은 **Flyway**로 한다(Phase 2 도입 예정):
-  `src/main/resources/db/migration/V<n>__<desc>.sql`.
+- 스키마 마이그레이션은 **Flyway**로 한다: `src/main/resources/db/migration/`에 순차 SQL 파일.
+  - **파일명 = `V0000__<desc>.sql`** — `V` 접두사(versioned 표시; `R__` repeatable·콜백과 구분,
+    비우면 Flyway 파싱 버그) + **4자리 zero-pad 정수**(`V0000`, `V0001`, … → `ls` 사전식 정렬이
+    실행 순서와 일치) + `__`(더블 언더스코어 구분자; 설명의 snake_case `_`와 충돌 방지).
+  - 버전은 **평탄한 정수만** 쓴다(소수점 서브버전 금지). `<desc>`는 영어 snake_case.
+- **`ddl-auto=validate`**: Flyway가 스키마 단일 소유자. Hibernate는 엔티티↔스키마 검증만 하고
+  절대 스키마를 만들거나 바꾸지 않는다. 엔티티와 마이그레이션이 어긋나면 부팅 실패(테스트가 CI에서 잡음).
 - **이미 적용된 마이그레이션 파일은 절대 수정하지 않는다.** 스키마 변경은 항상 새 `V` 파일.
   (Flyway 체크섬이 이를 강제한다.)
 - **파괴적 변경(컬럼/테이블 삭제, 타입 축소, NOT NULL 강화)은 expand→contract 2단계로 나눈다.**
