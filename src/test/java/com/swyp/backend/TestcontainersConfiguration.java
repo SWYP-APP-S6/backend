@@ -11,7 +11,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
  * config is needed. Requires Docker on the machine running the tests (CI runners have it).
  */
 @TestConfiguration(proxyBeanMethods = false)
-class TestcontainersConfiguration {
+public class TestcontainersConfiguration {
 
 	@Bean
 	@ServiceConnection

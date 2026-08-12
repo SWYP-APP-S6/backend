@@ -22,6 +22,11 @@ SWYP 앱의 백엔드 REST API 서버. (프로덕트 한 줄 설명은 확정되
 
 - **Package-by-feature**: `com.swyp.backend.<feature>` (예: `.user`, `.auth`) — 각 feature 안에
   필요에 따라 `controller` / `service` / `repository` / `domain` / `dto`.
+- **`com.swyp.backend.common`**: feature가 아닌 **여러 feature가 공유하는 타입**만 둔다
+  (예: `BaseTimeEntity`, `JpaAuditingConfig`). 특정 feature 것은 여기 넣지 않는다.
+- **감사 타임스탬프**: 엔티티는 `BaseTimeEntity`(`@MappedSuperclass`)를 상속해 `createdAt`/`updatedAt`을
+  얻는다. 값은 **Spring Data JPA Auditing**이 채운다(`JpaAuditingConfig`의 `@EnableJpaAuditing`).
+  DB default/trigger가 아니므로 **쓰기는 JPA를 통해야** 채워진다(현재 앱이 유일 writer).
 - **레이어 경계** (Phase 2에서 ArchUnit이 강제; 지금은 규약):
   - `controller → service → repository` 단방향. controller가 repository를 직접 호출하지 않는다.
   - **`repository`만 JPA 영속성 API**(`JpaRepository`/`EntityManager`)에 접근한다. service·controller는
@@ -87,6 +92,10 @@ Spring Security 의존성만 있고 설정은 아직 없다(TBD). 인증/인가 
 - **파괴적 변경(컬럼/테이블 삭제, 타입 축소, NOT NULL 강화)은 expand→contract 2단계로 나눈다.**
   먼저 추가(expand)하고 배포해 구/신 코드가 공존 가능하게 한 뒤, 아무도 안 읽을 때 제거(contract).
   순수 추가 nullable 컬럼은 1단계로 안전.
+- **소프트 삭제**(쓰는 테이블에 한해): `deleted_at timestamptz` nullable 컬럼 + Hibernate
+  `@SQLDelete`(delete→`update ... set deleted_at = now()`) + `@SQLRestriction("deleted_at is null")`.
+  유니크 컬럼은 **부분 유니크 인덱스**(`unique (...) where deleted_at is null`)로 재등록을 허용한다.
+  (레퍼런스: `com.swyp.backend.admin.Admin`.) 소프트삭제는 전 테이블 강제가 아니라 필요한 테이블만.
 - 영속성 관심사는 `repository`와 service의 `@Transactional` 경계 안에 가둔다.
 
 ## Local development
