@@ -24,6 +24,6 @@ jobs:
           java-version: "25"
           cache: gradle
 
-      # `./gradlew build` compiles, runs tests, and assembles the jar. Tests boot a real MySQL via
-      # Testcontainers (@ServiceConnection) — the ubuntu runner provides the Docker daemon they need.
+      # `./gradlew build` compiles, runs tests, and assembles the jar. Tests boot a real PostgreSQL
+      # (and Redis) via Testcontainers (@ServiceConnection) — the ubuntu runner provides the Docker daemon.
       - run: ./gradlew build --no-daemon
