@@ -47,3 +47,17 @@ out/
 .claude/scheduled_tasks.json
 .claude/scheduled_tasks.lock
 .claude/**/.state/
+
+### Secrets / local config — never commit (public repo: mistakes are permanent)
+.env
+*.env
+!*.env.example
+application-local.properties
+application-secret*.properties
+*.pem
+*.key
+*.p12
+*.jks
+
+### Personal handoff note (local only)
+HANDOFF.md
