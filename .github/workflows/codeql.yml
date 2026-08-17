@@ -25,7 +25,7 @@ jobs:
           java-version: "25"
           cache: gradle
 
-      - uses: github/codeql-action/init@v3
+      - uses: github/codeql-action/init@v4
         with:
           languages: java-kotlin
           build-mode: manual
@@ -33,4 +33,4 @@ jobs:
       # Compile only — CodeQL needs the classes, not the test run (so no Docker/Testcontainers here).
       - run: ./gradlew compileJava compileTestJava --no-daemon
 
-      - uses: github/codeql-action/analyze@v3
+      - uses: github/codeql-action/analyze@v4
