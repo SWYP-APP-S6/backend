@@ -5,7 +5,6 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 
-/** Shared authentication error codes (cross-feature auth infrastructure). */
 @Getter
 @RequiredArgsConstructor
 public enum AuthErrorCode implements ApiCode {

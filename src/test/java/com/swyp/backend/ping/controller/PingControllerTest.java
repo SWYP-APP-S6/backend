@@ -12,12 +12,6 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
-/**
- * Web-layer slice test for the ping feature — the reference pattern for controller tests. Fast
- * ({@code @WebMvcTest} loads only the web layer, no DB), the real {@link PingService} is imported so
- * the controller-to-service call is exercised for real. Security filters are disabled
- * ({@code addFilters = false}); a real SecurityFilterChain arrives with the auth work.
- */
 @WebMvcTest(PingController.class)
 @AutoConfigureMockMvc(addFilters = false)
 @Import(PingService.class)

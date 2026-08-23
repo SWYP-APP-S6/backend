@@ -15,12 +15,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-/**
- * Stateless JWT security. Public: health/ping + admin auth endpoints (login/refresh/logout); every
- * other request needs a valid bearer access token. {@link JwtAuthenticationFilter} populates the
- * context from the token and {@link RestAuthenticationEntryPoint} renders 401s as the standard error
- * envelope. CSRF/basic/form login are off (token-based API, no browser session).
- */
 @Configuration
 @EnableConfigurationProperties(JwtProperties.class)
 @EnableWebSecurity
@@ -31,10 +25,8 @@ public class SecurityConfig {
 		"/admin/auth/login",
 		"/admin/auth/refresh",
 		"/admin/auth/logout",
-		// App-user auth doesn't exist yet — recipe reads are open until it does.
 		"/recipes",
 		"/recipes/**",
-		// API docs — consider restricting to non-prod before deploying.
 		"/v3/api-docs",
 		"/v3/api-docs/**",
 		"/swagger-ui/**",

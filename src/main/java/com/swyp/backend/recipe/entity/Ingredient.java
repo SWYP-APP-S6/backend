@@ -10,10 +10,6 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-/**
- * Ingredient dictionary — the search/matching backbone ("냉장고 재료로 검색"). {@code normKey} collapses
- * spelling/phrasing variants (다진 마늘 / 마늘 2쪽 / 통마늘) onto one canonical entry.
- */
 @Getter
 @Entity
 @Table(name = "ingredients")

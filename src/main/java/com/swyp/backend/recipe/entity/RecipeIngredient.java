@@ -15,11 +15,6 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-/**
- * A parsed ingredient line. {@code ingredient} (machine matching) and {@code rawText} (human display)
- * serve different purposes and are both kept — splitting into amount/unit alone loses detail like
- * "2/3개". {@code ingredient} may be null when matching failed; {@code rawText} still renders.
- */
 @Getter
 @Entity
 @Table(

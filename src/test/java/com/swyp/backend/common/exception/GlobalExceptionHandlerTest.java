@@ -19,12 +19,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Verifies {@link GlobalExceptionHandler} maps exceptions to the standard error envelope with the
- * correct status. Uses {@code standaloneSetup} with a throwaway controller — the advice is tested
- * in isolation, before any real endpoint exists. Framework client errors (405, malformed body,
- * type mismatch) must map to 4xx, not the 500 fallback.
- */
 class GlobalExceptionHandlerTest {
 
 	private final MockMvc mockMvc = MockMvcBuilders
@@ -94,12 +88,10 @@ class GlobalExceptionHandlerTest {
 
 		@PostMapping("/test/body")
 		void body(@Valid @RequestBody Payload payload) {
-			// malformed JSON → HttpMessageNotReadableException; blank name → MethodArgumentNotValidException
 		}
 
 		@GetMapping("/test/mismatch")
 		void mismatch(@RequestParam int n) {
-			// "abc" fails to bind to int → MethodArgumentTypeMismatchException before this runs
 		}
 
 		@GetMapping("/test/boom")

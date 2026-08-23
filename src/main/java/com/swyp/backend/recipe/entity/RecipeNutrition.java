@@ -15,11 +15,6 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-/**
- * Nutrition facts, 1:1 with {@link Recipe} (shared PK via {@code @MapsId}). {@code basis} is kept
- * even though every current source is per-serving — comparing a 35kcal porridge to a 170kcal dessert
- * on the same scale requires knowing which basis each row uses once a second source arrives.
- */
 @Getter
 @Entity
 @Table(name = "recipe_nutrition")

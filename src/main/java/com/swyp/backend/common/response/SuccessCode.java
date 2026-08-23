@@ -4,10 +4,6 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 
-/**
- * Generic success codes for the {@link ApiResponse} envelope. Feature-specific success codes may
- * live in the feature; these cover the common cases.
- */
 @Getter
 @RequiredArgsConstructor
 public enum SuccessCode {

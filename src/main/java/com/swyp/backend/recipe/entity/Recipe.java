@@ -11,11 +11,6 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-/**
- * Recipe master row, sourced from an external feed (MFDS COOKRCP01 today; {@code source} +
- * {@code sourceId} leave room for more later). {@code published} gates visibility for review state
- * (parsing/image-migration failures), not licensing.
- */
 @Getter
 @Entity
 @Table(name = "recipes")
@@ -50,7 +45,6 @@ public class Recipe extends BaseTimeEntity {
 	@Column(name = "image_thumb_url", length = 512)
 	private String imageThumbUrl;
 
-	/** Original http(s) source image, kept so a failed migration to our own storage can be retried. */
 	@Column(name = "origin_image_url", length = 512)
 	private String originImageUrl;
 

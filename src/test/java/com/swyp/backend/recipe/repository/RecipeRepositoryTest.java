@@ -20,12 +20,6 @@ import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 
-/**
- * Persistence slice against a real PostgreSQL (Testcontainers) so Flyway builds V0002's schema and
- * {@code ddl-auto=validate} confirms the recipe entities match it. Also proves the ingredient
- * join-fetch query returns the association populated in one round trip (see
- * {@link RecipeIngredientRepository#findByRecipeIdWithIngredient}).
- */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({TestcontainersConfiguration.class, JpaAuditingConfig.class})

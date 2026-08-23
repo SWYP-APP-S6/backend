@@ -1,9 +1,5 @@
 package com.swyp.backend.common.response;
 
-/**
- * Standard success envelope — every successful response is wrapped as
- * {@code {status, code, message, data}}. Errors use {@link ErrorResponse} via the global handler.
- */
 public record ApiResponse<T>(int status, String code, String message, T data) {
 
 	public static <T> ApiResponse<T> of(SuccessCode code, T data) {

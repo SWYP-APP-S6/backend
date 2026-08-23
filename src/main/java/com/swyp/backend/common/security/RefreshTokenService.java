@@ -6,15 +6,6 @@ import java.util.UUID;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
-/**
- * Opaque refresh tokens stored in Redis ({@code refresh:{token} -> userId}, with the refresh TTL).
- * Redis is the source of truth — a refresh token is valid iff its key exists, so logout and rotation
- * both work by deleting the key.
- *
- * <p>Rotation is one-time-use: {@link #rotate} atomically consumes (GETDEL) the presented token and
- * mints a new one, so a previously rotated token is rejected on reuse. (Family-wide revocation on
- * reuse detection is a planned enhancement.)
- */
 @Service
 public class RefreshTokenService {
 
@@ -34,7 +25,6 @@ public class RefreshTokenService {
 		return token;
 	}
 
-	/** Consume the presented token and mint a new one. Missing token (expired/rotated/forged) → reject. */
 	public Rotation rotate(String presentedToken) {
 		String userId = redis.opsForValue().getAndDelete(KEY_PREFIX + presentedToken);
 		if (userId == null) {
@@ -43,7 +33,6 @@ public class RefreshTokenService {
 		return new Rotation(Long.valueOf(userId), issue(Long.valueOf(userId)));
 	}
 
-	/** Logout: drop the token so it can no longer be rotated. */
 	public void revoke(String token) {
 		redis.delete(KEY_PREFIX + token);
 	}
