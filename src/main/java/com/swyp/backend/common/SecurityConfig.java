@@ -31,6 +31,9 @@ public class SecurityConfig {
 		"/admin/auth/login",
 		"/admin/auth/refresh",
 		"/admin/auth/logout",
+		// App-user auth doesn't exist yet — recipe reads are open until it does.
+		"/recipes",
+		"/recipes/**",
 		// API docs — consider restricting to non-prod before deploying.
 		"/v3/api-docs",
 		"/v3/api-docs/**",
