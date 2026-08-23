@@ -20,4 +20,6 @@ paths:
   - `@WebMvcTest`·`@AutoConfigureMockMvc` = `org.springframework.boot.webmvc.test.autoconfigure.*`
   - `@DataJpaTest` = `org.springframework.boot.data.jpa.test.autoconfigure.*`
   - `@AutoConfigureTestDatabase` = `org.springframework.boot.jdbc.test.autoconfigure.*`
+  - `TestEntityManager` = `org.springframework.boot.jpa.test.autoconfigure.*` (note: different module/package
+    root than `@DataJpaTest` above — not `.data.jpa.test.`)
 - 완료 판정은 `./gradlew build`(컴파일+테스트) 초록으로.
