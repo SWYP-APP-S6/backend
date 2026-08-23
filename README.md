@@ -68,6 +68,5 @@ com.swyp.backend
 **`.claude/rules/`** (entity·repository·service·controller·dto·database·testing)에 있고, 로컬 실행 상세는
 **`.claude/docs/local-development.md`** 참고.
 
-- 코드·주석·커밋 메시지·테스트 이름: **영어**. 이슈·PR 설명: 한국어 허용.
-- 커밋: conventional (`feat`/`fix`/`refactor`/`chore`/`docs`/`test`), 영어. `main` 직접 push/merge는 사람 결정.
-- 이슈: GitHub Issues (`SWYP-APP-S6/backend`).
+- 코드·커밋 메시지·테스트 이름: **영어**. PR 설명: 한국어 허용. Java 코드에는 주석을 달지 않는다.
+- 커밋: conventional (`feat`/`fix`/`refactor`/`chore`/`docs`/`test`), 영어. 커밋/`main` 직접 push·merge는 사람 결정.

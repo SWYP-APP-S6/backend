@@ -24,7 +24,7 @@ argument — analyse the current conversation for open items.
    parent was identified. Report the issue URLs.
 
 ## Notes
+- Manual/opt-in only — this project's default workflow (CLAUDE.md rule 1) doesn't use issue tracking.
+  Use this command only when the user explicitly asks for a GitHub issue.
 - Not urgent — no milestone/assignee.
 - Title and body stay in Korean (internal team).
-- A confirmed design decision that belongs to an issue being implemented goes into **that** issue's
-  body (CLAUDE.md rule 3), not a new issue.

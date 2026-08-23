@@ -31,7 +31,7 @@ yes/no를 누르는 비용이 누적되면 결국 사람이 직접 하는 것보
 ### 2. git / gh
 | 패턴 | 근거 |
 | --- | --- |
-| `Bash(git:*)` | git 전체. mutation 포함이지만 일반 워크플로에 필수. **자동 push 금지는 권한이 아니라 CLAUDE.md 규칙 5로 강제**(모델이 명시 지시 없이 push하지 않는다). |
+| `Bash(git:*)` | git 전체. mutation 포함이지만 일반 워크플로에 필수. **자동 커밋·push 금지는 권한이 아니라 CLAUDE.md 규칙 5로 강제**(모델이 명시 지시 없이 커밋·push하지 않는다). |
 | `Bash(gh:*)` | GitHub CLI(PR/이슈 조회·생성) |
 
 ### 3. read-only 조회
