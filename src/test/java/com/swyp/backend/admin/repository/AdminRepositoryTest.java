@@ -12,12 +12,6 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.context.annotation.Import;
 
-/**
- * Persistence slice against a real PostgreSQL (Testcontainers), so Flyway builds the schema and
- * {@code ddl-auto=validate} confirms the entity matches it. {@link JpaAuditingConfig} is imported
- * explicitly because {@code @DataJpaTest} does not pick up plain {@code @Configuration} beans, and
- * without it the audit timestamps would stay null.
- */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({TestcontainersConfiguration.class, JpaAuditingConfig.class})

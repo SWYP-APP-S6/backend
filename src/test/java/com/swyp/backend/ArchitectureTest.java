@@ -9,10 +9,6 @@ import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
 import jakarta.persistence.Entity;
 
-/**
- * Enforces the layer boundaries documented in CLAUDE.md / .claude/rules as tests, so violations fail
- * the build instead of relying on reviewers to catch them.
- */
 @AnalyzeClasses(packages = "com.swyp.backend", importOptions = ImportOption.DoNotIncludeTests.class)
 class ArchitectureTest {
 

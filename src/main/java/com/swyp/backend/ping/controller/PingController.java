@@ -7,8 +7,6 @@ import com.swyp.backend.ping.service.PingService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Web layer for the ping feature. Delegates to {@link PingService} and wraps the DTO in the
- *  standard {@link ApiResponse} envelope — the controller never touches persistence directly. */
 @RestController
 public class PingController {
 

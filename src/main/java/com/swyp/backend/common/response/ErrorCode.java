@@ -4,12 +4,6 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 
-/**
- * Generic, cross-feature error codes thrown via {@code BusinessException} (plus the two the global
- * handler uses itself). Feature-specific codes live in that feature's own enum implementing
- * {@link ApiCode} — do not add domain codes here. Framework client errors (405, 415, unreadable
- * body, …) are not listed here: the global handler renders them from their HTTP status.
- */
 @Getter
 @RequiredArgsConstructor
 public enum ErrorCode implements ApiCode {

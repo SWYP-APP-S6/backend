@@ -13,7 +13,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Admin back-office authentication (separate from app-user auth). Email + password → JWT tokens. */
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/admin/auth")

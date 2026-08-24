@@ -16,13 +16,6 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
 
-/**
- * Admin identity, role, and login credential. {@code password} stores a BCrypt hash (encoding is done
- * in the auth service, never here); admins authenticate with email + password (no social login).
- *
- * <p>Soft delete: {@code delete(..)} sets {@code deleted_at} instead of removing the row
- * ({@code @SQLDelete}), and {@code @SQLRestriction} hides deleted rows from all queries.
- */
 @Getter
 @Entity
 @Table(name = "admins")
@@ -45,7 +38,6 @@ public class Admin extends BaseTimeEntity {
 	@Column(nullable = false, length = 20)
 	private AdminType type;
 
-	/** BCrypt hash — never a plaintext password. */
 	@Column(nullable = false, length = 255)
 	private String password;
 

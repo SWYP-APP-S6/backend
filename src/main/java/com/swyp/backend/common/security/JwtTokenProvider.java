@@ -9,11 +9,6 @@ import java.util.Date;
 import javax.crypto.SecretKey;
 import org.springframework.stereotype.Component;
 
-/**
- * Issues and verifies stateless access tokens (HMAC-signed JWT). The subject is the user id and the
- * {@code role} claim carries the authority. Refresh tokens are opaque and live in Redis (handled by
- * the refresh service), not here — so an access token is verified by signature alone, no store hit.
- */
 @Component
 public class JwtTokenProvider {
 
@@ -36,7 +31,6 @@ public class JwtTokenProvider {
 			.compact();
 	}
 
-	/** Verifies signature and expiry; throws {@link io.jsonwebtoken.JwtException} if invalid or expired. */
 	public Claims parse(String token) {
 		return Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
 	}

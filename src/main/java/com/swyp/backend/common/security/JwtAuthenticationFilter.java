@@ -14,12 +14,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-/**
- * Authenticates a request from its bearer access token: a valid token populates the SecurityContext
- * straight from its claims (no per-request DB lookup — stateless). A missing or invalid token simply
- * leaves the context empty; enforcement is left to authorization + the entry point, so a bad token on
- * a public path (e.g. login) is never rejected here.
- */
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
 	private final JwtTokenProvider tokenProvider;

@@ -16,15 +16,6 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
-/**
- * Central exception mapping. Extends {@link ResponseEntityExceptionHandler} so Spring MVC's whole
- * family of client-error exceptions (wrong method → 405, unreadable body → 400, unsupported media
- * type → 415, …) map to their correct status instead of falling through to 500 — all rendered as
- * our {@link ErrorResponse} envelope via the {@link #createResponseEntity} override.
- *
- * <p>Feature code throws {@link BusinessException} with its own {@link ApiCode}. Framework errors
- * carry the HTTP status name as their {@code code}; validation failures add per-field messages.
- */
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
@@ -53,10 +44,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 				ErrorResponse.of(ErrorCode.VALIDATION_FAILED, fieldErrors), headers, status, request);
 	}
 
-	/**
-	 * Single rendering point for every framework exception: swap the default ProblemDetail body for
-	 * our envelope (built from the resolved status), unless a handler already supplied an envelope.
-	 */
 	@Override
 	protected ResponseEntity<Object> createResponseEntity(
 			Object body, HttpHeaders headers, HttpStatusCode statusCode, WebRequest request) {

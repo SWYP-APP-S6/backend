@@ -23,14 +23,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-/**
- * Detail assembly issues one query per child collection (steps / ingredients / tags) instead of a
- * single query joining all of them — joining more than one collection in one JPQL either throws
- * {@code MultipleBagFetchException} or multiplies rows (steps × ingredients × tags). A fixed number
- * of queries per recipe is not N+1 (N+1 is one query per *row*, growing with result size); only the
- * ingredient join inside {@code recipe_ingredients} needed {@code left join fetch} to avoid firing
- * once per ingredient row.
- */
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)

@@ -1,5 +1,5 @@
 ---
-description: Code review against CLAUDE.md conventions (correctness + security + quality + boundaries)
+description: Code review against CLAUDE.md conventions (correctness + security + quality + boundaries + concurrency)
 ---
 
 Review the change in scope $ARGUMENTS. With no argument, target unstaged changes; else staged; else the
@@ -47,7 +47,7 @@ perspectives. Large + high-risk (auth, DB schema, security boundary) → split p
 **3. Code quality**
 - Type safety (no raw types; `Optional` used correctly, not `.get()` blindly). Naming clarity.
 - Magic numbers → constants. Duplicated / copy-pasted logic → shared helper. Single responsibility
-  (no God service). Pointless comments (keep non-obvious WHY only).
+  (no God service). No comments in Java code (CLAUDE.md rule 15).
 
 **4. Efficiency**
 - **N+1 queries**: JPA lazy associations fetched in a loop → use `@EntityGraph` / `join fetch` /
@@ -58,6 +58,17 @@ perspectives. Large + high-risk (auth, DB schema, security boundary) → split p
 **5. Correctness & tests**
 - Edge cases covered by tests; behavior verified (not just compiles) for endpoints.
 - Error handling maps to sensible HTTP responses (`@ExceptionHandler` / `ResponseStatusException`).
+
+**6. Concurrency & idempotency**
+- Read-check-then-write races: an existence/uniqueness check followed by a separate write isn't
+  atomic — rely on a DB constraint (`UNIQUE`) or `@Version` (optimistic locking), not just an
+  application-level `if`.
+- Counter-style mutations (load entity → increment field → save, e.g. `viewCount`/`likeCount`) can
+  lose updates under concurrent requests — prefer an atomic `UPDATE ... SET x = x + 1`, or flag the
+  race explicitly if the current traffic doesn't warrant fixing it yet.
+- Retried/duplicate requests (client retry, double-submit) produce the same result, not duplicate rows
+  or double side-effects — relevant wherever a single-use token/resource is consumed (see
+  `RefreshTokenService`'s rotation for the existing pattern).
 
 ### Output format
 Group as **Blocking / Should-fix / Nits / Looks good**, each item with a `file:line` citation,

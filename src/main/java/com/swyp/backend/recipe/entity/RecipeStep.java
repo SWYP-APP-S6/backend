@@ -14,7 +14,6 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-/** One cooking step. {@code seq} is a contiguous 1-based renumbering done at load time. */
 @Getter
 @Entity
 @Table(

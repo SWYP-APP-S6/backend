@@ -11,11 +11,6 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.stereotype.Component;
 
-/**
- * Renders the 401 for protected endpoints hit without valid authentication as the standard
- * {@link ErrorResponse} envelope — security-layer failures happen before the DispatcherServlet, so
- * they never reach {@code GlobalExceptionHandler} and must be written here.
- */
 @Component
 public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
 

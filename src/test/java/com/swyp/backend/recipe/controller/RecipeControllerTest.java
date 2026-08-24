@@ -27,10 +27,6 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Full-stack (real Postgres, real security filter chain) coverage for the recipe read API. Each test
- * runs in a rolled-back transaction so fixtures from one method never leak into another.
- */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import(TestcontainersConfiguration.class)

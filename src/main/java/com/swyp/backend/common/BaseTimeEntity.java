@@ -9,11 +9,6 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-/**
- * Audit timestamps shared by every entity. {@code @MappedSuperclass} is code-only reuse — it adds no
- * table; the columns land on each subclass's own table. Values are filled by Spring Data JPA auditing
- * (see {@link JpaAuditingConfig}), so writes must go through JPA; there is no DB-side default/trigger.
- */
 @Getter
 @MappedSuperclass
 @EntityListeners(AuditingEntityListener.class)

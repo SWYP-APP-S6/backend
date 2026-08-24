@@ -12,11 +12,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Admin credential authentication. Issues a JWT access token (subject = admin id, role = AdminType)
- * plus a rotating Redis refresh token. No DB writes — only reads and Redis, so the whole service is
- * read-only for JPA.
- */
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)

@@ -11,11 +11,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 
-/**
- * Exercises refresh rotation against a real Redis (Testcontainers). Full context because the service
- * needs the autoconfigured StringRedisTemplate and the bound JwtProperties; the Postgres container is
- * imported because booting the app wires JPA.
- */
 @SpringBootTest
 @Import({TestcontainersConfiguration.class, RedisTestcontainersConfiguration.class})
 class RefreshTokenServiceTest {
@@ -31,7 +26,6 @@ class RefreshTokenServiceTest {
 
 		assertThat(rotation.userId()).isEqualTo(7L);
 		assertThat(rotation.token()).isNotEqualTo(issued);
-		// old token is single-use: reusing it after rotation is rejected
 		assertThatThrownBy(() -> refreshTokenService.rotate(issued)).isInstanceOf(BusinessException.class);
 	}
 

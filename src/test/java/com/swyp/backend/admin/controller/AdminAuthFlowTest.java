@@ -17,11 +17,6 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
-/**
- * End-to-end admin auth against real Postgres + Redis: login with the seeded SUPER admin, then the
- * full token lifecycle (rotation, logout revocation) and access enforcement through the real filter
- * chain.
- */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import({TestcontainersConfiguration.class, RedisTestcontainersConfiguration.class})
@@ -84,7 +79,6 @@ class AdminAuthFlowTest {
 	void protectedEndpoint_withValidToken_passesSecurity() throws Exception {
 		String access = login("$.data.accessToken");
 
-		// authenticated → clears security → no handler mapped at this path → 404 (not 401)
 		mockMvc.perform(get("/admin/members").header("Authorization", "Bearer " + access))
 			.andExpect(status().isNotFound());
 	}

@@ -13,11 +13,6 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
-/**
- * Boots the full app with the real security filter chain (no {@code addFilters = false}) to prove the
- * interim {@link SecurityConfig} leaves endpoints reachable — without it, Spring Security's default
- * lockdown would 401 every request, including a plain {@code GET /ping}.
- */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import({TestcontainersConfiguration.class, RedisTestcontainersConfiguration.class})
