@@ -59,5 +59,11 @@ application-secret*.properties
 *.p12
 *.jks
 
+### 생성 데이터 — scripts/mfds_ingest.py 로 언제든 재생성되는 파생 산출물이라 커밋하지 않는다.
+### (README.md 는 재생성/투입 방법을 담고 있으므로 추적한다. 디렉터리가 아니라 파일 패턴을
+###  무시해야 하위 파일을 되살릴 수 있다 — 부모 디렉터리가 제외되면 negation 이 안 먹는다.)
+src/main/resources/db/data/*.sql
+
 ### Personal handoff note (local only)
 HANDOFF.md
+/docs

@@ -42,6 +42,9 @@ services:
       SPRING_DATASOURCE_PASSWORD: swyp
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: "6379"
+      # compose 는 프로젝트 루트 `.env` 를 변수 치환에만 쓴다(컨테이너 자동 주입 아님).
+      # 그래서 여기서 명시적으로 넘긴다. `.env` 가 없으면 빈 값 → 앱은 그대로 뜬다.
+      MFDS_API_KEY: ${MFDS_API_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy

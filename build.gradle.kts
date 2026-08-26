@@ -47,3 +47,24 @@ dependencies {
 tasks.withType<Test> {
 	useJUnitPlatform()
 }
+
+// db/data 의 시드 SQL 은 psql 로 직접 넣는 운영 산출물이라 클래스패스에 올릴 이유가 없다.
+// build/resources 단계에서 걷어내 jar 와 테스트 클래스패스 양쪽에서 제외한다(약 5MB).
+tasks.processResources {
+	exclude("db/data/**")
+}
+
+// `.env` 는 docker compose 가 읽지만 Spring Boot 는 네이티브로 읽지 않는다. bootRun 도 같은 파일을
+// 쓰도록 여기서 환경변수로 넘긴다 — 키를 두 곳에서 관리하면 반드시 어긋난다.
+tasks.named<JavaExec>("bootRun") {
+	val dotenv = rootProject.file(".env")
+	if (dotenv.exists()) {
+		dotenv.readLines()
+			.map(String::trim)
+			.filter { it.isNotEmpty() && !it.startsWith("#") && it.contains("=") }
+			.forEach {
+				val (key, value) = it.split("=", limit = 2)
+				environment(key.trim(), value.trim().removeSurrounding("\""))
+			}
+	}
+}
