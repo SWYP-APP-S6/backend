@@ -46,6 +46,9 @@ dependencies {
 
 tasks.withType<Test> {
 	useJUnitPlatform()
+	// jwt.secret 에는 기본값이 없다(운영에서 조용히 공개 키로 떨어지지 않게 하려고).
+	// 테스트 환경은 여기서 자기 키를 넘긴다 — CI 에도 `.env` 없이 그대로 적용된다.
+	environment("JWT_SECRET", "test-only-secret-that-is-at-least-32-bytes-long")
 }
 
 // db/data 의 시드 SQL 은 psql 로 직접 넣는 운영 산출물이라 클래스패스에 올릴 이유가 없다.

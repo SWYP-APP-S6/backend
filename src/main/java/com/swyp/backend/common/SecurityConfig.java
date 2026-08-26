@@ -4,6 +4,7 @@ import com.swyp.backend.common.security.JwtAuthenticationFilter;
 import com.swyp.backend.common.security.JwtProperties;
 import com.swyp.backend.common.security.JwtTokenProvider;
 import com.swyp.backend.common.security.RestAuthenticationEntryPoint;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -27,6 +28,9 @@ public class SecurityConfig {
 		"/admin/auth/logout",
 		"/recipes",
 		"/recipes/**",
+	};
+
+	private static final String[] API_DOCS_ENDPOINTS = {
 		"/v3/api-docs",
 		"/v3/api-docs/**",
 		"/swagger-ui/**",
@@ -40,13 +44,18 @@ public class SecurityConfig {
 
 	@Bean
 	SecurityFilterChain filterChain(HttpSecurity http, JwtTokenProvider tokenProvider,
-			RestAuthenticationEntryPoint authenticationEntryPoint) throws Exception {
+			RestAuthenticationEntryPoint authenticationEntryPoint,
+			@Value("${springdoc.api-docs.enabled:true}") boolean apiDocsEnabled) throws Exception {
 		http
 			.csrf(csrf -> csrf.disable())
 			.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-			.authorizeHttpRequests(auth -> auth
-				.requestMatchers(PUBLIC_ENDPOINTS).permitAll()
-				.anyRequest().authenticated())
+			.authorizeHttpRequests(auth -> {
+				auth.requestMatchers(PUBLIC_ENDPOINTS).permitAll();
+				if (apiDocsEnabled) {
+					auth.requestMatchers(API_DOCS_ENDPOINTS).permitAll();
+				}
+				auth.anyRequest().authenticated();
+			})
 			.exceptionHandling(exception -> exception.authenticationEntryPoint(authenticationEntryPoint))
 			.addFilterBefore(new JwtAuthenticationFilter(tokenProvider), UsernamePasswordAuthenticationFilter.class)
 			.httpBasic(basic -> basic.disable())

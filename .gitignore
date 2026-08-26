@@ -60,9 +60,9 @@ application-secret*.properties
 *.jks
 
 ### 생성 데이터 — scripts/mfds_ingest.py 로 언제든 재생성되는 파생 산출물이라 커밋하지 않는다.
-### (README.md 는 재생성/투입 방법을 담고 있으므로 추적한다. 디렉터리가 아니라 파일 패턴을
-###  무시해야 하위 파일을 되살릴 수 있다 — 부모 디렉터리가 제외되면 negation 이 안 먹는다.)
-src/main/resources/db/data/*.sql
+### 생성기가 만드는 파일만 지목한다. 같은 디렉터리의 손으로 쓴 시드(dev_seed_admin.sql)와
+### README 는 추적해야 하기 때문이다.
+src/main/resources/db/data/mfds_*.sql
 
 ### Personal handoff note (local only)
 HANDOFF.md

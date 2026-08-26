@@ -9,12 +9,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.jayway.jsonpath.JsonPath;
 import com.swyp.backend.RedisTestcontainersConfiguration;
 import com.swyp.backend.TestcontainersConfiguration;
+import com.swyp.backend.admin.entity.Admin;
+import com.swyp.backend.admin.entity.AdminType;
+import com.swyp.backend.admin.repository.AdminRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest
@@ -22,14 +27,30 @@ import org.springframework.test.web.servlet.MockMvc;
 @Import({TestcontainersConfiguration.class, RedisTestcontainersConfiguration.class})
 class AdminAuthFlowTest {
 
+	private static final String EMAIL = "auth-flow-admin@swyp.test";
+	private static final String PASSWORD = "swyp-admin-1234";
 	private static final String LOGIN_BODY = """
-		{"email":"admin@swyp.com","password":"swyp-admin-1234"}""";
+		{"email":"%s","password":"%s"}""".formatted(EMAIL, PASSWORD);
 
 	@Autowired
 	MockMvc mockMvc;
 
+	@Autowired
+	AdminRepository adminRepository;
+
+	@Autowired
+	PasswordEncoder passwordEncoder;
+
+	@BeforeEach
+	void createAdmin() {
+		if (adminRepository.findByEmail(EMAIL).isEmpty()) {
+			adminRepository.save(
+				new Admin(EMAIL, "Auth Flow Admin", AdminType.SUPER, passwordEncoder.encode(PASSWORD)));
+		}
+	}
+
 	@Test
-	void login_withSeededSuperAdmin_returnsTokens() throws Exception {
+	void login_withExistingSuperAdmin_returnsTokens() throws Exception {
 		mockMvc.perform(post("/admin/auth/login").contentType(MediaType.APPLICATION_JSON).content(LOGIN_BODY))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.accessToken").exists())
@@ -39,7 +60,7 @@ class AdminAuthFlowTest {
 	@Test
 	void login_withWrongPassword_returnsUnauthorized() throws Exception {
 		String body = """
-			{"email":"admin@swyp.com","password":"wrong"}""";
+			{"email":"%s","password":"wrong"}""".formatted(EMAIL);
 		mockMvc.perform(post("/admin/auth/login").contentType(MediaType.APPLICATION_JSON).content(body))
 			.andExpect(status().isUnauthorized())
 			.andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"));
