@@ -49,4 +49,8 @@ public class Admin extends BaseTimeEntity {
 		this.type = type;
 		this.password = password;
 	}
+
+	public void changePassword(String encodedPassword) {
+		this.password = encodedPassword;
+	}
 }
