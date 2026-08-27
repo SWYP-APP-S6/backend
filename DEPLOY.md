@@ -13,7 +13,24 @@ Naver Cloud Platform 단일 VM 위에 `docker compose` 로 전체 스택(app + P
 ## 배포하는 법
 
 ```bash
-ssh deploy@<서버 IP>
+ssh root@<서버 IP>
+deploy
+```
+
+`/usr/local/bin/deploy` 는 서버에 직접 둔 한 줄짜리 래퍼다(레포에는 없다):
+
+```sh
+#!/bin/sh
+exec su - deploy -c /home/deploy/backend/scripts/deploy.sh
+```
+
+**배포는 항상 `deploy` 유저로 돌아야 한다** — root 로 `docker compose` 를 돌리면 컨테이너와
+볼륨이 root 소유로 생겨 기존 것과 섞인다. 래퍼가 `su - deploy` 로 넘기므로 로그인 셸이 새로
+뜨고 docker 그룹 권한도 정상적으로 잡힌다.
+
+`deploy` 유저로 직접 들어와 있다면 스크립트를 그대로 실행해도 된다:
+
+```bash
 cd ~/backend && ./scripts/deploy.sh
 ```
 
