@@ -3,6 +3,7 @@ package com.swyp.backend.admin.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -32,6 +33,10 @@ class AdminAuthFlowTest {
 	private static final String LOGIN_BODY = """
 		{"email":"%s","password":"%s"}""".formatted(EMAIL, PASSWORD);
 
+	private static final String PW_EMAIL = "password-change-admin@swyp.test";
+	private static final String PW_OLD = "initial-password-1234";
+	private static final String PW_NEW = "changed-password-5678";
+
 	@Autowired
 	MockMvc mockMvc;
 
@@ -47,6 +52,83 @@ class AdminAuthFlowTest {
 			adminRepository.save(
 				new Admin(EMAIL, "Auth Flow Admin", AdminType.SUPER, passwordEncoder.encode(PASSWORD)));
 		}
+		// 테스트 밖에는 트랜잭션이 없어 조회한 엔티티가 detached 다 — 더티 체킹이 돌지 않으므로
+		// 명시적으로 저장해야 앞선 테스트가 바꿔 놓은 비밀번호가 되돌아간다.
+		adminRepository.findByEmail(PW_EMAIL).ifPresentOrElse(
+			admin -> {
+				admin.changePassword(passwordEncoder.encode(PW_OLD));
+				adminRepository.save(admin);
+			},
+			() -> adminRepository.save(
+				new Admin(PW_EMAIL, "Password Admin", AdminType.MANAGER, passwordEncoder.encode(PW_OLD))));
+	}
+
+	private String accessTokenFor(String email, String password) throws Exception {
+		String body = mockMvc.perform(post("/admin/auth/login")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"email":"%s","password":"%s"}""".formatted(email, password)))
+			.andExpect(status().isOk())
+			.andReturn().getResponse().getContentAsString();
+		return JsonPath.read(body, "$.data.accessToken");
+	}
+
+	private static String passwordChangeBody(String current, String next) {
+		return """
+			{"currentPassword":"%s","newPassword":"%s"}""".formatted(current, next);
+	}
+
+	@Test
+	void changePassword_withCorrectCurrentPassword_lettsTheAdminLogInWithTheNewOne() throws Exception {
+		String accessToken = accessTokenFor(PW_EMAIL, PW_OLD);
+
+		mockMvc.perform(put("/admin/auth/password")
+				.header("Authorization", "Bearer " + accessToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(passwordChangeBody(PW_OLD, PW_NEW)))
+			.andExpect(status().isOk());
+
+		mockMvc.perform(post("/admin/auth/login")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"email":"%s","password":"%s"}""".formatted(PW_EMAIL, PW_NEW)))
+			.andExpect(status().isOk());
+
+		mockMvc.perform(post("/admin/auth/login")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"email":"%s","password":"%s"}""".formatted(PW_EMAIL, PW_OLD)))
+			.andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void changePassword_withWrongCurrentPassword_isRejected() throws Exception {
+		String accessToken = accessTokenFor(PW_EMAIL, PW_OLD);
+
+		mockMvc.perform(put("/admin/auth/password")
+				.header("Authorization", "Bearer " + accessToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(passwordChangeBody("not-the-current-password", PW_NEW)))
+			.andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void changePassword_withoutToken_isRejected() throws Exception {
+		mockMvc.perform(put("/admin/auth/password")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(passwordChangeBody(PW_OLD, PW_NEW)))
+			.andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void changePassword_withTooShortNewPassword_isRejected() throws Exception {
+		String accessToken = accessTokenFor(PW_EMAIL, PW_OLD);
+
+		mockMvc.perform(put("/admin/auth/password")
+				.header("Authorization", "Bearer " + accessToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(passwordChangeBody(PW_OLD, "short")))
+			.andExpect(status().isBadRequest());
 	}
 
 	@Test

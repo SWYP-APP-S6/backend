@@ -43,6 +43,16 @@ public class AdminAuthService {
 		refreshTokenService.revoke(refreshToken);
 	}
 
+	@Transactional
+	public void changePassword(Long adminId, String currentPassword, String newPassword) {
+		Admin admin = adminRepository.findById(adminId)
+				.orElseThrow(() -> new BusinessException(AuthErrorCode.INVALID_CREDENTIALS));
+		if (!passwordEncoder.matches(currentPassword, admin.getPassword())) {
+			throw new BusinessException(AuthErrorCode.INVALID_CREDENTIALS);
+		}
+		admin.changePassword(passwordEncoder.encode(newPassword));
+	}
+
 	private TokenResponse issueFor(Admin admin) {
 		String accessToken = tokenProvider.createAccessToken(admin.getId(), admin.getType().name());
 		String refreshToken = refreshTokenService.issue(admin.getId());
