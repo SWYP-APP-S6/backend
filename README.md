@@ -13,7 +13,11 @@ SWYP 앱의 백엔드 REST API 서버. (관리자 백오피스 + 소비자·판�
 
 - **Docker** — 실행·테스트에 필수. 로컬 개발용 PostgreSQL·Redis는 `bootRun`/테스트가 컨테이너로 자동 기동한다.
 - JDK는 별도 설치 불필요 — Gradle toolchain(foojay)이 JDK 25를 자동으로 받는다.
-- 최초 클론 후 1회: `git config core.hooksPath .githooks` (커밋 훅 활성화)
+- 최초 클론 후 1회:
+  - `git config core.hooksPath .githooks` (커밋 훅 활성화)
+  - `cp .env.example .env` — **필수**. `jwt.secret`에 기본값이 없어 `JWT_SECRET` 없이는 앱이 뜨지 않는다
+    (기본값이 있으면 운영에서 환경변수를 빠뜨렸을 때 공개 저장소의 키로 조용히 떨어진다).
+    `.env`는 `bootRun`과 `docker compose` 양쪽이 읽는다.
 
 ## 빠른 시작
 
@@ -24,7 +28,8 @@ SWYP 앱의 백엔드 REST API 서버. (관리자 백오피스 + 소비자·판�
 - 헬스: <http://localhost:8080/ping> → `{"data":{"message":"pong"}}`
 - **API 문서(Swagger UI)**: <http://localhost:8080/swagger-ui/index.html>
 
-로그인 흐름 확인(로컬 dev seed admin — **프로덕션 전 교체/삭제**):
+로그인 흐름 확인. dev 관리자는 스키마에 없으므로(V0012가 제거) 로컬에서 한 번 넣어야 한다 —
+`psql "postgresql://swyp:swyp@localhost:5432/swyp" -f src/main/resources/db/data/dev_seed_admin.sql`:
 
 ```bash
 curl -X POST localhost:8080/admin/auth/login \

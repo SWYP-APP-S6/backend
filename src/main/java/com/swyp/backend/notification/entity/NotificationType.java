@@ -1,0 +1,12 @@
+package com.swyp.backend.notification.entity;
+
+public enum NotificationType {
+	HOLD_CREATED,
+	HOLD_EXPIRING_SOON,
+	HOLD_EXPIRED,
+	PICKUP_COMPLETED,
+	HOLD_CANCELED_BY_OWNER,
+	NEARBY_PRODUCT_REGISTERED,
+	STOCK_RECONFIRM_REQUEST,
+	NEW_HOLD_RECEIVED
+}

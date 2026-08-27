@@ -36,6 +36,9 @@ public class Recipe extends BaseTimeEntity {
 	@Column(name = "cook_method", length = 32)
 	private String cookMethod;
 
+	@Column(name = "cook_time_minutes")
+	private Short cookTimeMinutes;
+
 	@Column(nullable = false)
 	private short servings;
 
@@ -78,6 +81,10 @@ public class Recipe extends BaseTimeEntity {
 		this.cookMethod = cookMethod;
 		this.servings = servings;
 		this.license = license;
+	}
+
+	public void assignCookTimeMinutes(Short cookTimeMinutes) {
+		this.cookTimeMinutes = cookTimeMinutes;
 	}
 
 	public void assignImages(String imageUrl, String imageThumbUrl, String originImageUrl) {

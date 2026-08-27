@@ -124,6 +124,22 @@ SWYP 앱의 백엔드 REST API 서버. (프로덕트 한 줄 설명은 확정되
 - 로컬 실행·인프라(Docker Compose, `./gradlew bootRun`, 전체 스택 도커, `bootTestRun`, Redis 접두)는
   `.claude/docs/local-development.md` 참고. (**로컬 실행엔 Docker 필요.**)
 
+## Deployment
+
+- **NCP 단일 VM + `docker compose`**(app/postgres/redis), 앞단에 nginx 리버스 프록시. 개념·필수 env
+  변수·운영 명령어는 [`DEPLOY.md`](DEPLOY.md), 서버 `.env` 템플릿은 `deploy.env.example`.
+- **배포는 서버가 끌어온다(pull)** — `ssh deploy@<서버>` → `cd ~/backend && ./scripts/deploy.sh`.
+  **GitHub Actions로 배포하지 않는다**: 이 저장소는 public이고, public 저장소에 self-hosted
+  runner를 붙이면 fork의 PR이 배포 호스트에서 코드를 실행할 수 있다(GitHub 공식 권고도 러너는
+  private 전용). public을 유지하는 이유는 Free 플랜에서 **CodeQL이 public에서만 무료**이고
+  **Actions 분도 public만 무제한**이기 때문 — 자세한 근거는 `DEPLOY.md`.
+- public이라 서버가 인증 없이 clone한다 → 서버에 레포 토큰·배포 키가 없고 인바운드도 없다.
+  `build` job(컴파일+테스트)은 PR·push마다 계속 자동으로 돈다.
+- `compose.yaml`은 **로컬과 운영이 같은 파일**을 쓴다. 운영 전용 값(`SPRING_PROFILES_ACTIVE=prod`,
+  비밀번호)은 서버 `.env`로만 주입하고, 파일에 적힌 기본값은 전부 로컬용이다.
+- 작은 VM 전제의 안전장치는 `compose.yaml`에 박혀 있다 — 로그 rotation·`mem_limit`·redis
+  `maxmemory`. **swap/swappiness는 OS 레벨이라 레포로 관리되지 않는 서버별 수동 설정**(DEPLOY.md).
+
 ## Tests
 
 - JUnit 5 + **Testcontainers 실제 PostgreSQL**(Docker 필요). `./gradlew build` = 컴파일+테스트 로컬 게이트(규칙 6).

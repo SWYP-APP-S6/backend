@@ -2,6 +2,10 @@ name: CI
 
 # Every PR to main, and every push to main. Feature work integrates via PR; main also receives
 # direct pushes (e.g. the harness bootstrap), so both paths are gated by the same build.
+#
+# Deployment deliberately does NOT live here. This repository is public, and a self-hosted runner
+# on a public repository lets a fork's pull request execute code on the deployment host. The
+# server pulls instead (scripts/deploy.sh) — see DEPLOY.md.
 on:
   pull_request:
     branches: [main]
