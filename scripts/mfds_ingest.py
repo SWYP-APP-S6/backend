@@ -89,6 +89,16 @@ def clean(v) -> str:
     return (v or "").strip()
 
 
+def image_url(v) -> str:
+    """식약처가 http 로 주는 이미지 URL 을 https 로 올린다.
+
+    같은 호스트가 https 를 정상 지원하며 http 는 302 로 되돌린다. 평문 URL 을 그대로 두면
+    HTTPS 페이지에서 mixed content 로 차단되고 iOS ATS 도 막는다.
+    """
+    u = clean(v)
+    return "https://" + u[len("http://"):] if u.startswith("http://") else u
+
+
 def split_top_level(text: str) -> list[str]:
     """괄호 밖의 쉼표에서만 자른다. 원본에 짝이 안 맞는 괄호가 있어 깊이는 0 밑으로 내리지 않는다."""
     out, buf, depth = [], [], 0
@@ -229,7 +239,7 @@ def parse_steps(row: dict) -> list[tuple[int, str, str | None]]:
         text = re.sub(r"(?<=[^\sA-Za-z])[A-Za-z]$", "", text)  # 끝에 붙은 이미지 앵커 문자
         text = re.sub(r"\s+", " ", text).strip()
         if text:
-            steps.append((text, clean(row.get(f"MANUAL_IMG{i:02d}")) or None))
+            steps.append((text, image_url(row.get(f"MANUAL_IMG{i:02d}")) or None))
     return [(n, c, img) for n, (c, img) in enumerate(steps, start=1)]
 
 
@@ -286,8 +296,8 @@ def main() -> None:
         recipes.append((
             sid, clean(r.get("RCP_NM"))[:255], clean(r.get("RCP_PAT2"))[:32] or None,
             clean(r.get("RCP_WAY2"))[:32] or None,
-            clean(r.get("ATT_FILE_NO_MK"))[:512] or None,
-            clean(r.get("ATT_FILE_NO_MAIN"))[:512] or None,
+            image_url(r.get("ATT_FILE_NO_MK"))[:512] or None,
+            image_url(r.get("ATT_FILE_NO_MAIN"))[:512] or None,
         ))
         for seq, content, img in parse_steps(r):
             steps.append((sid, seq, content, (img or "")[:512] or None))
