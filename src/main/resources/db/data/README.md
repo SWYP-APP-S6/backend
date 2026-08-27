@@ -33,8 +33,15 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f src/main/resources/db/data/mfds_cookr
 전체가 한 트랜잭션이고 모든 INSERT 가 `on conflict do nothing` 이라 **재실행해도 안전**하다.
 자식 행은 id 를 박지 않고 `(source, source_id)` 로 조인해 부모를 찾으므로 identity 컬럼과 충돌하지 않는다.
 
-**운영 서버에 올릴 때**는 커밋 대상이 아니므로, 파일을 직접 전송(`scp`)하거나 서버에서
-`MFDS_API_KEY` 를 지정해 스크립트를 돌려 만든다.
+**운영 서버에 올릴 때**는 커밋 대상이 아니므로 로컬에서 밀어넣는다:
+
+```sh
+./scripts/seed-remote.sh root@api.mangro.cloud              # 본체
+./scripts/seed-remote.sh root@api.mangro.cloud --with-raw   # 원본까지
+```
+
+파일을 SSH stdin 으로 흘려보내므로 서버에 사본이 남지 않는다. 위 멱등성 덕분에 몇 번을 다시
+돌려도 안전하다. 서버에서 직접 만들고 싶다면 `MFDS_API_KEY` 를 지정해 수집 스크립트를 돌린다.
 
 ## 관리자 계정
 
