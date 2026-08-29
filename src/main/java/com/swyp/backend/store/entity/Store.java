@@ -62,6 +62,12 @@ public class Store extends BaseTimeEntity {
 	@Column(nullable = false, length = 20)
 	private StoreStatus status;
 
+	@Column(name = "business_registration_number", length = 20)
+	private String businessRegistrationNumber;
+
+	@Column(name = "application_note", columnDefinition = "text")
+	private String applicationNote;
+
 	public Store(
 			User owner,
 			String name,
@@ -99,6 +105,11 @@ public class Store extends BaseTimeEntity {
 	public void updateBusinessHours(LocalTime businessOpenTime, LocalTime businessCloseTime) {
 		this.businessOpenTime = businessOpenTime;
 		this.businessCloseTime = businessCloseTime;
+	}
+
+	public void submitApplication(String businessRegistrationNumber, String applicationNote) {
+		this.businessRegistrationNumber = businessRegistrationNumber;
+		this.applicationNote = applicationNote;
 	}
 
 	public void approve() {
