@@ -1,6 +1,5 @@
 package com.swyp.backend.common.security;
 
-import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -28,11 +27,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 		String token = resolveToken(request);
 		if (token != null) {
 			try {
-				Claims claims = tokenProvider.parse(token);
+				JwtTokenProvider.AccessToken accessToken = tokenProvider.parseAccessToken(token);
 				var authentication = new UsernamePasswordAuthenticationToken(
-						Long.valueOf(claims.getSubject()),
+						accessToken.principalId(),
 						null,
-						List.of(new SimpleGrantedAuthority("ROLE_" + claims.get("role", String.class))));
+						List.of(
+							new SimpleGrantedAuthority("ROLE_" + accessToken.role()),
+							new SimpleGrantedAuthority(accessToken.realm().authority())));
 				authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 				SecurityContextHolder.getContext().setAuthentication(authentication);
 			} catch (JwtException | IllegalArgumentException e) {

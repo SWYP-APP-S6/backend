@@ -65,6 +65,14 @@ SWYP 앱의 백엔드 REST API 서버. (프로덕트 한 줄 설명은 확정되
   `common.security.*`(`JwtTokenProvider`·`RefreshTokenService`·`JwtProperties`·`JwtAuthenticationFilter`).
   역할 = `ROLE_<AdminType>`(SUPER/MANAGER/DEVELOPER). 시드 SUPER admin은 V0001(DEV ONLY, 프로덕션 전 교체).
 - **앱 유저(소비자·판매자)**: 아직 미구현 — 위 auth 인프라 재사용 예정. **소셜 로그인은 나중**(기능 개발 후).
+- **realm 분리(admin ↔ 앱 유저)**: 두 주체가 같은 JWT/Redis 인프라를 쓰게 되므로 access 토큰에 `realm`
+  클레임(`TokenRealm` = ADMIN/USER)을 넣고, refresh 토큰도 Redis 키를 `refresh:<realm>:<token>`으로
+  나눈다. `/admin/**`는 `REALM_ADMIN` authority를 요구한다 — 앱 유저 토큰으로는 관리자 API에 닿지
+  못하고, 앱 유저 refresh 토큰을 `/admin/auth/refresh`에 넣어도 회전되지 않는다(id가 겹치는 admin
+  토큰이 발급되던 문제). 인가 거부는 `RestAccessDeniedHandler`가 403 error envelope로 만든다.
+  access 토큰은 `typ=access`라서 다른 용도의 토큰을 bearer로 써도 통과하지 못한다.
+  **앱 유저 전용 엔드포인트를 새로 만들면 `SecurityConfig`에 `REALM_USER` 요구를 함께 등록한다** —
+  `authenticated()`만 걸면 admin 토큰으로도 들어올 수 있고, 그 id가 `users` 의 다른 사람을 가리킨다.
 - 토큰 정책: access/refresh TTL은 `jwt.*`(application.properties), secret은 `JWT_SECRET` env(dev 기본값 커밋).
   refresh는 Redis에 저장·회전(1회용)·로그아웃 시 폐기.
 
