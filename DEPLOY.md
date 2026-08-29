@@ -63,6 +63,8 @@ pull 방향 배포가 성립한다. 서버로 들어오는 인바운드 연결�
 | `SPRING_PROFILES_ACTIVE` | ✅ | `prod`. 이게 있어야 swagger 가 닫힌다 |
 | `JWT_SECRET` | ✅ | 32바이트 이상. 없으면 앱이 기동하지 않는다 (`openssl rand -base64 48`) |
 | `POSTGRES_PASSWORD` | ✅ | **볼륨 최초 초기화 때만 적용** — 첫 배포 때 정하고 이후 바꾸지 않는다 |
+| `KAKAO_CONSUMER_APP_ID` | ✅ | 소비자 앱의 카카오 **숫자 앱 ID**(REST API 키 아님). 없으면 앱은 뜨지만 소비자 카카오 로그인이 전부 거부된다 |
+| `KAKAO_OWNER_APP_ID` | ✅ | 점주 앱의 카카오 앱 ID. 소비자 앱과 **다른 카카오 앱**이다 |
 | `MFDS_API_KEY` | ❌ | 레시피 수집 배치 전용. 비어 있어도 앱은 뜬다 |
 
 값을 확인할 때는 시크릿이 터미널에 남지 않도록 키와 길이만 본다:

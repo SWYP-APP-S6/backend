@@ -9,8 +9,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface UserRepository extends JpaRepository<User, Long> {
 
-	Optional<User> findByOauthProviderAndOauthProviderId(
-			String oauthProvider, String oauthProviderId);
+	Optional<User> findByOauthProviderAndOauthProviderIdAndRole(
+			String oauthProvider, String oauthProviderId, UserRole role);
 
 	Page<User> findByRole(UserRole role, Pageable pageable);
 }

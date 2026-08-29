@@ -7,6 +7,7 @@ import com.swyp.backend.common.exception.BusinessException;
 import com.swyp.backend.common.security.AuthErrorCode;
 import com.swyp.backend.common.security.JwtTokenProvider;
 import com.swyp.backend.common.security.RefreshTokenService;
+import com.swyp.backend.common.security.TokenRealm;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -32,15 +33,15 @@ public class AdminAuthService {
 	}
 
 	public TokenResponse refresh(String refreshToken) {
-		RefreshTokenService.Rotation rotation = refreshTokenService.rotate(refreshToken);
-		Admin admin = adminRepository.findById(rotation.userId())
+		RefreshTokenService.Rotation rotation = refreshTokenService.rotate(TokenRealm.ADMIN, refreshToken);
+		Admin admin = adminRepository.findById(rotation.principalId())
 				.orElseThrow(() -> new BusinessException(AuthErrorCode.INVALID_CREDENTIALS));
-		String accessToken = tokenProvider.createAccessToken(admin.getId(), admin.getType().name());
+		String accessToken = accessTokenFor(admin);
 		return new TokenResponse(accessToken, rotation.token());
 	}
 
 	public void logout(String refreshToken) {
-		refreshTokenService.revoke(refreshToken);
+		refreshTokenService.revoke(TokenRealm.ADMIN, refreshToken);
 	}
 
 	@Transactional
@@ -54,8 +55,10 @@ public class AdminAuthService {
 	}
 
 	private TokenResponse issueFor(Admin admin) {
-		String accessToken = tokenProvider.createAccessToken(admin.getId(), admin.getType().name());
-		String refreshToken = refreshTokenService.issue(admin.getId());
-		return new TokenResponse(accessToken, refreshToken);
+		return new TokenResponse(accessTokenFor(admin), refreshTokenService.issue(TokenRealm.ADMIN, admin.getId()));
+	}
+
+	private String accessTokenFor(Admin admin) {
+		return tokenProvider.createAccessToken(TokenRealm.ADMIN, admin.getId(), admin.getType().name());
 	}
 }

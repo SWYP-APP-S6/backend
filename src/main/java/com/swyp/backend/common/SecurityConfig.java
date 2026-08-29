@@ -3,7 +3,9 @@ package com.swyp.backend.common;
 import com.swyp.backend.common.security.JwtAuthenticationFilter;
 import com.swyp.backend.common.security.JwtProperties;
 import com.swyp.backend.common.security.JwtTokenProvider;
+import com.swyp.backend.common.security.RestAccessDeniedHandler;
 import com.swyp.backend.common.security.RestAuthenticationEntryPoint;
+import com.swyp.backend.common.security.TokenRealm;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -31,6 +33,11 @@ public class SecurityConfig {
 		"/admin/auth/login",
 		"/admin/auth/refresh",
 		"/admin/auth/logout",
+		"/auth/consumer/kakao",
+		"/auth/owner/kakao",
+		"/auth/signup",
+		"/auth/refresh",
+		"/auth/logout",
 		"/recipes",
 		"/recipes/**",
 	};
@@ -64,6 +71,7 @@ public class SecurityConfig {
 	@Bean
 	SecurityFilterChain filterChain(HttpSecurity http, JwtTokenProvider tokenProvider,
 			RestAuthenticationEntryPoint authenticationEntryPoint,
+			RestAccessDeniedHandler accessDeniedHandler,
 			@Value("${springdoc.api-docs.enabled:true}") boolean apiDocsEnabled) throws Exception {
 		http
 			.cors(Customizer.withDefaults())
@@ -74,9 +82,12 @@ public class SecurityConfig {
 				if (apiDocsEnabled) {
 					auth.requestMatchers(API_DOCS_ENDPOINTS).permitAll();
 				}
+				auth.requestMatchers("/admin/**").hasAuthority(TokenRealm.ADMIN.authority());
 				auth.anyRequest().authenticated();
 			})
-			.exceptionHandling(exception -> exception.authenticationEntryPoint(authenticationEntryPoint))
+			.exceptionHandling(exception -> exception
+				.authenticationEntryPoint(authenticationEntryPoint)
+				.accessDeniedHandler(accessDeniedHandler))
 			.addFilterBefore(new JwtAuthenticationFilter(tokenProvider), UsernamePasswordAuthenticationFilter.class)
 			.httpBasic(basic -> basic.disable())
 			.formLogin(form -> form.disable());

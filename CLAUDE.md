@@ -16,6 +16,9 @@ SWYP 앱의 백엔드 REST API 서버. (프로덕트 한 줄 설명은 확정되
   불변 DTO는 Lombok이 아니라 `record`(아래 Architecture). 규칙 12의 명시적 예외(규칙 12 참조).
 - 스키마 마이그레이션: **Flyway** (`spring-boot-starter-flyway` + `org.flywaydb:flyway-database-postgresql`).
   자세한 규약은 아래 Database 섹션.
+- **외부 API 호출**: `RestClient`. Boot 4는 클라이언트 자동설정이 별도 모듈이라
+  **`spring-boot-starter-restclient`가 있어야** `RestClient.Builder` 빈이 생긴다(webmvc 스타터만으론 없음).
+  타임아웃은 `spring.http.clients.{connect,read}-timeout`으로 전역 설정한다.
 - **ArchUnit**: 레이어 경계를 테스트로 강제(`ArchitectureTest`). Java 25 바이트코드 파싱 위해 **1.5.0+** 필요.
 - **API 문서**: springdoc-openapi (`/swagger-ui`, `/v3/api-docs`). **Boot 4 → springdoc 3.x**(2.x는 Boot 3용). 인증은 `bearerAuth` 스킴.
 - **도입 예정 (Phase 2)**: Spotless(포맷) · Checkstyle(스타일). 미리 안 깔고 마찰 생기면 추가.
@@ -64,9 +67,37 @@ SWYP 앱의 백엔드 REST API 서버. (프로덕트 한 줄 설명은 확정되
   `common.SecurityConfig`(STATELESS·JWT 필터·`RestAuthenticationEntryPoint`가 401을 error envelope로),
   `common.security.*`(`JwtTokenProvider`·`RefreshTokenService`·`JwtProperties`·`JwtAuthenticationFilter`).
   역할 = `ROLE_<AdminType>`(SUPER/MANAGER/DEVELOPER). 시드 SUPER admin은 V0001(DEV ONLY, 프로덕션 전 교체).
-- **앱 유저(소비자·판매자)**: 아직 미구현 — 위 auth 인프라 재사용 예정. **소셜 로그인은 나중**(기능 개발 후).
-- 토큰 정책: access/refresh TTL은 `jwt.*`(application.properties), secret은 `JWT_SECRET` env(dev 기본값 커밋).
-  refresh는 Redis에 저장·회전(1회용)·로그아웃 시 폐기.
+- **앱 유저(소비자·점주)**: **카카오 로그인만** 쓴다(관리자 백오피스는 해당 없음 — 위 email+password 유지).
+  **소비자 앱과 점주 앱은 별개의 카카오 앱**이다(콘솔의 플랫폼 등록이 앱마다 필요하고, 한 카카오 앱에
+  패키지명·번들ID를 여러 개 넣으려면 '멀티 앱' 권한 신청이 별도로 필요해서). 앱이 카카오 SDK로 받은
+  access token을 넘기면 서버가 `/v1/user/access_token_info`로 **app_id가 그 역할의 카카오 앱인지
+  검증**한 뒤(`kakao.consumer-app-id`/`kakao.owner-app-id`) `/v2/user/me`로 닉네임을 읽는다 —
+  다른 앱 토큰으로 남의 계정에 로그인하는 토큰 치환을 막고, 소비자 앱 토큰을 점주 엔드포인트에
+  쓰는 것도 여기서 걸린다. **카카오 토큰은 저장하지 않는다** — 로그인 순간 신원 확인용으로만 쓴다.
+  엔드포인트는 앱별로 분리 — `/auth/consumer/kakao`·`/auth/owner/kakao`(role을 클라이언트가 정하지
+  못한다) + `/auth/{signup,refresh,logout}`. 구성: `user.controller.UserAuthController`,
+  `user.service.{UserAuthService,KakaoOauthClient,KakaoRestOauthClient,SignupTokenProvider}`.
+- **신규 가입은 2단계** — 첫 카카오 로그인은 `registered:false` + 단기 **signupToken**만 주고 `users`
+  row를 만들지 않는다. 약관 동의 후 `/auth/signup`이 계정을 만든다(기능명세서 C-002: "인증됐으나 약관
+  미동의인 계정이 남으면 안 됨" — 이탈하면 아무것도 남지 않는다). 필수 약관 3건은
+  `SignupRequest`의 `@AssertTrue`로 강제하고, 스키마에는 `terms_agreed_at` 한 건으로 기록한다
+  (항목별 동의 이력이 필요해지면 별도 테이블).
+  **유저 식별자는 `(oauth_provider, oauth_provider_id, role)`**(V0015의 `uq_users_oauth_identity`) —
+  카카오 회원번호는 **앱마다 다르게 발급**되므로 서로 다른 두 사람이 각 앱에서 같은 번호를 가질 수
+  있다. `role`이 곧 '어느 카카오 앱에서 온 번호인가'라서 식별자에 들어간다. 그 결과 한 사람이 소비자
+  계정과 점주 계정을 각각 가질 수 있다(앱이 분리돼 있으니 정상 동작).
+- **realm 분리(admin ↔ 앱 유저)**: 두 주체가 같은 JWT/Redis 인프라를 쓰므로 access 토큰에 `realm`
+  클레임(`TokenRealm` = ADMIN/USER)을 넣고, refresh 토큰도 Redis 키를 `refresh:<realm>:<token>`으로
+  나눈다. `/admin/**`는 `REALM_ADMIN` authority를 요구한다 — **앱 유저 토큰으로는 관리자 API에 닿지
+  못하고**, 앱 유저 refresh 토큰을 `/admin/auth/refresh`에 넣어도 회전되지 않는다(id가 겹치는 admin
+  토큰이 발급되던 문제). 인가 거부는 `RestAccessDeniedHandler`가 403 error envelope로 만든다.
+  access 토큰은 `typ=access`라서 가입 토큰(`typ=signup`)을 bearer로 써도 통과하지 못한다.
+  **앱 유저 전용 엔드포인트를 새로 만들면 `SecurityConfig`에 `REALM_USER` 요구를 함께 등록한다** —
+  `authenticated()`만 걸면 admin 토큰으로도 들어올 수 있고, 그 id가 `users` 의 다른 사람을 가리킨다.
+- 토큰 정책: access/refresh TTL은 `jwt.*`, 가입 토큰 TTL은 `auth.signup-ttl`(application.properties),
+  secret은 `JWT_SECRET` env(dev 기본값 커밋). refresh는 Redis에 저장·회전(1회용)·로그아웃 시 폐기.
+  카카오 앱 검증용 `KAKAO_CONSUMER_APP_ID`·`KAKAO_OWNER_APP_ID`(콘솔의 **숫자 앱 ID**, REST API 키가
+  아님)는 미설정이면 0이 되어 **그 앱의 카카오 로그인이 전부 거부된다**(fail-closed, 기동은 된다).
 
 ## Workflow (rules)
 

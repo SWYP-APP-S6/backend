@@ -40,6 +40,31 @@ curl -X POST localhost:8080/admin/auth/login \
 
 Swagger UI 우측 상단 **Authorize** 에 access 토큰을 넣으면 보호 엔드포인트도 UI에서 호출된다.
 
+### 앱 유저 로그인 (카카오)
+
+관리자 웹은 위 email+password 를 그대로 쓰고, **소비자 앱 / 점주 앱만 카카오 로그인**을 쓴다.
+두 앱은 **별개의 카카오 앱**이라 서버 설정도 `KAKAO_CONSUMER_APP_ID` / `KAKAO_OWNER_APP_ID` 두 개다
+(콘솔의 숫자 앱 ID). 앱이 카카오 SDK 로 받은 access token 을 넘기면, 서버는 그 토큰이 **그 역할의
+카카오 앱**에서 발급된 것인지 확인한 뒤 자체 JWT 를 발급한다.
+
+카카오 회원번호는 앱마다 다르게 발급되므로 유저 식별자는 `(provider, provider_id, role)` 이고,
+같은 사람이 소비자 계정과 점주 계정을 각각 가질 수 있다.
+
+```
+POST /auth/consumer/kakao   { "kakaoAccessToken": "..." }   # 점주 앱은 /auth/owner/kakao
+  → 기존 회원: { "registered": true,  "accessToken": "...", "refreshToken": "..." }
+  → 신규:      { "registered": false, "signupToken": "..." }   # 아직 계정을 만들지 않는다
+
+POST /auth/signup           { "signupToken": "...", "serviceTermsAgreed": true,
+                              "privacyTermsAgreed": true, "locationTermsAgreed": true,
+                              "marketingOptIn": false }
+  → 계정 생성 + { "accessToken": "...", "refreshToken": "..." }
+
+POST /auth/refresh · /auth/logout   { "refreshToken": "..." }
+```
+
+약관 동의 화면에서 이탈하면 계정이 남지 않도록, 신규 유저는 `/auth/signup` 시점에 생성된다.
+
 ## 테스트 / 빌드
 
 ```bash
@@ -56,6 +81,7 @@ CI(`.github/workflows/ci.yml`)가 PR·main push마다 동일하게 `./gradlew bu
 ```
 com.swyp.backend
 ├── admin/            # 관리자 feature (entity·repository·controller·service·dto)
+├── user/             # 앱 유저 feature — 카카오 로그인·가입 포함
 ├── ping/             # walking skeleton (컨벤션 레퍼런스)
 └── common/           # 여러 feature가 공유하는 것
     ├── response/     # ApiResponse·ErrorResponse·SuccessCode·ErrorCode

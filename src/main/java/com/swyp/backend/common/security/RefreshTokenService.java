@@ -2,6 +2,7 @@ package com.swyp.backend.common.security;
 
 import com.swyp.backend.common.exception.BusinessException;
 import java.time.Duration;
+import java.util.Locale;
 import java.util.UUID;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -19,24 +20,28 @@ public class RefreshTokenService {
 		this.ttl = properties.refreshTtl();
 	}
 
-	public String issue(Long userId) {
+	public String issue(TokenRealm realm, Long principalId) {
 		String token = UUID.randomUUID().toString();
-		redis.opsForValue().set(KEY_PREFIX + token, String.valueOf(userId), ttl);
+		redis.opsForValue().set(key(realm, token), String.valueOf(principalId), ttl);
 		return token;
 	}
 
-	public Rotation rotate(String presentedToken) {
-		String userId = redis.opsForValue().getAndDelete(KEY_PREFIX + presentedToken);
-		if (userId == null) {
+	public Rotation rotate(TokenRealm realm, String presentedToken) {
+		String principalId = redis.opsForValue().getAndDelete(key(realm, presentedToken));
+		if (principalId == null) {
 			throw new BusinessException(AuthErrorCode.INVALID_REFRESH_TOKEN);
 		}
-		return new Rotation(Long.valueOf(userId), issue(Long.valueOf(userId)));
+		return new Rotation(Long.valueOf(principalId), issue(realm, Long.valueOf(principalId)));
 	}
 
-	public void revoke(String token) {
-		redis.delete(KEY_PREFIX + token);
+	public void revoke(TokenRealm realm, String token) {
+		redis.delete(key(realm, token));
 	}
 
-	public record Rotation(Long userId, String token) {
+	private String key(TokenRealm realm, String token) {
+		return KEY_PREFIX + realm.name().toLowerCase(Locale.ROOT) + ":" + token;
+	}
+
+	public record Rotation(Long principalId, String token) {
 	}
 }
