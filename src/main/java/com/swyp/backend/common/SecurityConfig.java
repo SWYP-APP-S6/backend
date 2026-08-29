@@ -33,6 +33,11 @@ public class SecurityConfig {
 		"/admin/auth/login",
 		"/admin/auth/refresh",
 		"/admin/auth/logout",
+		"/auth/consumer/kakao",
+		"/auth/owner/kakao",
+		"/auth/signup",
+		"/auth/refresh",
+		"/auth/logout",
 		"/recipes",
 		"/recipes/**",
 	};
