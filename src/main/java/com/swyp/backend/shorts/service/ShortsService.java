@@ -70,6 +70,7 @@ public class ShortsService {
 		body.put("title", request == null ? null : request.title());
 		body.put("origin", request == null ? null : request.origin());
 		body.put("context", request == null ? null : request.context());
+		body.put("language", request == null ? null : request.language());
 		return client.post(
 			"/api/media/" + UriUtils.encodePathSegment(name, StandardCharsets.UTF_8) + "/register",
 			ShortsClient.withAdmin(body, adminId));
@@ -79,6 +80,7 @@ public class ShortsService {
 		Map<String, Object> body = new HashMap<>();
 		body.put("url", request.url());
 		body.put("context", request.context());
+		body.put("language", request.language());
 		return client.post("/api/sources/from-url", ShortsClient.withAdmin(body, adminId));
 	}
 
@@ -91,6 +93,7 @@ public class ShortsService {
 		Map<String, Object> body = new HashMap<>();
 		body.put("model", request.model());
 		body.put("initialPrompt", request.initialPrompt());
+		body.put("language", request.language());
 		body.put("force", request.force());
 		return client.post("/api/chunks/" + chunkId + "/stt", body);
 	}

@@ -104,7 +104,7 @@ public class AdminShortsController {
 	@PostMapping("/chunks/{chunkId}/stt")
 	public ApiResponse<JsonNode> runStt(@PathVariable long chunkId, @RequestBody(required = false) SttRequest request) {
 		return ApiResponse.of(SuccessCode.OK,
-			shortsService.runStt(chunkId, request == null ? new SttRequest(null, null, false) : request));
+			shortsService.runStt(chunkId, request == null ? new SttRequest(null, null, null, false) : request));
 	}
 
 	@PostMapping("/chunks/{chunkId}/segment")
