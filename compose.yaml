@@ -77,10 +77,16 @@ services:
       MFDS_API_KEY: ${MFDS_API_KEY:-}
       # 기본값이 없다. 비어 있으면 JwtProperties 가 기동을 막고 이유를 알려준다.
       JWT_SECRET: ${JWT_SECRET:-}
-      # mem_limit 만 걸면 JVM 은 컨테이너 메모리의 기본 25% 만 힙으로 잡는다(1300m 기준 325MB).
-      # 힙 ~975MB + 메타스페이스/스레드/JIT ~325MB 로 명시 배분한다.
+      # 숏폼 생성 파이프라인(shorts_maker). 별도 레포/컨테이너이고 같은 도커 네트워크에 붙는다.
+      # 없거나 꺼져 있으면 관리자 화면의 숏폼 탭만 503 이 되고 나머지 API 는 정상이다.
+      SHORTS_BASE_URL: ${SHORTS_BASE_URL:-http://shorts:8100}
+      SHORTS_API_TOKEN: ${SHORTS_API_TOKEN:-}
+      # mem_limit 만 걸면 JVM 은 컨테이너 메모리의 기본 25% 만 힙으로 잡는다(1024m 기준 256MB).
+      # 힙 ~768MB + 메타스페이스/스레드/JIT ~256MB 로 명시 배분한다.
       JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=75.0
-    mem_limit: 1300m
+    # 1300m → 1024m. shorts_maker(1400m, whisper 추론이 1.1GB) 를 같은 VM 에 얹으면서
+    # 줄였다. 현재 부하에서는 힙 768MB 로 충분하고, 모자라면 VM 을 키우는 게 다음 수순이다.
+    mem_limit: 1024m
     <<: *default-logging
     depends_on:
       postgres:
