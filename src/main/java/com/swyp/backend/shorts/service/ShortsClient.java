@@ -49,6 +49,11 @@ public class ShortsClient {
 		});
 	}
 
+	public JsonNode delete(String path) {
+		return exchange(
+			() -> restClient.delete().uri(path).headers(this::applyToken).retrieve().body(JsonNode.class));
+	}
+
 	public Resource download(String path) {
 		return exchange(
 			() -> restClient.get().uri(path).headers(this::applyToken).retrieve().body(Resource.class));
