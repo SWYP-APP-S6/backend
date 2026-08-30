@@ -137,7 +137,8 @@ deploy-sm
 - 🔴 `SHORTS_API_TOKEN` 은 **양쪽 `.env` 에 같은 값**이어야 한다. 컨테이너는 `0.0.0.0` 에
   바인딩하므로 토큰이 없으면 앱이 기동을 거부한다(무인증 노출 방지).
 - 원본 영상은 업로드 기능이 아직 없다 — `scp` 로 올린다:
-  `scp 강연.mp4 deploy@<서버>:~/shorts_maker/sources/`
+  `scp <로컬영상>.mp4 deploy@<서버>:~/shorts_maker/sources/video_sample.mp4`
+  (한글 파일명은 셸·컨테이너 경로에서 인코딩 문제가 생기기 쉬우니 영문으로 올린다)
 - shorts_maker 가 꺼져 있어도 **다른 API 는 정상**이다. 관리자 화면의 숏폼 탭만 503 이 된다.
 
 ## 참고
