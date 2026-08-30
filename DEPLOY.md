@@ -124,8 +124,8 @@ free -h        # Swap 이 4Gi 인지 확인
 # 최초 1회 (root)
 su - deploy -c 'git clone https://github.com/SWYP-APP-S6/shorts_maker.git ~/shorts_maker'
 su - deploy -c 'cp ~/shorts_maker/deploy.env.example ~/shorts_maker/.env'   # 값 채우기
-printf '#!/bin/sh\nexec su - deploy -c /home/deploy/shorts_maker/scripts/deploy.sh\n' \
-  > /usr/local/bin/deploy-sm
+# 🔴 한 줄이다. 줄을 나누면 붙여넣을 때 깨진다.
+printf '#!/bin/sh\nexec su - deploy -c /home/deploy/shorts_maker/scripts/deploy.sh\n' > /usr/local/bin/deploy-sm
 chmod +x /usr/local/bin/deploy-sm
 
 # 배포
