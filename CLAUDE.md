@@ -19,6 +19,10 @@ SWYP 앱의 백엔드 REST API 서버. (프로덕트 한 줄 설명은 확정되
 - **외부 API 호출**: `RestClient`. Boot 4는 클라이언트 자동설정이 별도 모듈이라
   **`spring-boot-starter-restclient`가 있어야** `RestClient.Builder` 빈이 생긴다(webmvc 스타터만으론 없음).
   타임아웃은 `spring.http.clients.{connect,read}-timeout`으로 전역 설정한다.
+- **Jackson 3** (`tools.jackson.databind`) — Boot 4 의 HTTP 메시지 컨버터가 쓰는 건 이쪽이다.
+  `com.fasterxml.jackson`(2.x)도 전이 의존성으로 클래스패스에 **함께 있어서** 잘못 import 해도
+  컴파일은 된다. 그 경우 `JsonNode` 가 트리가 아니라 **POJO 로 직렬화**된다
+  (`{"array":false,"bigDecimal":false,…}`) — 응답이 조용히 망가지므로 import 를 확인할 것.
 - **ArchUnit**: 레이어 경계를 테스트로 강제(`ArchitectureTest`). Java 25 바이트코드 파싱 위해 **1.5.0+** 필요.
 - **API 문서**: springdoc-openapi (`/swagger-ui`, `/v3/api-docs`). **Boot 4 → springdoc 3.x**(2.x는 Boot 3용). 인증은 `bearerAuth` 스킴.
 - **도입 예정 (Phase 2)**: Spotless(포맷) · Checkstyle(스타일). 미리 안 깔고 마찰 생기면 추가.
@@ -98,6 +102,15 @@ SWYP 앱의 백엔드 REST API 서버. (프로덕트 한 줄 설명은 확정되
   secret은 `JWT_SECRET` env(dev 기본값 커밋). refresh는 Redis에 저장·회전(1회용)·로그아웃 시 폐기.
   카카오 앱 검증용 `KAKAO_CONSUMER_APP_ID`·`KAKAO_OWNER_APP_ID`(콘솔의 **숫자 앱 ID**, REST API 키가
   아님)는 미설정이면 0이 되어 **그 앱의 카카오 로그인이 전부 거부된다**(fail-closed, 기동은 된다).
+
+## Shorts (숏폼 생성 베타)
+
+- 관리자 백오피스의 베타 기능. **파이프라인 본체는 별도 레포/서비스**(`SWYP-APP-S6/shorts_maker`,
+  Python). 이 백엔드는 `com.swyp.backend.shorts` 에서 **프록시만** 한다 — `/admin/shorts/**`.
+- 기존 `/admin/**` 의 `REALM_ADMIN` 규칙이 그대로 적용된다(SecurityConfig 변경 없음).
+- 파이프라인 응답은 `JsonNode` 로 통과시킨다. 스키마 소유자가 이쪽이 아니라서 DTO 로 미러링하면
+  파이썬 쪽 변경마다 함께 깨진다.
+- 설계 문서: [`docs/make_shorts.md`](docs/make_shorts.md). **전제가 바뀌면 그 문서 §1 부터 고친다.**
 
 ## Workflow (rules)
 
