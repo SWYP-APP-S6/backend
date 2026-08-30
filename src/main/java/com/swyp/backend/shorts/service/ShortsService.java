@@ -3,14 +3,18 @@ package com.swyp.backend.shorts.service;
 import tools.jackson.databind.JsonNode;
 import com.swyp.backend.shorts.dto.ChunkCreateRequest;
 import com.swyp.backend.shorts.dto.ClipReviewRequest;
+import com.swyp.backend.shorts.dto.MediaRegisterRequest;
 import com.swyp.backend.shorts.dto.RankRequest;
 import com.swyp.backend.shorts.dto.SourceCreateRequest;
+import com.swyp.backend.shorts.dto.SourceFromUrlRequest;
 import com.swyp.backend.shorts.dto.SttRequest;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
+import org.springframework.web.util.UriUtils;
 
 @Service
 @RequiredArgsConstructor
@@ -50,6 +54,32 @@ public class ShortsService {
 		body.put("origin", request.origin());
 		body.put("context", request.context());
 		return client.post("/api/sources", ShortsClient.withAdmin(body, adminId));
+	}
+
+	public JsonNode listMedia() {
+		return client.get("/api/media");
+	}
+
+	// 🔴 서버에서 파일과 파생물을 실제로 지운다. 되돌릴 수 없다.
+	public JsonNode deleteMedia(String name) {
+		return client.delete("/api/media/" + UriUtils.encodePathSegment(name, StandardCharsets.UTF_8));
+	}
+
+	public JsonNode registerMedia(String name, MediaRegisterRequest request, Long adminId) {
+		Map<String, Object> body = new HashMap<>();
+		body.put("title", request == null ? null : request.title());
+		body.put("origin", request == null ? null : request.origin());
+		body.put("context", request == null ? null : request.context());
+		return client.post(
+			"/api/media/" + UriUtils.encodePathSegment(name, StandardCharsets.UTF_8) + "/register",
+			ShortsClient.withAdmin(body, adminId));
+	}
+
+	public JsonNode createSourceFromUrl(SourceFromUrlRequest request, Long adminId) {
+		Map<String, Object> body = new HashMap<>();
+		body.put("url", request.url());
+		body.put("context", request.context());
+		return client.post("/api/sources/from-url", ShortsClient.withAdmin(body, adminId));
 	}
 
 	public JsonNode createChunk(long sourceId, ChunkCreateRequest request) {

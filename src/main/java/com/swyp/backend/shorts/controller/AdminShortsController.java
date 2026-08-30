@@ -5,8 +5,10 @@ import com.swyp.backend.common.response.ApiResponse;
 import com.swyp.backend.common.response.SuccessCode;
 import com.swyp.backend.shorts.dto.ChunkCreateRequest;
 import com.swyp.backend.shorts.dto.ClipReviewRequest;
+import com.swyp.backend.shorts.dto.MediaRegisterRequest;
 import com.swyp.backend.shorts.dto.RankRequest;
 import com.swyp.backend.shorts.dto.SourceCreateRequest;
+import com.swyp.backend.shorts.dto.SourceFromUrlRequest;
 import com.swyp.backend.shorts.dto.SttRequest;
 import com.swyp.backend.shorts.service.ShortsService;
 import jakarta.validation.Valid;
@@ -16,6 +18,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -66,6 +69,30 @@ public class AdminShortsController {
 			@AuthenticationPrincipal Long adminId, @Valid @RequestBody SourceCreateRequest request) {
 		return ResponseEntity.status(HttpStatus.CREATED)
 			.body(ApiResponse.of(SuccessCode.CREATED, shortsService.createSource(request, adminId)));
+	}
+
+	@GetMapping("/media")
+	public ApiResponse<JsonNode> listMedia() {
+		return ApiResponse.of(SuccessCode.OK, shortsService.listMedia());
+	}
+
+	@DeleteMapping("/media/{name}")
+	public ApiResponse<JsonNode> deleteMedia(@PathVariable String name) {
+		return ApiResponse.of(SuccessCode.OK, shortsService.deleteMedia(name));
+	}
+
+	@PostMapping("/media/{name}/register")
+	public ApiResponse<JsonNode> registerMedia(
+			@AuthenticationPrincipal Long adminId,
+			@PathVariable String name,
+			@RequestBody(required = false) MediaRegisterRequest request) {
+		return ApiResponse.of(SuccessCode.OK, shortsService.registerMedia(name, request, adminId));
+	}
+
+	@PostMapping("/sources/from-url")
+	public ApiResponse<JsonNode> createSourceFromUrl(
+			@AuthenticationPrincipal Long adminId, @Valid @RequestBody SourceFromUrlRequest request) {
+		return ApiResponse.of(SuccessCode.OK, shortsService.createSourceFromUrl(request, adminId));
 	}
 
 	@PostMapping("/sources/{sourceId}/chunks")
