@@ -72,6 +72,13 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-swyp}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: "6379"
+      # compose 는 프로젝트 루트 .env 를 변수 치환에만 쓰고 컨테이너에 자동 주입하지 않으므로,
+      # 카카오 앱 ID도 다른 항목들처럼 여기서 명시적으로 넘겨야 한다(빠져 있으면 .env 에 값이
+      # 있어도 컨테이너는 못 보고 "앱 ID 미설정"으로 기동한다). long 에 바인딩되므로(
+      # application.properties) 빈 문자열이면 파싱에 실패한다 — 기본값을 문자열 "0"으로 줘서
+      # 미설정 상태(fail-closed)를 유지한다.
+      KAKAO_CONSUMER_APP_ID: ${KAKAO_CONSUMER_APP_ID:-0}
+      KAKAO_OWNER_APP_ID: ${KAKAO_OWNER_APP_ID:-0}
       # compose 는 프로젝트 루트 `.env` 를 변수 치환에만 쓴다(컨테이너 자동 주입 아님).
       # 그래서 여기서 명시적으로 넘긴다. `.env` 가 없으면 빈 값 → 앱은 그대로 뜬다.
       MFDS_API_KEY: ${MFDS_API_KEY:-}
