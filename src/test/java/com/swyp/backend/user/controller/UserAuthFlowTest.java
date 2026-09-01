@@ -165,6 +165,29 @@ class UserAuthFlowTest {
 	}
 
 	@Test
+	void kakaoCodeExchange_returnsTheAccessTokenTheCodeWasIssuedFor() throws Exception {
+		kakaoOauthClient.registerCode(
+			UserRole.CONSUMER, "auth-code-1", "http://localhost:5173/kakao-test", "exchanged-token");
+
+		mockMvc.perform(post("/auth/consumer/kakao/exchange")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"code":"auth-code-1","redirectUri":"http://localhost:5173/kakao-test"}"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.kakaoAccessToken").value("exchanged-token"));
+	}
+
+	@Test
+	void kakaoCodeExchange_withAnUnknownCode_isRejected() throws Exception {
+		mockMvc.perform(post("/auth/consumer/kakao/exchange")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"code":"never-issued","redirectUri":"http://localhost:5173/kakao-test"}"""))
+			.andExpect(status().isUnauthorized())
+			.andExpect(jsonPath("$.code").value("INVALID_OAUTH_TOKEN"));
+	}
+
+	@Test
 	void theSameKakaoNumberInBothApps_becomesTwoIndependentAccounts() throws Exception {
 		signUp(UserRole.CONSUMER, "token-shared-consumer", "kakao-777", "소비자쪽", "$.data.accessToken");
 		signUp(UserRole.OWNER, "token-shared-owner", "kakao-777", "점주쪽", "$.data.accessToken");
@@ -260,6 +283,8 @@ class UserAuthFlowTest {
 			identities.put(key(role, kakaoAccessToken), identity);
 		}
 
+		private final Map<String, String> authorizationCodes = new ConcurrentHashMap<>();
+
 		@Override
 		public Identity fetchIdentity(UserRole role, String kakaoAccessToken) {
 			Identity identity = identities.get(key(role, kakaoAccessToken));
@@ -269,8 +294,25 @@ class UserAuthFlowTest {
 			return identity;
 		}
 
+		void registerCode(UserRole role, String code, String redirectUri, String kakaoAccessToken) {
+			authorizationCodes.put(codeKey(role, code, redirectUri), kakaoAccessToken);
+		}
+
+		@Override
+		public String exchangeAuthorizationCode(UserRole role, String code, String redirectUri) {
+			String kakaoAccessToken = authorizationCodes.get(codeKey(role, code, redirectUri));
+			if (kakaoAccessToken == null) {
+				throw new BusinessException(UserAuthErrorCode.INVALID_OAUTH_TOKEN);
+			}
+			return kakaoAccessToken;
+		}
+
 		private static String key(UserRole role, String kakaoAccessToken) {
 			return role.name() + ":" + kakaoAccessToken;
+		}
+
+		private static String codeKey(UserRole role, String code, String redirectUri) {
+			return role.name() + ":" + code + ":" + redirectUri;
 		}
 	}
 }

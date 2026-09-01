@@ -6,6 +6,8 @@ public interface KakaoOauthClient {
 
 	Identity fetchIdentity(UserRole role, String kakaoAccessToken);
 
+	String exchangeAuthorizationCode(UserRole role, String code, String redirectUri);
+
 	record Identity(String providerId, String nickname) {
 	}
 }
