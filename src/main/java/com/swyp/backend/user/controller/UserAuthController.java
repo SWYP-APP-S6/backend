@@ -4,6 +4,8 @@ import com.swyp.backend.common.response.ApiResponse;
 import com.swyp.backend.common.response.SuccessCode;
 import com.swyp.backend.user.dto.KakaoLoginRequest;
 import com.swyp.backend.user.dto.KakaoLoginResponse;
+import com.swyp.backend.user.dto.KakaoTokenExchangeRequest;
+import com.swyp.backend.user.dto.KakaoTokenExchangeResponse;
 import com.swyp.backend.user.dto.RefreshRequest;
 import com.swyp.backend.user.dto.SignupRequest;
 import com.swyp.backend.user.dto.TokenResponse;
@@ -35,6 +37,20 @@ public class UserAuthController {
 	public ApiResponse<KakaoLoginResponse> loginAsOwner(@Valid @RequestBody KakaoLoginRequest request) {
 		return ApiResponse.of(
 			SuccessCode.OK, userAuthService.loginWithKakao(UserRole.OWNER, request.kakaoAccessToken()));
+	}
+
+	@PostMapping("/consumer/kakao/exchange")
+	public ApiResponse<KakaoTokenExchangeResponse> exchangeConsumerCode(
+			@Valid @RequestBody KakaoTokenExchangeRequest request) {
+		return ApiResponse.of(SuccessCode.OK,
+			userAuthService.exchangeKakaoCode(UserRole.CONSUMER, request.code(), request.redirectUri()));
+	}
+
+	@PostMapping("/owner/kakao/exchange")
+	public ApiResponse<KakaoTokenExchangeResponse> exchangeOwnerCode(
+			@Valid @RequestBody KakaoTokenExchangeRequest request) {
+		return ApiResponse.of(SuccessCode.OK,
+			userAuthService.exchangeKakaoCode(UserRole.OWNER, request.code(), request.redirectUri()));
 	}
 
 	@PostMapping("/signup")

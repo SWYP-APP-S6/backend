@@ -5,6 +5,7 @@ import com.swyp.backend.common.security.JwtTokenProvider;
 import com.swyp.backend.common.security.RefreshTokenService;
 import com.swyp.backend.common.security.TokenRealm;
 import com.swyp.backend.user.dto.KakaoLoginResponse;
+import com.swyp.backend.user.dto.KakaoTokenExchangeResponse;
 import com.swyp.backend.user.dto.SignupRequest;
 import com.swyp.backend.user.dto.TokenResponse;
 import com.swyp.backend.user.entity.User;
@@ -31,6 +32,10 @@ public class UserAuthService {
 	private final UserRepository userRepository;
 	private final JwtTokenProvider tokenProvider;
 	private final RefreshTokenService refreshTokenService;
+
+	public KakaoTokenExchangeResponse exchangeKakaoCode(UserRole role, String code, String redirectUri) {
+		return new KakaoTokenExchangeResponse(kakaoOauthClient.exchangeAuthorizationCode(role, code, redirectUri));
+	}
 
 	public KakaoLoginResponse loginWithKakao(UserRole role, String kakaoAccessToken) {
 		KakaoOauthClient.Identity identity = kakaoOauthClient.fetchIdentity(role, kakaoAccessToken);
