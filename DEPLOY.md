@@ -91,15 +91,12 @@ Killer 가 **관계없는 컨테이너**를 죽인다.
 
 | 서비스 | 상한 | 비고 |
 |---|---|---|
-| app | 1024m | `-XX:MaxRAMPercentage=75.0` 로 힙 ~768MB |
+| app | 1300m | `-XX:MaxRAMPercentage=75.0` 로 힙 ~975MB |
 | postgres | 512m | `shared_buffers` 기본값(128MB) 대비 여유 |
 | redis | 320m | `maxmemory 256mb` 위의 오버헤드 여유분 |
-| shorts (별도 레포) | 1400m | whisper `small` 추론이 실측 1.1GB + ffmpeg |
-| **합계** | **3256m** | |
 
-남는 ~840MB 로 OS 와 **배포 중 Gradle 빌드**(순간 1.5~2GB)를 감당해야 하므로 부족하다 —
-그 순간은 **swap 4GB** 로 넘긴다(`vm.swappiness=10`). OS 레벨이라 레포로 관리되지 않는
-서버별 수동 설정이다.
+나머지(~1.9GB)는 OS 와 **배포 중 Gradle 빌드**(순간 1.5~2GB) 몫이다. 이 순간의 안전망으로
+서버에 swap 4GB + `vm.swappiness=10` 을 걸어둔다(OS 레벨이라 레포로 관리되지 않는 서버별 수동 설정).
 
 > **왜 여전히 서버에서 빌드하는가**: `Dockerfile` 의 build 스테이지가 컨테이너 안에서
 > `./gradlew bootJar` 를 돌린다. GitHub Actions 의 `build` job 은 **테스트 게이트일 뿐**
@@ -113,32 +110,6 @@ fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /
 free -h        # Swap 이 4Gi 인지 확인
 ```
 `/etc/fstab` 에 `/swapfile none swap sw 0 0` 이 이미 있으면 재부팅 후에도 유지된다.
-
-## 숏폼 생성 파이프라인 (shorts_maker)
-
-관리자 백오피스의 베타 기능. **별도 레포/컨테이너**이고, 이 백엔드가 `/admin/shorts/**` 로
-프록시한다(설계 문서 `docs/make_shorts.md` §13). 관리자 인증은 기존 `REALM_ADMIN` 이 담당하므로
-**shorts_maker 는 JWT 를 모르고, 포트를 호스트에 열지 않는다.**
-
-```bash
-# 최초 1회 (root)
-su - deploy -c 'git clone https://github.com/SWYP-APP-S6/shorts_maker.git ~/shorts_maker'
-su - deploy -c 'cp ~/shorts_maker/deploy.env.example ~/shorts_maker/.env'   # 값 채우기
-# 🔴 한 줄이다. 줄을 나누면 붙여넣을 때 깨진다.
-printf '#!/bin/sh\nexec su - deploy -c /home/deploy/shorts_maker/scripts/deploy.sh\n' > /usr/local/bin/deploy-sm
-chmod +x /usr/local/bin/deploy-sm
-
-# 배포
-deploy-sm
-```
-
-- 🔴 **backend 를 먼저 배포한다.** shorts_maker 가 `backend_default` 네트워크에 얹히므로
-  그 네트워크가 없으면 기동하지 않는다(`deploy.sh` 가 먼저 확인하고 멈춘다).
-- 🔴 `SHORTS_API_TOKEN` 은 **양쪽 `.env` 에 같은 값**이어야 한다. 컨테이너는 `0.0.0.0` 에
-  바인딩하므로 토큰이 없으면 앱이 기동을 거부한다(무인증 노출 방지).
-- 원본 영상은 업로드 기능이 아직 없다 — `scp` 로 올린다:
-  `scp 강연.mp4 deploy@<서버>:~/shorts_maker/sources/`
-- shorts_maker 가 꺼져 있어도 **다른 API 는 정상**이다. 관리자 화면의 숏폼 탭만 503 이 된다.
 
 ## 참고
 
