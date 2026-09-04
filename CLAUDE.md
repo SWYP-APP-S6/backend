@@ -103,15 +103,6 @@ SWYP 앱의 백엔드 REST API 서버. (프로덕트 한 줄 설명은 확정되
   카카오 앱 검증용 `KAKAO_CONSUMER_APP_ID`·`KAKAO_OWNER_APP_ID`(콘솔의 **숫자 앱 ID**, REST API 키가
   아님)는 미설정이면 0이 되어 **그 앱의 카카오 로그인이 전부 거부된다**(fail-closed, 기동은 된다).
 
-## Shorts (숏폼 생성 베타)
-
-- 관리자 백오피스의 베타 기능. **파이프라인 본체는 별도 레포/서비스**(`SWYP-APP-S6/shorts_maker`,
-  Python). 이 백엔드는 `com.swyp.backend.shorts` 에서 **프록시만** 한다 — `/admin/shorts/**`.
-- 기존 `/admin/**` 의 `REALM_ADMIN` 규칙이 그대로 적용된다(SecurityConfig 변경 없음).
-- 파이프라인 응답은 `JsonNode` 로 통과시킨다. 스키마 소유자가 이쪽이 아니라서 DTO 로 미러링하면
-  파이썬 쪽 변경마다 함께 깨진다.
-- 설계 문서: [`docs/make_shorts.md`](docs/make_shorts.md). **전제가 바뀌면 그 문서 §1 부터 고친다.**
-
 ## Workflow (rules)
 
 1. **논의 후 바로 구현한다.** 문제 정의와 접근을 충분히 합의한 뒤 코드로 들어간다 — 이 프로젝트
