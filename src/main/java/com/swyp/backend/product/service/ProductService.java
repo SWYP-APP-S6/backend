@@ -8,11 +8,13 @@ import com.swyp.backend.hold.repository.HoldRepository;
 import com.swyp.backend.notification.entity.NotificationType;
 import com.swyp.backend.notification.service.NotificationService;
 import com.swyp.backend.product.dto.HoldDisposition;
+import com.swyp.backend.product.dto.OwnerHomeResponse;
 import com.swyp.backend.product.dto.ProductAvailableQtyUpdateRequest;
 import com.swyp.backend.product.dto.ProductDetailResponse;
 import com.swyp.backend.product.dto.ProductRegisterRequest;
 import com.swyp.backend.product.dto.ProductSummaryResponse;
 import com.swyp.backend.product.entity.Product;
+import com.swyp.backend.product.entity.ProductCategory;
 import com.swyp.backend.product.exception.ProductErrorCode;
 import com.swyp.backend.product.repository.ProductRepository;
 import com.swyp.backend.store.entity.Store;
@@ -46,15 +48,14 @@ public class ProductService {
 		}
 
 		LocalDateTime now = LocalDateTime.now();
-		LocalDateTime pickupEndAt = LocalDateTime.of(now.toLocalDate(), store.getBusinessCloseTime());
-		if (!pickupEndAt.isAfter(now)) {
-			pickupEndAt = pickupEndAt.plusDays(1);
-		}
+		LocalDateTime pickupEndAt = request.pickupEndAt() != null
+				? request.pickupEndAt()
+				: defaultPickupEndAt(store, now);
 
 		Product product = new Product(
 				store,
 				request.name(),
-				request.category(),
+				request.category() != null ? request.category() : ProductCategory.ETC,
 				request.initialQty(),
 				request.originalPrice(),
 				request.salePrice(),
@@ -68,14 +69,28 @@ public class ProductService {
 		return ProductDetailResponse.from(product, 0L);
 	}
 
-	public List<ProductSummaryResponse> getMyProducts(Long ownerId) {
+	public OwnerHomeResponse getHome(Long ownerId) {
 		Store store = storeService.validateAndGetStoreByOwnerId(ownerId);
 		List<Product> products = productRepository.findByStoreIdOrderByCreatedAtDesc(store.getId());
 		Map<Long, Long> activeHoldQtyByProduct = holdRepository.findActiveHoldQtyByStoreId(store.getId()).stream()
 				.collect(Collectors.toMap(ActiveHoldQty::productId, ActiveHoldQty::qty));
-		return products.stream()
+
+		List<ProductSummaryResponse> productResponses = products.stream()
 				.map(product -> ProductSummaryResponse.from(product, activeHoldQtyByProduct.getOrDefault(product.getId(), 0L)))
 				.toList();
+
+		int heldQty = products.stream().mapToInt(Product::getHeldQty).sum();
+		int reconfirmPendingCount = (int) products.stream()
+				.filter(product -> product.getReconfirmSentAt() != null && product.getReconfirmAnsweredAt() == null)
+				.count();
+		long completedQty = holdRepository.sumQtyByStoreIdAndStatus(store.getId(), HoldStatus.COMPLETED);
+		long activeHoldCount = holdRepository.countByStoreIdAndStatus(store.getId(), HoldStatus.HOLDING);
+
+		return new OwnerHomeResponse(
+				new OwnerHomeResponse.Summary(products.size(), heldQty, completedQty),
+				reconfirmPendingCount,
+				activeHoldCount,
+				productResponses);
 	}
 
 	public ProductDetailResponse getMyProduct(Long ownerId, Long productId) {
@@ -126,5 +141,10 @@ public class ProductService {
 	private Product validateAndGetProduct(Long productId, Long storeId) {
 		return productRepository.findByIdAndStoreId(productId, storeId)
 				.orElseThrow(() -> new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND));
+	}
+
+	private static LocalDateTime defaultPickupEndAt(Store store, LocalDateTime now) {
+		LocalDateTime pickupEndAt = LocalDateTime.of(now.toLocalDate(), store.getBusinessCloseTime());
+		return pickupEndAt.isAfter(now) ? pickupEndAt : pickupEndAt.plusDays(1);
 	}
 }

@@ -3,13 +3,12 @@ package com.swyp.backend.product.controller;
 import com.swyp.backend.common.response.ApiResponse;
 import com.swyp.backend.common.response.SuccessCode;
 import com.swyp.backend.common.security.CurrentUser;
+import com.swyp.backend.product.dto.OwnerHomeResponse;
 import com.swyp.backend.product.dto.ProductAvailableQtyUpdateRequest;
 import com.swyp.backend.product.dto.ProductDetailResponse;
 import com.swyp.backend.product.dto.ProductRegisterRequest;
-import com.swyp.backend.product.dto.ProductSummaryResponse;
 import com.swyp.backend.product.service.ProductService;
 import jakarta.validation.Valid;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -37,8 +36,8 @@ public class OwnerProductController {
 	}
 
 	@GetMapping
-	public ApiResponse<List<ProductSummaryResponse>> getMyProducts(Authentication authentication) {
-		return ApiResponse.of(SuccessCode.OK, productService.getMyProducts(CurrentUser.id(authentication)));
+	public ApiResponse<OwnerHomeResponse> getHome(Authentication authentication) {
+		return ApiResponse.of(SuccessCode.OK, productService.getHome(CurrentUser.id(authentication)));
 	}
 
 	@GetMapping("/{id}")

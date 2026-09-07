@@ -11,6 +11,7 @@ public record ProductSummaryResponse(
 		int initialQty,
 		int availableQty,
 		String status,
+		long activeHoldQty,
 		boolean oversold,
 		boolean reconfirmPending,
 		Instant createdAt) {
@@ -24,6 +25,7 @@ public record ProductSummaryResponse(
 				product.getInitialQty(),
 				product.getAvailableQty(),
 				product.getStatus().name(),
+				activeHoldQty,
 				product.getAvailableQty() < activeHoldQty,
 				product.getReconfirmSentAt() != null && product.getReconfirmAnsweredAt() == null,
 				product.getCreatedAt());

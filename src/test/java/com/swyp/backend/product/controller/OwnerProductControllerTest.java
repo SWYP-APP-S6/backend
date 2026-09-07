@@ -119,6 +119,30 @@ class OwnerProductControllerTest {
 	}
 
 	@Test
+	void registerProduct_withoutACategory_defaultsToEtc() throws Exception {
+		mockMvc.perform(post("/owner/products")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"name":"당근","initialQty":10,"originalPrice":1000,"salePrice":800,\
+					"photoUrl":"https://example.com/a.jpg"}"""))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.data.category").value("ETC"));
+	}
+
+	@Test
+	void registerProduct_withAnExplicitPickupEndAt_overridesTheStoreDefault() throws Exception {
+		mockMvc.perform(post("/owner/products")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"name":"당근","category":"VEGETABLE","initialQty":10,"originalPrice":1000,"salePrice":800,\
+					"photoUrl":"https://example.com/a.jpg","pickupEndAt":"2099-01-01T18:00:00"}"""))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.data.pickupEndAt").value("2099-01-01T18:00:00"));
+	}
+
+	@Test
 	void registerProduct_withoutAStore_isRejected() throws Exception {
 		User ownerWithoutStore = userRepository.saveAndFlush(
 			new User(UserRole.OWNER, "가게없는점주", null, false, Instant.now()));
@@ -134,17 +158,36 @@ class OwnerProductControllerTest {
 	}
 
 	@Test
-	void getMyProducts_listsOnlyMyStoresProducts() throws Exception {
+	void getHome_summarizesHeldAndCompletedQtyAcrossAllProducts() throws Exception {
+		Product product = createProduct("당근", 10);
+		User consumer = createConsumer();
+		product.hold(4);
+		productRepository.saveAndFlush(product);
+		Hold completedHold = new Hold(consumer, product, 4, Instant.now().plus(Duration.ofMinutes(15)));
+		completedHold.complete(Instant.now());
+		holdRepository.saveAndFlush(completedHold);
+
+		mockMvc.perform(get("/owner/products").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.summary.heldQty").value(4))
+			.andExpect(jsonPath("$.data.summary.completedQty").value(4))
+			.andExpect(jsonPath("$.data.activeHoldCount").value(0));
+	}
+
+	@Test
+	void getHome_listsOnlyMyStoresProducts_andCountsThemAsRegistered() throws Exception {
 		createProduct("당근", 10);
 		createProduct("감자", 5);
 
 		mockMvc.perform(get("/owner/products").header("Authorization", "Bearer " + token))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.length()").value(2));
+			.andExpect(jsonPath("$.data.products.length()").value(2))
+			.andExpect(jsonPath("$.data.summary.registeredCount").value(2))
+			.andExpect(jsonPath("$.data.summary.heldQty").value(0));
 	}
 
 	@Test
-	void getMyProducts_flagsOversoldProducts() throws Exception {
+	void getHome_flagsOversoldProducts_withTheActiveHoldQty() throws Exception {
 		Product product = createProduct("당근", 10);
 		User consumer = createConsumer();
 		holdRepository.saveAndFlush(new Hold(consumer, product, 3, Instant.now().plus(Duration.ofMinutes(15))));
@@ -153,7 +196,9 @@ class OwnerProductControllerTest {
 
 		mockMvc.perform(get("/owner/products").header("Authorization", "Bearer " + token))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data[0].oversold").value(true));
+			.andExpect(jsonPath("$.data.products[0].oversold").value(true))
+			.andExpect(jsonPath("$.data.products[0].activeHoldQty").value(3))
+			.andExpect(jsonPath("$.data.activeHoldCount").value(1));
 	}
 
 	@Test
