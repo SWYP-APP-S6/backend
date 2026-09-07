@@ -85,6 +85,7 @@ public class SecurityConfig {
 					auth.requestMatchers(API_DOCS_ENDPOINTS).permitAll();
 				}
 				auth.requestMatchers("/admin/**").hasAuthority(TokenRealm.ADMIN.authority());
+				auth.requestMatchers("/owner/**").hasAuthority(TokenRealm.USER.authority());
 				auth.anyRequest().authenticated();
 			})
 			.exceptionHandling(exception -> exception

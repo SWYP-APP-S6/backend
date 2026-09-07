@@ -3,16 +3,22 @@ package com.swyp.backend.store.service;
 import com.swyp.backend.common.exception.BusinessException;
 import com.swyp.backend.common.response.PageResponse;
 import com.swyp.backend.store.dto.StoreDetailResponse;
+import com.swyp.backend.store.dto.StoreRegisterRequest;
 import com.swyp.backend.store.dto.StoreSummaryResponse;
 import com.swyp.backend.store.entity.Store;
 import com.swyp.backend.store.entity.StoreStatus;
 import com.swyp.backend.store.exception.StoreErrorCode;
 import com.swyp.backend.store.repository.StoreRepository;
+import com.swyp.backend.user.entity.User;
+import com.swyp.backend.user.entity.UserRole;
+import com.swyp.backend.user.service.UserService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -21,6 +27,44 @@ import org.springframework.transaction.annotation.Transactional;
 public class StoreService {
 
 	private final StoreRepository storeRepository;
+	private final UserService userService;
+	private final GeocodingClient geocodingClient;
+
+	@Transactional(propagation = Propagation.NOT_SUPPORTED)
+	public StoreDetailResponse registerStore(Long ownerId, StoreRegisterRequest request) {
+		User owner = userService.validateAndGetUser(ownerId);
+		if (owner.getRole() != UserRole.OWNER) {
+			throw new BusinessException(StoreErrorCode.OWNER_ROLE_REQUIRED);
+		}
+		if (storeRepository.findByOwnerId(ownerId).isPresent()) {
+			throw new BusinessException(StoreErrorCode.STORE_ALREADY_REGISTERED);
+		}
+
+		GeocodingClient.Coordinates coordinates = geocodingClient.geocode(request.address());
+		Store store = new Store(
+				owner,
+				request.name(),
+				request.address(),
+				request.addressDetail(),
+				request.phone(),
+				coordinates.latitude(),
+				coordinates.longitude(),
+				request.businessOpenTime(),
+				request.businessCloseTime());
+		store.submitApplication(request.businessRegistrationNumber(), request.applicationNote());
+		try {
+			storeRepository.saveAndFlush(store);
+		} catch (DataIntegrityViolationException e) {
+			throw new BusinessException(StoreErrorCode.STORE_ALREADY_REGISTERED);
+		}
+		return StoreDetailResponse.from(store);
+	}
+
+	public StoreDetailResponse getMyStore(Long ownerId) {
+		Store store = storeRepository.findByOwnerId(ownerId)
+				.orElseThrow(() -> new BusinessException(StoreErrorCode.STORE_NOT_REGISTERED));
+		return StoreDetailResponse.from(store);
+	}
 
 	public PageResponse<StoreSummaryResponse> getStores(StoreStatus status, Pageable pageable) {
 		Page<Store> stores = status == null
