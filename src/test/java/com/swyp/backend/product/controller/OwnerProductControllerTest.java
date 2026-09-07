@@ -70,6 +70,12 @@ class OwnerProductControllerTest {
 
 	@BeforeEach
 	void setUp() {
+		holdRepository.deleteAll();
+		notificationRepository.deleteAll();
+		productRepository.deleteAll();
+		storeRepository.deleteAll();
+		userRepository.deleteAll();
+
 		owner = userRepository.saveAndFlush(new User(UserRole.OWNER, "테스트점주", null, false, Instant.now()));
 		store = storeRepository.saveAndFlush(new Store(
 			owner, "테스트가게", "서울특별시 강남구 역삼로 1", null, "0212345678",
