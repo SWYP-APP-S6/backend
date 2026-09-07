@@ -28,6 +28,11 @@ public interface HoldRepository extends JpaRepository<Hold, Long> {
 
 	List<Hold> findByStatusAndExpiresAtLessThanEqual(HoldStatus status, Instant expiresAt);
 
+	List<Hold> findByProductIdAndStatus(Long productId, HoldStatus status);
+
+	@Query("select coalesce(sum(h.qty), 0) from Hold h where h.product.id = :productId and h.status = :status")
+	long sumQtyByProductIdAndStatus(@Param("productId") Long productId, @Param("status") HoldStatus status);
+
 	@Query("""
 			select h from Hold h
 			join fetch h.user

@@ -61,9 +61,12 @@ public class StoreService {
 	}
 
 	public StoreDetailResponse getMyStore(Long ownerId) {
-		Store store = storeRepository.findByOwnerId(ownerId)
+		return StoreDetailResponse.from(validateAndGetStoreByOwnerId(ownerId));
+	}
+
+	public Store validateAndGetStoreByOwnerId(Long ownerId) {
+		return storeRepository.findByOwnerId(ownerId)
 				.orElseThrow(() -> new BusinessException(StoreErrorCode.STORE_NOT_REGISTERED));
-		return StoreDetailResponse.from(store);
 	}
 
 	public PageResponse<StoreSummaryResponse> getStores(StoreStatus status, Pageable pageable) {
