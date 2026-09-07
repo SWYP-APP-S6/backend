@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -28,14 +29,14 @@ public class StoreService {
 	private final UserService userService;
 	private final GeocodingClient geocodingClient;
 
-	@Transactional
+	@Transactional(propagation = Propagation.NOT_SUPPORTED)
 	public StoreDetailResponse registerStore(Long ownerId, StoreRegisterRequest request) {
 		User owner = userService.validateAndGetUser(ownerId);
 		if (owner.getRole() != UserRole.OWNER) {
 			throw new BusinessException(StoreErrorCode.OWNER_ROLE_REQUIRED);
 		}
 		if (storeRepository.findByOwnerId(ownerId).isPresent()) {
-			throw new BusinessException(StoreErrorCode.ALREADY_REGISTERED);
+			throw new BusinessException(StoreErrorCode.STORE_ALREADY_REGISTERED);
 		}
 
 		GeocodingClient.Coordinates coordinates = geocodingClient.geocode(request.address());

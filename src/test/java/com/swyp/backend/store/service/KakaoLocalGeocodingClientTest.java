@@ -75,22 +75,22 @@ class KakaoLocalGeocodingClientTest {
 	}
 
 	@Test
-	void geocode_mapsKakaoRejectionToGeocodingFailed() {
+	void geocode_mapsKakaoRejectionToGeocodingUnavailable() {
 		server.expect(requestToUriTemplate(BASE_URL + "/v2/local/search/address.json?query={query}", ADDRESS))
 			.andRespond(withUnauthorizedRequest());
 
 		BusinessException thrown = catchThrowableOfType(BusinessException.class, () -> client.geocode(ADDRESS));
 
-		assertThat(thrown.getCode()).isEqualTo(StoreErrorCode.GEOCODING_FAILED);
+		assertThat(thrown.getCode()).isEqualTo(StoreErrorCode.GEOCODING_UNAVAILABLE);
 	}
 
 	@Test
-	void geocode_mapsKakaoOutageToGeocodingFailed() {
+	void geocode_mapsKakaoOutageToGeocodingUnavailable() {
 		server.expect(requestToUriTemplate(BASE_URL + "/v2/local/search/address.json?query={query}", ADDRESS))
 			.andRespond(withServerError());
 
 		BusinessException thrown = catchThrowableOfType(BusinessException.class, () -> client.geocode(ADDRESS));
 
-		assertThat(thrown.getCode()).isEqualTo(StoreErrorCode.GEOCODING_FAILED);
+		assertThat(thrown.getCode()).isEqualTo(StoreErrorCode.GEOCODING_UNAVAILABLE);
 	}
 }

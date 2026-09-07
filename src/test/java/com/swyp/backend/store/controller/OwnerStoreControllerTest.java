@@ -32,6 +32,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -110,7 +111,7 @@ class OwnerStoreControllerTest {
 				.contentType(MediaType.APPLICATION_JSON)
 				.content(registerBody()))
 			.andExpect(status().isConflict())
-			.andExpect(jsonPath("$.code").value("ALREADY_REGISTERED"));
+			.andExpect(jsonPath("$.code").value("STORE_ALREADY_REGISTERED"));
 	}
 
 	@Test
@@ -125,6 +126,21 @@ class OwnerStoreControllerTest {
 				.content(registerBody()))
 			.andExpect(status().isForbidden())
 			.andExpect(jsonPath("$.code").value("OWNER_ROLE_REQUIRED"));
+	}
+
+	@Test
+	void registerStore_rejectsAPhoneNumberLongerThanTheColumnLimit() throws Exception {
+		User owner = createUser(UserRole.OWNER);
+		String tooLongPhone = "0".repeat(21);
+
+		mockMvc.perform(post("/owner/stores")
+				.header("Authorization", "Bearer " + tokenFor(owner))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"name":"청과왕","address":"%s","addressDetail":"1층","phone":"%s",\
+					"businessOpenTime":"09:00:00","businessCloseTime":"21:00:00"}""".formatted(ADDRESS, tooLongPhone)))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
 	}
 
 	@Test
@@ -189,6 +205,11 @@ class OwnerStoreControllerTest {
 
 		@Override
 		public Coordinates geocode(String address) {
+			if (TransactionSynchronizationManager.isActualTransactionActive()) {
+				throw new IllegalStateException(
+					"geocode() ran inside an active transaction — it must stay outside one "
+						+ "so a slow Kakao call can't hold a pooled DB connection");
+			}
 			Coordinates coordinates = coordinatesByAddress.get(address);
 			if (coordinates == null) {
 				throw new BusinessException(StoreErrorCode.GEOCODING_FAILED);

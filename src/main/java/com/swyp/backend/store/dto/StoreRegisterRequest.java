@@ -10,7 +10,7 @@ public record StoreRegisterRequest(
 		@NotBlank @Size(max = 100) String name,
 		@NotBlank @Size(max = 255) String address,
 		@Size(max = 255) String addressDetail,
-		@NotBlank @Pattern(regexp = "^[0-9-]+$", message = "연락처는 숫자와 하이픈만 사용할 수 있습니다.")
+		@NotBlank @Size(max = 20) @Pattern(regexp = "^[0-9-]+$", message = "연락처는 숫자와 하이픈만 사용할 수 있습니다.")
 		String phone,
 		@NotNull LocalTime businessOpenTime,
 		@NotNull LocalTime businessCloseTime,

@@ -53,10 +53,10 @@ public class KakaoLocalGeocodingClient implements GeocodingClient {
 				scale(document.x()));
 		} catch (HttpClientErrorException e) {
 			log.warn("Kakao local API rejected the geocoding request: {}", e.getStatusCode());
-			throw new BusinessException(StoreErrorCode.GEOCODING_FAILED);
+			throw new BusinessException(StoreErrorCode.GEOCODING_UNAVAILABLE);
 		} catch (RestClientException e) {
 			log.error("Kakao local API call failed", e);
-			throw new BusinessException(StoreErrorCode.GEOCODING_FAILED);
+			throw new BusinessException(StoreErrorCode.GEOCODING_UNAVAILABLE);
 		}
 	}
 
