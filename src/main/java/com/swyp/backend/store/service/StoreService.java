@@ -14,6 +14,7 @@ import com.swyp.backend.user.entity.UserRole;
 import com.swyp.backend.user.service.UserService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -51,7 +52,11 @@ public class StoreService {
 				request.businessOpenTime(),
 				request.businessCloseTime());
 		store.submitApplication(request.businessRegistrationNumber(), request.applicationNote());
-		storeRepository.save(store);
+		try {
+			storeRepository.saveAndFlush(store);
+		} catch (DataIntegrityViolationException e) {
+			throw new BusinessException(StoreErrorCode.STORE_ALREADY_REGISTERED);
+		}
 		return StoreDetailResponse.from(store);
 	}
 

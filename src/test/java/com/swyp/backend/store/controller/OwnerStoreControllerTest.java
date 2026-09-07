@@ -19,8 +19,15 @@ import com.swyp.backend.user.entity.UserRole;
 import com.swyp.backend.user.repository.UserRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -156,6 +163,36 @@ class OwnerStoreControllerTest {
 	}
 
 	@Test
+	void registerStore_underConcurrentRequestsForTheSameOwner_onlyOneSucceeds() throws Exception {
+		User owner = createUser(UserRole.OWNER);
+		geocodingClient.register(ADDRESS,
+			new GeocodingClient.Coordinates(new BigDecimal("37.500600"), new BigDecimal("127.036500")));
+		String token = tokenFor(owner);
+		geocodingClient.awaitBothCallsBeforeReturning();
+
+		ExecutorService executor = Executors.newFixedThreadPool(2);
+		try {
+			List<Future<Integer>> futures = new ArrayList<>();
+			for (int i = 0; i < 2; i++) {
+				futures.add(executor.submit(() -> mockMvc.perform(post("/owner/stores")
+						.header("Authorization", "Bearer " + token)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(registerBody()))
+					.andReturn().getResponse().getStatus()));
+			}
+			List<Integer> statuses = new ArrayList<>();
+			for (Future<Integer> future : futures) {
+				statuses.add(future.get(10, TimeUnit.SECONDS));
+			}
+			assertThat(statuses).containsExactlyInAnyOrder(201, 409);
+		} finally {
+			executor.shutdownNow();
+		}
+
+		assertThat(storeRepository.findByOwnerId(owner.getId())).isPresent();
+	}
+
+	@Test
 	void getMyStore_withNoStoreRegistered_returnsNotFound() throws Exception {
 		User owner = createUser(UserRole.OWNER);
 
@@ -194,6 +231,7 @@ class OwnerStoreControllerTest {
 	static class StubGeocodingClient implements GeocodingClient {
 
 		private final Map<String, Coordinates> coordinatesByAddress = new ConcurrentHashMap<>();
+		private volatile CyclicBarrier barrier;
 
 		void register(String address, Coordinates coordinates) {
 			coordinatesByAddress.put(address, coordinates);
@@ -201,6 +239,11 @@ class OwnerStoreControllerTest {
 
 		void clear() {
 			coordinatesByAddress.clear();
+			barrier = null;
+		}
+
+		void awaitBothCallsBeforeReturning() {
+			barrier = new CyclicBarrier(2);
 		}
 
 		@Override
@@ -209,6 +252,14 @@ class OwnerStoreControllerTest {
 				throw new IllegalStateException(
 					"geocode() ran inside an active transaction — it must stay outside one "
 						+ "so a slow Kakao call can't hold a pooled DB connection");
+			}
+			CyclicBarrier currentBarrier = barrier;
+			if (currentBarrier != null) {
+				try {
+					currentBarrier.await(10, TimeUnit.SECONDS);
+				} catch (Exception e) {
+					throw new IllegalStateException(e);
+				}
 			}
 			Coordinates coordinates = coordinatesByAddress.get(address);
 			if (coordinates == null) {
