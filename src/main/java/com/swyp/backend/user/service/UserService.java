@@ -1,10 +1,12 @@
 package com.swyp.backend.user.service;
 
+import com.swyp.backend.common.exception.BusinessException;
 import com.swyp.backend.common.response.PageResponse;
 import com.swyp.backend.user.dto.UserSummaryResponse;
 import com.swyp.backend.user.entity.User;
 import com.swyp.backend.user.entity.UserLocation;
 import com.swyp.backend.user.entity.UserRole;
+import com.swyp.backend.user.exception.UserAuthErrorCode;
 import com.swyp.backend.user.repository.UserLocationRepository;
 import com.swyp.backend.user.repository.UserRepository;
 import java.util.List;
@@ -24,6 +26,11 @@ public class UserService {
 
 	private final UserRepository userRepository;
 	private final UserLocationRepository userLocationRepository;
+
+	public User validateAndGetUser(Long id) {
+		return userRepository.findById(id)
+				.orElseThrow(() -> new BusinessException(UserAuthErrorCode.USER_NOT_FOUND));
+	}
 
 	public PageResponse<UserSummaryResponse> getUsers(UserRole role, Pageable pageable) {
 		Page<User> users = role == null
