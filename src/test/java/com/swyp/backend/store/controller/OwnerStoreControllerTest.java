@@ -64,8 +64,10 @@ class OwnerStoreControllerTest {
 	StubGeocodingClient geocodingClient;
 
 	@BeforeEach
-	void resetGeocodingStub() {
+	void setUp() {
 		geocodingClient.clear();
+		storeRepository.deleteAll();
+		userRepository.deleteAll();
 	}
 
 	private User createUser(UserRole role) {
