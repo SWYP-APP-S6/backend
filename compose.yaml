@@ -83,6 +83,9 @@ services:
       # 바인딩엔 문제없다 — 비어 있으면 교환 요청만 카카오에서 거부된다(fail-closed).
       KAKAO_CONSUMER_REST_API_KEY: ${KAKAO_CONSUMER_REST_API_KEY:-}
       KAKAO_OWNER_REST_API_KEY: ${KAKAO_OWNER_REST_API_KEY:-}
+      # 해당 앱에서 Client Secret 이 켜져 있으면 필수 — 꺼져 있으면 빈 값으로 둬도 된다.
+      KAKAO_CONSUMER_CLIENT_SECRET: ${KAKAO_CONSUMER_CLIENT_SECRET:-}
+      KAKAO_OWNER_CLIENT_SECRET: ${KAKAO_OWNER_CLIENT_SECRET:-}
       # 점주 가게 등록(O-003-02)의 주소 → 좌표 변환용. 로그인 앱 키와 무관한 별개 카카오 앱 키다.
       KAKAO_LOCAL_REST_API_KEY: ${KAKAO_LOCAL_REST_API_KEY:-}
       # compose 는 프로젝트 루트 `.env` 를 변수 치환에만 쓴다(컨테이너 자동 주입 아님).
