@@ -7,6 +7,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
@@ -23,9 +25,19 @@ public class RestAccessDeniedHandler implements AccessDeniedHandler {
 	@Override
 	public void handle(HttpServletRequest request, HttpServletResponse response,
 			AccessDeniedException accessDeniedException) throws IOException {
-		response.setStatus(AuthErrorCode.FORBIDDEN.getStatus().value());
+		AuthErrorCode code = isGuest(SecurityContextHolder.getContext().getAuthentication())
+				? AuthErrorCode.LOGIN_REQUIRED
+				: AuthErrorCode.FORBIDDEN;
+		response.setStatus(code.getStatus().value());
 		response.setContentType(MediaType.APPLICATION_JSON_VALUE);
 		response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-		objectMapper.writeValue(response.getWriter(), ErrorResponse.of(AuthErrorCode.FORBIDDEN));
+		objectMapper.writeValue(response.getWriter(), ErrorResponse.of(code));
+	}
+
+	private static boolean isGuest(Authentication authentication) {
+		return authentication != null
+				&& TokenRealm.fromAuthorities(authentication.getAuthorities())
+					.filter(realm -> realm == TokenRealm.GUEST)
+					.isPresent();
 	}
 }

@@ -2,6 +2,7 @@ package com.swyp.backend.common;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -32,6 +33,10 @@ class SecurityConfigTest {
 		return tokenProvider.createAccessToken(realm, 1L, role);
 	}
 
+	private String bearer(TokenRealm realm, String role) {
+		return "Bearer " + accessTokenFor(realm, role);
+	}
+
 	@Test
 	void ping_isReachableThroughSecurityFilterChain() throws Exception {
 		mockMvc.perform(get("/ping"))
@@ -42,6 +47,47 @@ class SecurityConfigTest {
 	@Test
 	void openApiDocs_isPublic() throws Exception {
 		mockMvc.perform(get("/v3/api-docs")).andExpect(status().isOk());
+	}
+
+	@Test
+	void recipes_withoutAToken_isUnauthorized() throws Exception {
+		mockMvc.perform(get("/recipes/categories"))
+			.andExpect(status().isUnauthorized())
+			.andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+	}
+
+	@Test
+	void recipes_areBrowsableByGuestUserAndAdminRealms() throws Exception {
+		mockMvc.perform(get("/recipes/categories").header("Authorization", bearer(TokenRealm.GUEST, "GUEST")))
+			.andExpect(status().isOk());
+		mockMvc.perform(get("/recipes/categories").header("Authorization", bearer(TokenRealm.USER, "CONSUMER")))
+			.andExpect(status().isOk());
+		mockMvc.perform(get("/recipes/categories").header("Authorization", bearer(TokenRealm.ADMIN, "SUPER")))
+			.andExpect(status().isOk());
+	}
+
+	@Test
+	void browseEndpoints_openOnlyGetToGuests() throws Exception {
+		mockMvc.perform(post("/recipes/1").header("Authorization", bearer(TokenRealm.GUEST, "GUEST")))
+			.andExpect(status().isForbidden())
+			.andExpect(jsonPath("$.code").value("LOGIN_REQUIRED"));
+	}
+
+	@Test
+	void guestToken_onAMemberOnlyEndpoint_getsLoginRequired() throws Exception {
+		mockMvc.perform(get("/owner/stores/me").header("Authorization", bearer(TokenRealm.GUEST, "GUEST")))
+			.andExpect(status().isForbidden())
+			.andExpect(jsonPath("$.code").value("LOGIN_REQUIRED"));
+		mockMvc.perform(get("/admin/users").header("Authorization", bearer(TokenRealm.GUEST, "GUEST")))
+			.andExpect(status().isForbidden())
+			.andExpect(jsonPath("$.code").value("LOGIN_REQUIRED"));
+	}
+
+	@Test
+	void adminEndpoints_rejectUserRealmTokens() throws Exception {
+		mockMvc.perform(get("/admin/users").header("Authorization", bearer(TokenRealm.USER, "OWNER")))
+			.andExpect(status().isForbidden())
+			.andExpect(jsonPath("$.code").value("FORBIDDEN"));
 	}
 
 	@Test

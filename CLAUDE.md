@@ -97,11 +97,20 @@ SWYP 앱의 백엔드 REST API 서버. (프로덕트 한 줄 설명은 확정되
   토큰이 발급되던 문제). 인가 거부는 `RestAccessDeniedHandler`가 403 error envelope로 만든다.
   access 토큰은 `typ=access`라서 가입 토큰(`typ=signup`)을 bearer로 써도 통과하지 못한다.
   **앱 유저 전용 엔드포인트를 새로 만들면 `SecurityConfig`에 `REALM_USER` 요구를 함께 등록한다** —
-  `authenticated()`만 걸면 admin 토큰으로도 들어올 수 있고, 그 id가 `users` 의 다른 사람을 가리킨다.
+  `authenticated()`만 걸면 admin·guest 토큰으로도 들어올 수 있고, 그 id가 `users` 의 다른 사람을
+  가리킨다(`anyRequest()`의 기본이 `REALM_USER`라 안 적으면 그쪽으로 떨어진다).
 - **realm 위에 role도 요구한다** — realm 은 '앱 유저인가'만 가르고 소비자/점주를 구분하지 않는다.
   그래서 `/owner/**`는 `REALM_USER` **와 `ROLE_OWNER`를 둘 다** 요구한다(`AuthorizationManagers.allOf`).
   realm 만 걸면 소비자 토큰으로 점주 API를 전부 호출할 수 있다. 역할이 갈리는 엔드포인트를 추가할
   때마다 같은 형태로 등록한다 — 회귀는 `SecurityConfigTest`가 잡는다.
+- **비회원 구경하기(guest)**: 소비자 앱은 카카오 로그인 없이도 조회 API를 쓸 수 있다. `POST /auth/guest`
+  (installId)가 `realm=GUEST`·`role=GUEST` access 토큰을 준다(refresh 없음, 수명은 `jwt.guest-access-ttl` — TTL은 `JwtProperties.accessTtlFor(realm)`이 realm으로 정한다). principal은
+  서버가 만든 무작위 long이고 **`users` row는 없다** — `@AuthenticationPrincipal Long`으로 유저를 찾는
+  엔드포인트에 guest가 닿으면 안 되므로 조회 외 엔드포인트는 반드시 `REALM_USER`를 요구한다.
+  **조회 엔드포인트(`/recipes/**` 등)는 `BROWSE_ENDPOINTS`에 등록**해 **GET만** USER·GUEST·ADMIN 셋에 열고,
+  `permitAll`은 `/ping`과 인증 엔드포인트에만 쓴다(익명 대량 요청의 구멍을 남기지 않기 위해).
+  guest가 회원 전용을 부르면 `RestAccessDeniedHandler`가 **403 `LOGIN_REQUIRED`**(그 외 거부는
+  `FORBIDDEN`)를 내려 앱이 가입 안내로 분기한다. guest 토큰은 인증 수단이 아니라 **rate limit 키**다.
 - 토큰 정책: access/refresh TTL은 `jwt.*`, 가입 토큰 TTL은 `auth.signup-ttl`(application.properties),
   secret은 `JWT_SECRET` env(dev 기본값 커밋). refresh는 Redis에 저장·회전(1회용)·로그아웃 시 폐기.
   카카오 앱 검증용 `KAKAO_CONSUMER_APP_ID`·`KAKAO_OWNER_APP_ID`(콘솔의 **숫자 앱 ID**, REST API 키가

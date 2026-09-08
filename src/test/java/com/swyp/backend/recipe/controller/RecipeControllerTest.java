@@ -4,7 +4,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.swyp.backend.RedisTestcontainersConfiguration;
 import com.swyp.backend.TestcontainersConfiguration;
+import com.swyp.backend.common.security.JwtTokenProvider;
+import com.swyp.backend.common.security.TokenRealm;
 import com.swyp.backend.recipe.entity.Ingredient;
 import com.swyp.backend.recipe.entity.NutritionBasis;
 import com.swyp.backend.recipe.entity.Recipe;
@@ -19,6 +22,7 @@ import com.swyp.backend.recipe.repository.RecipeRepository;
 import com.swyp.backend.recipe.repository.RecipeStepRepository;
 import com.swyp.backend.recipe.repository.RecipeTagRepository;
 import java.math.BigDecimal;
+import java.util.concurrent.ThreadLocalRandom;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -29,7 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import(TestcontainersConfiguration.class)
+@Import({TestcontainersConfiguration.class, RedisTestcontainersConfiguration.class})
 @Transactional
 class RecipeControllerTest {
 
@@ -54,6 +58,14 @@ class RecipeControllerTest {
 	@Autowired
 	RecipeTagRepository recipeTagRepository;
 
+	@Autowired
+	JwtTokenProvider tokenProvider;
+
+	private String guestBearer() {
+		return "Bearer " + tokenProvider.createAccessToken(
+			TokenRealm.GUEST, ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE), "GUEST");
+	}
+
 	@Test
 	void getRecipe_returnsFullDetail() throws Exception {
 		Recipe recipe = recipeRepository.save(recipe("반찬", true));
@@ -67,7 +79,7 @@ class RecipeControllerTest {
 				new BigDecimal("10.00"), new BigDecimal("12.00"), new BigDecimal("500.00")));
 		recipeTagRepository.save(new RecipeTag(recipe, "간단요리"));
 
-		mockMvc.perform(get("/recipes/{id}", recipe.getId()))
+		mockMvc.perform(get("/recipes/{id}", recipe.getId()).header("Authorization", guestBearer()))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.title").value("제목"))
 			.andExpect(jsonPath("$.data.steps.length()").value(2))
@@ -81,7 +93,7 @@ class RecipeControllerTest {
 	void getRecipe_unpublished_returnsNotFound() throws Exception {
 		Recipe recipe = recipeRepository.save(recipe("반찬", false));
 
-		mockMvc.perform(get("/recipes/{id}", recipe.getId()))
+		mockMvc.perform(get("/recipes/{id}", recipe.getId()).header("Authorization", guestBearer()))
 			.andExpect(status().isNotFound())
 			.andExpect(jsonPath("$.code").value("RECIPE_NOT_FOUND"));
 	}
@@ -92,7 +104,7 @@ class RecipeControllerTest {
 		recipeRepository.save(recipe("국", true));
 		recipeRepository.save(recipe("후식", false));
 
-		mockMvc.perform(get("/recipes/categories"))
+		mockMvc.perform(get("/recipes/categories").header("Authorization", guestBearer()))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data").isArray())
 			.andExpect(jsonPath("$.data[0]").value("국"))
@@ -109,7 +121,7 @@ class RecipeControllerTest {
 		}
 		recipeRepository.save(recipe("국", true));
 
-		mockMvc.perform(get("/recipes").param("category", "반찬"))
+		mockMvc.perform(get("/recipes").param("category", "반찬").header("Authorization", guestBearer()))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.content.length()").value(2))
 			.andExpect(jsonPath("$.data.content[0].id").value(high.getId()))

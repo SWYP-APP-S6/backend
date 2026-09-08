@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authorization.AuthorityAuthorizationManager;
 import org.springframework.security.authorization.AuthorizationManagers;
 import org.springframework.security.config.Customizer;
@@ -37,6 +38,7 @@ public class SecurityConfig {
 		"/admin/auth/login",
 		"/admin/auth/refresh",
 		"/admin/auth/logout",
+		"/auth/guest",
 		"/auth/consumer/kakao",
 		"/auth/consumer/kakao/exchange",
 		"/auth/owner/kakao",
@@ -44,6 +46,9 @@ public class SecurityConfig {
 		"/auth/signup",
 		"/auth/refresh",
 		"/auth/logout",
+	};
+
+	private static final String[] BROWSE_ENDPOINTS = {
 		"/recipes",
 		"/recipes/**",
 	};
@@ -88,11 +93,13 @@ public class SecurityConfig {
 				if (apiDocsEnabled) {
 					auth.requestMatchers(API_DOCS_ENDPOINTS).permitAll();
 				}
+				auth.requestMatchers(HttpMethod.GET, BROWSE_ENDPOINTS).hasAnyAuthority(
+					TokenRealm.USER.authority(), TokenRealm.GUEST.authority(), TokenRealm.ADMIN.authority());
 				auth.requestMatchers("/admin/**").hasAuthority(TokenRealm.ADMIN.authority());
 				auth.requestMatchers("/owner/**").access(AuthorizationManagers.allOf(
 					AuthorityAuthorizationManager.hasAuthority(TokenRealm.USER.authority()),
 					AuthorityAuthorizationManager.hasRole(OWNER_ROLE)));
-				auth.anyRequest().authenticated();
+				auth.anyRequest().hasAuthority(TokenRealm.USER.authority());
 			})
 			.exceptionHandling(exception -> exception
 				.authenticationEntryPoint(authenticationEntryPoint)

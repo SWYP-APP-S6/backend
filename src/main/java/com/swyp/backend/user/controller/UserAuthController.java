@@ -2,6 +2,8 @@ package com.swyp.backend.user.controller;
 
 import com.swyp.backend.common.response.ApiResponse;
 import com.swyp.backend.common.response.SuccessCode;
+import com.swyp.backend.user.dto.GuestTokenRequest;
+import com.swyp.backend.user.dto.GuestTokenResponse;
 import com.swyp.backend.user.dto.KakaoLoginRequest;
 import com.swyp.backend.user.dto.KakaoLoginResponse;
 import com.swyp.backend.user.dto.KakaoTokenExchangeRequest;
@@ -10,6 +12,7 @@ import com.swyp.backend.user.dto.RefreshRequest;
 import com.swyp.backend.user.dto.SignupRequest;
 import com.swyp.backend.user.dto.TokenResponse;
 import com.swyp.backend.user.entity.UserRole;
+import com.swyp.backend.user.service.GuestTokenService;
 import com.swyp.backend.user.service.UserAuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +29,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserAuthController {
 
 	private final UserAuthService userAuthService;
+	private final GuestTokenService guestTokenService;
+
+	@PostMapping("/guest")
+	public ApiResponse<GuestTokenResponse> issueGuestToken(@Valid @RequestBody GuestTokenRequest request) {
+		return ApiResponse.of(SuccessCode.OK, guestTokenService.issue(request.installId()));
+	}
 
 	@PostMapping("/consumer/kakao")
 	public ApiResponse<KakaoLoginResponse> loginAsConsumer(@Valid @RequestBody KakaoLoginRequest request) {
