@@ -67,6 +67,10 @@ pull 방향 배포가 성립한다. 서버로 들어오는 인바운드 연결�
 | `KAKAO_OWNER_APP_ID` | ✅ | 점주 앱의 카카오 앱 ID. 소비자 앱과 **다른 카카오 앱**이다 |
 | `KAKAO_LOCAL_REST_API_KEY` | ✅ | 점주 가게 등록(주소 → 좌표 변환)용 카카오 로컬 API 키. 위 로그인용 앱 ID들과 무관한 별개 값이다 — "카카오맵" 제품을 활성화한 앱의 **REST API 키**. 없으면 가게 등록이 전부 거부된다 |
 | `MFDS_API_KEY` | ❌ | 레시피 수집 배치 전용. 비어 있어도 앱은 뜬다 |
+| `KAKAO_CONSUMER_REST_API_KEY` | ❌ | 관리자 웹 `/kakao-test` 의 인가 코드 교환 전용. 네이티브 앱 로그인은 SDK 토큰을 쓰므로 영향 없다 — 비면 그 페이지의 웹 로그인만 거부된다 |
+| `KAKAO_OWNER_REST_API_KEY` | ❌ | 위와 같음(점주 앱 키) |
+| `KAKAO_CONSUMER_CLIENT_SECRET` | ❌ | 위 REST API 키의 클라이언트 시크릿. 콘솔에서 켜 둔 앱이면 **필수** — 없으면 교환이 401(`invalid_client`/KOE010) |
+| `KAKAO_OWNER_CLIENT_SECRET` | ❌ | 위와 같음(점주 앱 시크릿) |
 
 값을 확인할 때는 시크릿이 터미널에 남지 않도록 키와 길이만 본다:
 
