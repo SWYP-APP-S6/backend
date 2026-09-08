@@ -3,6 +3,9 @@ package com.swyp.backend.common;
 import com.swyp.backend.common.security.JwtAuthenticationFilter;
 import com.swyp.backend.common.security.JwtProperties;
 import com.swyp.backend.common.security.JwtTokenProvider;
+import com.swyp.backend.common.security.RateLimitFilter;
+import com.swyp.backend.common.security.RateLimitProperties;
+import com.swyp.backend.common.security.RateLimiter;
 import com.swyp.backend.common.security.RestAccessDeniedHandler;
 import com.swyp.backend.common.security.RestAuthenticationEntryPoint;
 import com.swyp.backend.common.security.TokenRealm;
@@ -25,9 +28,10 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import tools.jackson.databind.ObjectMapper;
 
 @Configuration
-@EnableConfigurationProperties(JwtProperties.class)
+@EnableConfigurationProperties({JwtProperties.class, RateLimitProperties.class})
 @EnableWebSecurity
 public class SecurityConfig {
 
@@ -81,9 +85,11 @@ public class SecurityConfig {
 
 	@Bean
 	SecurityFilterChain filterChain(HttpSecurity http, JwtTokenProvider tokenProvider,
+			RateLimiter rateLimiter, ObjectMapper objectMapper,
 			RestAuthenticationEntryPoint authenticationEntryPoint,
 			RestAccessDeniedHandler accessDeniedHandler,
 			@Value("${springdoc.api-docs.enabled:true}") boolean apiDocsEnabled) throws Exception {
+		JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(tokenProvider);
 		http
 			.cors(Customizer.withDefaults())
 			.csrf(csrf -> csrf.disable())
@@ -104,7 +110,8 @@ public class SecurityConfig {
 			.exceptionHandling(exception -> exception
 				.authenticationEntryPoint(authenticationEntryPoint)
 				.accessDeniedHandler(accessDeniedHandler))
-			.addFilterBefore(new JwtAuthenticationFilter(tokenProvider), UsernamePasswordAuthenticationFilter.class)
+			.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+			.addFilterAfter(new RateLimitFilter(rateLimiter, objectMapper), JwtAuthenticationFilter.class)
 			.httpBasic(basic -> basic.disable())
 			.formLogin(form -> form.disable());
 		return http.build();

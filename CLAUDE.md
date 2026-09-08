@@ -111,6 +111,13 @@ SWYP 앱의 백엔드 REST API 서버. (프로덕트 한 줄 설명은 확정되
   `permitAll`은 `/ping`과 인증 엔드포인트에만 쓴다(익명 대량 요청의 구멍을 남기지 않기 위해).
   guest가 회원 전용을 부르면 `RestAccessDeniedHandler`가 **403 `LOGIN_REQUIRED`**(그 외 거부는
   `FORBIDDEN`)를 내려 앱이 가입 안내로 분기한다. guest 토큰은 인증 수단이 아니라 **rate limit 키**다.
+- **과다 요청 방지 2겹**: (1) nginx `limit_req`(IP 기준, VM 수동 설정 — **적용 예정**,
+  `docs/guest-browsing-design.md` §4.1), (2)
+  `RateLimitFilter`가 인증된 주체(realm+principal) 단위로 Redis 고정 창(`ratelimit:<realm>:<id>:<분>`,
+  `INCR`+`EXPIRE`) 한도(`ratelimit.per-minute.{guest,user,admin}`)를 넘기면 **429 `TOO_MANY_REQUESTS`**
+  + `Retry-After`. Redis 장애 시 fail-open(WARN 로그). `/auth/guest`는 installId당 하루
+  `auth.guest-issue-limit-per-day`회까지만 발급(초과 시 429 `GUEST_ISSUE_LIMIT_EXCEEDED`).
+  배경·근거는 `docs/guest-browsing-design.md`.
 - 토큰 정책: access/refresh TTL은 `jwt.*`, 가입 토큰 TTL은 `auth.signup-ttl`(application.properties),
   secret은 `JWT_SECRET` env(dev 기본값 커밋). refresh는 Redis에 저장·회전(1회용)·로그아웃 시 폐기.
   카카오 앱 검증용 `KAKAO_CONSUMER_APP_ID`·`KAKAO_OWNER_APP_ID`(콘솔의 **숫자 앱 ID**, REST API 키가
