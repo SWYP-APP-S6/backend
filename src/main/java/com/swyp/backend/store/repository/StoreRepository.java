@@ -12,6 +12,8 @@ public interface StoreRepository extends JpaRepository<Store, Long> {
 
 	Optional<Store> findByOwnerId(Long ownerId);
 
+	boolean existsByOwnerId(Long ownerId);
+
 	// 목록에서 점주를 함께 보여주므로 미리 당겨온다 — 없으면 행마다 조회가 한 번씩 더 나간다.
 	@EntityGraph(attributePaths = "owner")
 	Page<Store> findAllBy(Pageable pageable);

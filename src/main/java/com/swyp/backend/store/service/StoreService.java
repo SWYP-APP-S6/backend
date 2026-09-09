@@ -39,7 +39,7 @@ public class StoreService {
 		if (owner.getRole() != UserRole.OWNER) {
 			throw new BusinessException(StoreErrorCode.OWNER_ROLE_REQUIRED);
 		}
-		if (storeRepository.findByOwnerId(ownerId).isPresent()) {
+		if (storeRepository.existsByOwnerId(ownerId)) {
 			throw new BusinessException(StoreErrorCode.STORE_ALREADY_REGISTERED);
 		}
 
