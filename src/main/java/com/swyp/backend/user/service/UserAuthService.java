@@ -11,7 +11,7 @@ import com.swyp.backend.user.dto.TokenResponse;
 import com.swyp.backend.user.entity.User;
 import com.swyp.backend.user.entity.UserRole;
 import com.swyp.backend.user.exception.UserAuthErrorCode;
-import com.swyp.backend.user.repository.UserRepository;
+import com.swyp.backend.user.function.UserFunction;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -29,7 +29,7 @@ public class UserAuthService {
 
 	private final KakaoOauthClient kakaoOauthClient;
 	private final SignupTokenProvider signupTokenProvider;
-	private final UserRepository userRepository;
+	private final UserFunction userFunction;
 	private final JwtTokenProvider tokenProvider;
 	private final RefreshTokenService refreshTokenService;
 
@@ -39,8 +39,8 @@ public class UserAuthService {
 
 	public KakaoLoginResponse loginWithKakao(UserRole role, String kakaoAccessToken) {
 		KakaoOauthClient.Identity identity = kakaoOauthClient.fetchIdentity(role, kakaoAccessToken);
-		return userRepository
-			.findByOauthProviderAndOauthProviderIdAndRole(PROVIDER_KAKAO, identity.providerId(), role)
+		return userFunction
+			.findByOauthIdentity(PROVIDER_KAKAO, identity.providerId(), role)
 			.map(user -> KakaoLoginResponse.registered(issueTokensFor(user)))
 			.orElseGet(() -> KakaoLoginResponse.signupRequired(signupTokenProvider.issue(
 				PROVIDER_KAKAO, identity.providerId(), nicknameFor(identity), role)));
@@ -49,14 +49,14 @@ public class UserAuthService {
 	@Transactional
 	public TokenResponse signup(SignupRequest request) {
 		SignupTokenProvider.SignupTicket ticket = signupTokenProvider.parse(request.signupToken());
-		if (userRepository.findByOauthProviderAndOauthProviderIdAndRole(
+		if (userFunction.findByOauthIdentity(
 				ticket.provider(), ticket.providerId(), ticket.role()).isPresent()) {
 			throw new BusinessException(UserAuthErrorCode.ALREADY_REGISTERED);
 		}
 		User user = new User(ticket.role(), ticket.nickname(), null, request.marketingOptIn(), Instant.now());
 		user.linkOauthAccount(ticket.provider(), ticket.providerId());
 		try {
-			userRepository.saveAndFlush(user);
+			userFunction.save(user);
 		} catch (DataIntegrityViolationException e) {
 			throw new BusinessException(UserAuthErrorCode.ALREADY_REGISTERED);
 		}
@@ -65,8 +65,7 @@ public class UserAuthService {
 
 	public TokenResponse refresh(String refreshToken) {
 		RefreshTokenService.Rotation rotation = refreshTokenService.rotate(TokenRealm.USER, refreshToken);
-		User user = userRepository.findById(rotation.principalId())
-			.orElseThrow(() -> new BusinessException(UserAuthErrorCode.USER_NOT_FOUND));
+		User user = userFunction.getById(rotation.principalId());
 		return new TokenResponse(accessTokenFor(user), rotation.token());
 	}
 

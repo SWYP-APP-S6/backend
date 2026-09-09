@@ -8,10 +8,10 @@ import com.swyp.backend.store.dto.StoreSummaryResponse;
 import com.swyp.backend.store.entity.Store;
 import com.swyp.backend.store.entity.StoreStatus;
 import com.swyp.backend.store.exception.StoreErrorCode;
-import com.swyp.backend.store.repository.StoreRepository;
+import com.swyp.backend.store.function.StoreFunction;
 import com.swyp.backend.user.entity.User;
 import com.swyp.backend.user.entity.UserRole;
-import com.swyp.backend.user.service.UserService;
+import com.swyp.backend.user.function.UserFunction;
 import java.math.BigDecimal;
 import java.util.List;
 import org.hibernate.exception.ConstraintViolationException;
@@ -30,17 +30,17 @@ public class StoreService {
 
 	private static final String OWNER_UNIQUE_CONSTRAINT = "uq_stores_owner";
 
-	private final StoreRepository storeRepository;
-	private final UserService userService;
+	private final StoreFunction storeFunction;
+	private final UserFunction userFunction;
 	private final GeocodingClient geocodingClient;
 
 	@Transactional(propagation = Propagation.NOT_SUPPORTED)
 	public StoreDetailResponse registerStore(Long ownerId, StoreRegisterRequest request) {
-		User owner = userService.validateAndGetUser(ownerId);
+		User owner = userFunction.getById(ownerId);
 		if (owner.getRole() != UserRole.OWNER) {
 			throw new BusinessException(StoreErrorCode.OWNER_ROLE_REQUIRED);
 		}
-		if (storeRepository.existsByOwnerId(ownerId)) {
+		if (storeFunction.existsByOwnerId(ownerId)) {
 			throw new BusinessException(StoreErrorCode.STORE_ALREADY_REGISTERED);
 		}
 
@@ -60,7 +60,7 @@ public class StoreService {
 		store.replaceBusinessDays(request.businessDays());
 		store.submitApplication(request.businessRegistrationNumber(), request.applicationNote());
 		try {
-			storeRepository.saveAndFlush(store);
+			storeFunction.save(store);
 		} catch (DataIntegrityViolationException e) {
 			if (isOwnerConflict(e)) {
 				throw new BusinessException(StoreErrorCode.STORE_ALREADY_REGISTERED);
@@ -76,18 +76,12 @@ public class StoreService {
 	}
 
 	public StoreDetailResponse getMyStore(Long ownerId) {
-		return StoreDetailResponse.from(validateAndGetStoreByOwnerId(ownerId));
+		return StoreDetailResponse.from(storeFunction.getByOwnerId(ownerId));
 	}
 
-	public Store validateAndGetStoreByOwnerId(Long ownerId) {
-		return storeRepository.findByOwnerId(ownerId)
-				.orElseThrow(() -> new BusinessException(StoreErrorCode.STORE_NOT_REGISTERED));
-	}
 
 	public PageResponse<StoreSummaryResponse> getStores(StoreStatus status, Pageable pageable) {
-		Page<Store> stores = status == null
-				? storeRepository.findAllBy(pageable)
-				: storeRepository.findByStatus(status, pageable);
+		Page<Store> stores = storeFunction.findAllByStatus(status, pageable);
 
 		List<StoreSummaryResponse> content =
 				stores.getContent().stream().map(StoreSummaryResponse::from).toList();
@@ -95,12 +89,12 @@ public class StoreService {
 	}
 
 	public StoreDetailResponse getStore(Long storeId) {
-		return StoreDetailResponse.from(validateAndGetStore(storeId));
+		return StoreDetailResponse.from(storeFunction.getById(storeId));
 	}
 
 	@Transactional
 	public void updateStatus(Long storeId, StoreStatus status) {
-		Store store = validateAndGetStore(storeId);
+		Store store = storeFunction.getById(storeId);
 		switch (status) {
 			case APPROVED -> store.approve();
 			case REJECTED -> store.reject();
@@ -109,8 +103,4 @@ public class StoreService {
 		}
 	}
 
-	private Store validateAndGetStore(Long storeId) {
-		return storeRepository.findById(storeId)
-				.orElseThrow(() -> new BusinessException(StoreErrorCode.STORE_NOT_FOUND));
-	}
 }
