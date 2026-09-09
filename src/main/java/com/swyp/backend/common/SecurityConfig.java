@@ -36,6 +36,7 @@ import tools.jackson.databind.ObjectMapper;
 public class SecurityConfig {
 
 	private static final String OWNER_ROLE = "OWNER";
+	private static final String CONSUMER_ROLE = "CONSUMER";
 
 	private static final String[] PUBLIC_ENDPOINTS = {
 		"/ping",
@@ -55,6 +56,7 @@ public class SecurityConfig {
 	private static final String[] BROWSE_ENDPOINTS = {
 		"/recipes",
 		"/recipes/**",
+		"/products/nearby",
 	};
 
 	private static final String[] API_DOCS_ENDPOINTS = {
@@ -99,8 +101,12 @@ public class SecurityConfig {
 				if (apiDocsEnabled) {
 					auth.requestMatchers(API_DOCS_ENDPOINTS).permitAll();
 				}
-				auth.requestMatchers(HttpMethod.GET, BROWSE_ENDPOINTS).hasAnyAuthority(
-					TokenRealm.USER.authority(), TokenRealm.GUEST.authority(), TokenRealm.ADMIN.authority());
+				auth.requestMatchers(HttpMethod.GET, BROWSE_ENDPOINTS).access(AuthorizationManagers.anyOf(
+					AuthorityAuthorizationManager.hasAuthority(TokenRealm.GUEST.authority()),
+					AuthorityAuthorizationManager.hasAuthority(TokenRealm.ADMIN.authority()),
+					AuthorizationManagers.allOf(
+						AuthorityAuthorizationManager.hasAuthority(TokenRealm.USER.authority()),
+						AuthorityAuthorizationManager.hasRole(CONSUMER_ROLE))));
 				auth.requestMatchers("/admin/**").hasAuthority(TokenRealm.ADMIN.authority());
 				auth.requestMatchers("/owner/**").access(AuthorizationManagers.allOf(
 					AuthorityAuthorizationManager.hasAuthority(TokenRealm.USER.authority()),
