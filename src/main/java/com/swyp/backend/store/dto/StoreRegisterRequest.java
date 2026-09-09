@@ -12,7 +12,8 @@ import java.util.Set;
 
 public record StoreRegisterRequest(
 		@NotBlank @Size(max = 100) String name,
-		@NotEmpty @Size(max = 3, message = "가게 종류는 최대 3개까지 선택할 수 있습니다.")
+		@NotEmpty(message = "가게 종류를 1개 이상 선택해 주세요.")
+		@Size(max = 3, message = "가게 종류는 최대 3개까지 선택할 수 있습니다.")
 		Set<StoreCategory> categories,
 		@Pattern(regexp = "^[0-9]{5}$", message = "우편번호는 5자리 숫자여야 합니다.") String postalCode,
 		@NotBlank @Size(max = 255) String address,
@@ -21,7 +22,11 @@ public record StoreRegisterRequest(
 		String phone,
 		@NotNull LocalTime businessOpenTime,
 		@NotNull LocalTime businessCloseTime,
-		@NotEmpty Set<DayOfWeek> businessDays,
+		@NotEmpty(message = "영업 요일을 1개 이상 선택해 주세요.") Set<DayOfWeek> businessDays,
 		@Size(max = 20) String businessRegistrationNumber,
 		String applicationNote) {
+
+	public StoreRegisterRequest {
+		postalCode = postalCode == null || postalCode.isBlank() ? null : postalCode;
+	}
 }
