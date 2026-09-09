@@ -87,6 +87,7 @@ class ProductControllerTest {
 		Store store = new Store(
 				owner,
 				name,
+				"04524",
 				"서울시 마포구 망원동 1",
 				"1층",
 				"02-1234-5678",

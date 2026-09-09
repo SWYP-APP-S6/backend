@@ -80,7 +80,7 @@ class OwnerProductControllerTest {
 
 		owner = userRepository.saveAndFlush(new User(UserRole.OWNER, "테스트점주", null, false, Instant.now()));
 		store = storeRepository.saveAndFlush(new Store(
-			owner, "테스트가게", "서울특별시 강남구 역삼로 1", null, "0212345678",
+			owner, "테스트가게", "04524", "서울특별시 강남구 역삼로 1", null, "0212345678",
 			new BigDecimal("37.500000"), new BigDecimal("127.030000"),
 			LocalTime.of(9, 0), LocalTime.of(21, 0)));
 		token = tokenProvider.createAccessToken(TokenRealm.USER, owner.getId(), owner.getRole().name());
@@ -288,7 +288,7 @@ class OwnerProductControllerTest {
 	void getMyProduct_forAnotherStoresProduct_isNotFound() throws Exception {
 		User otherOwner = userRepository.saveAndFlush(new User(UserRole.OWNER, "다른점주", null, false, Instant.now()));
 		Store otherStore = storeRepository.saveAndFlush(new Store(
-			otherOwner, "다른가게", "주소", null, "0210001000",
+			otherOwner, "다른가게", "04524", "주소", null, "0210001000",
 			new BigDecimal("37.1"), new BigDecimal("127.1"), LocalTime.of(9, 0), LocalTime.of(21, 0)));
 		Product othersProduct = productRepository.saveAndFlush(new Product(
 			otherStore, "남의상품", ProductCategory.FRUIT, 5, 1000, 800,

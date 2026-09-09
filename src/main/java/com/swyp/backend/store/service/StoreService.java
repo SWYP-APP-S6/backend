@@ -44,6 +44,7 @@ public class StoreService {
 		Store store = new Store(
 				owner,
 				request.name(),
+				request.postalCode(),
 				request.address(),
 				request.addressDetail(),
 				request.phone(),
@@ -51,6 +52,8 @@ public class StoreService {
 				coordinates.longitude(),
 				request.businessOpenTime(),
 				request.businessCloseTime());
+		store.replaceCategories(request.categories());
+		store.replaceBusinessDays(request.businessDays());
 		store.submitApplication(request.businessRegistrationNumber(), request.applicationNote());
 		try {
 			storeRepository.saveAndFlush(store);
