@@ -107,7 +107,9 @@ SWYP 앱의 백엔드 REST API 서버. (프로덕트 한 줄 설명은 확정되
   (installId)가 `realm=GUEST`·`role=GUEST` access 토큰을 준다(refresh 없음, 수명은 `jwt.guest-access-ttl` — TTL은 `JwtProperties.accessTtlFor(realm)`이 realm으로 정한다). principal은
   서버가 만든 무작위 long이고 **`users` row는 없다** — `@AuthenticationPrincipal Long`으로 유저를 찾는
   엔드포인트에 guest가 닿으면 안 되므로 조회 외 엔드포인트는 반드시 `REALM_USER`를 요구한다.
-  **조회 엔드포인트(`/recipes/**` 등)는 `BROWSE_ENDPOINTS`에 등록**해 **GET만** USER·GUEST·ADMIN 셋에 열고,
+  **조회 엔드포인트(`/recipes/**`·`/products/nearby` 등)는 `BROWSE_ENDPOINTS`에 등록**해 **GET만**
+  GUEST·ADMIN·(`REALM_USER`+`ROLE_CONSUMER`) 셋에 연다 — **점주는 제외된다.** realm 만 걸면
+  `REALM_USER` 가 소비자와 점주를 함께 통과시켜, `/owner/**` 와 대칭인 구멍이 반대 방향으로 남는다.
   `permitAll`은 `/ping`과 인증 엔드포인트에만 쓴다(익명 대량 요청의 구멍을 남기지 않기 위해).
   guest가 회원 전용을 부르면 `RestAccessDeniedHandler`가 **403 `LOGIN_REQUIRED`**(그 외 거부는
   `FORBIDDEN`)를 내려 앱이 가입 안내로 분기한다. guest 토큰은 인증 수단이 아니라 **rate limit 키**다.
