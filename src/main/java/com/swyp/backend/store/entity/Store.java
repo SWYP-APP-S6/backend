@@ -33,6 +33,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Store extends BaseTimeEntity {
 
+	private static final int MAX_CATEGORIES = 3;
+
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
@@ -127,6 +129,10 @@ public class Store extends BaseTimeEntity {
 	}
 
 	public void replaceCategories(Collection<StoreCategory> categories) {
+		if (categories.isEmpty() || categories.size() > MAX_CATEGORIES) {
+			throw new IllegalArgumentException(
+					"store categories must be between 1 and " + MAX_CATEGORIES);
+		}
 		this.categories.clear();
 		this.categories.addAll(categories);
 	}
