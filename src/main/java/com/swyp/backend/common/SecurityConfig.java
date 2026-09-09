@@ -3,6 +3,9 @@ package com.swyp.backend.common;
 import com.swyp.backend.common.security.JwtAuthenticationFilter;
 import com.swyp.backend.common.security.JwtProperties;
 import com.swyp.backend.common.security.JwtTokenProvider;
+import com.swyp.backend.common.security.RateLimitFilter;
+import com.swyp.backend.common.security.RateLimitProperties;
+import com.swyp.backend.common.security.RateLimiter;
 import com.swyp.backend.common.security.RestAccessDeniedHandler;
 import com.swyp.backend.common.security.RestAuthenticationEntryPoint;
 import com.swyp.backend.common.security.TokenRealm;
@@ -11,6 +14,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authorization.AuthorityAuthorizationManager;
 import org.springframework.security.authorization.AuthorizationManagers;
 import org.springframework.security.config.Customizer;
@@ -24,9 +28,10 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import tools.jackson.databind.ObjectMapper;
 
 @Configuration
-@EnableConfigurationProperties(JwtProperties.class)
+@EnableConfigurationProperties({JwtProperties.class, RateLimitProperties.class})
 @EnableWebSecurity
 public class SecurityConfig {
 
@@ -37,6 +42,7 @@ public class SecurityConfig {
 		"/admin/auth/login",
 		"/admin/auth/refresh",
 		"/admin/auth/logout",
+		"/auth/guest",
 		"/auth/consumer/kakao",
 		"/auth/consumer/kakao/exchange",
 		"/auth/owner/kakao",
@@ -44,6 +50,9 @@ public class SecurityConfig {
 		"/auth/signup",
 		"/auth/refresh",
 		"/auth/logout",
+	};
+
+	private static final String[] BROWSE_ENDPOINTS = {
 		"/recipes",
 		"/recipes/**",
 	};
@@ -76,9 +85,11 @@ public class SecurityConfig {
 
 	@Bean
 	SecurityFilterChain filterChain(HttpSecurity http, JwtTokenProvider tokenProvider,
+			RateLimiter rateLimiter, ObjectMapper objectMapper,
 			RestAuthenticationEntryPoint authenticationEntryPoint,
 			RestAccessDeniedHandler accessDeniedHandler,
 			@Value("${springdoc.api-docs.enabled:true}") boolean apiDocsEnabled) throws Exception {
+		JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(tokenProvider);
 		http
 			.cors(Customizer.withDefaults())
 			.csrf(csrf -> csrf.disable())
@@ -88,16 +99,19 @@ public class SecurityConfig {
 				if (apiDocsEnabled) {
 					auth.requestMatchers(API_DOCS_ENDPOINTS).permitAll();
 				}
+				auth.requestMatchers(HttpMethod.GET, BROWSE_ENDPOINTS).hasAnyAuthority(
+					TokenRealm.USER.authority(), TokenRealm.GUEST.authority(), TokenRealm.ADMIN.authority());
 				auth.requestMatchers("/admin/**").hasAuthority(TokenRealm.ADMIN.authority());
 				auth.requestMatchers("/owner/**").access(AuthorizationManagers.allOf(
 					AuthorityAuthorizationManager.hasAuthority(TokenRealm.USER.authority()),
 					AuthorityAuthorizationManager.hasRole(OWNER_ROLE)));
-				auth.anyRequest().authenticated();
+				auth.anyRequest().hasAuthority(TokenRealm.USER.authority());
 			})
 			.exceptionHandling(exception -> exception
 				.authenticationEntryPoint(authenticationEntryPoint)
 				.accessDeniedHandler(accessDeniedHandler))
-			.addFilterBefore(new JwtAuthenticationFilter(tokenProvider), UsernamePasswordAuthenticationFilter.class)
+			.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+			.addFilterAfter(new RateLimitFilter(rateLimiter, objectMapper), JwtAuthenticationFilter.class)
 			.httpBasic(basic -> basic.disable())
 			.formLogin(form -> form.disable());
 		return http.build();

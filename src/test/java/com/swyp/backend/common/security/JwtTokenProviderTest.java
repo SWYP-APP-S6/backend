@@ -11,7 +11,8 @@ import org.junit.jupiter.api.Test;
 class JwtTokenProviderTest {
 
 	private final JwtTokenProvider provider = new JwtTokenProvider(
-		new JwtProperties("test-secret-that-is-at-least-32-bytes-long!!", Duration.ofMinutes(30), Duration.ofDays(14)));
+		new JwtProperties(
+			"test-secret-that-is-at-least-32-bytes-long!!", Duration.ofMinutes(30), Duration.ofHours(24), Duration.ofDays(14)));
 
 	@Test
 	void createAndParse_roundTripsSubjectRealmAndRole() {

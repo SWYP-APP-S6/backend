@@ -13,7 +13,8 @@ public enum UserAuthErrorCode implements ApiCode {
 	OAUTH_PROVIDER_UNAVAILABLE(HttpStatus.BAD_GATEWAY, "카카오 인증 서버와 통신할 수 없습니다."),
 	INVALID_SIGNUP_TOKEN(HttpStatus.UNAUTHORIZED, "유효하지 않거나 만료된 가입 토큰입니다."),
 	ALREADY_REGISTERED(HttpStatus.CONFLICT, "이미 가입된 계정입니다."),
-	USER_NOT_FOUND(HttpStatus.NOT_FOUND, "회원을 찾을 수 없습니다.");
+	USER_NOT_FOUND(HttpStatus.NOT_FOUND, "회원을 찾을 수 없습니다."),
+	GUEST_ISSUE_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "비회원 토큰 발급 한도를 초과했습니다.");
 
 	private final HttpStatus status;
 	private final String message;

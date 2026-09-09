@@ -21,11 +21,11 @@ public class JwtTokenProvider {
 	private static final String ACCESS_TYPE = "access";
 
 	private final SecretKey key;
-	private final Duration accessTtl;
+	private final JwtProperties properties;
 
 	public JwtTokenProvider(JwtProperties properties) {
 		this.key = Keys.hmacShaKeyFor(properties.secret().getBytes(StandardCharsets.UTF_8));
-		this.accessTtl = properties.accessTtl();
+		this.properties = properties;
 	}
 
 	public String createAccessToken(TokenRealm realm, Long principalId, String role) {
@@ -33,7 +33,7 @@ public class JwtTokenProvider {
 			ACCESS_TYPE,
 			String.valueOf(principalId),
 			Map.of(REALM_CLAIM, realm.name(), ROLE_CLAIM, role),
-			accessTtl);
+			properties.accessTtlFor(realm));
 	}
 
 	public AccessToken parseAccessToken(String token) {
