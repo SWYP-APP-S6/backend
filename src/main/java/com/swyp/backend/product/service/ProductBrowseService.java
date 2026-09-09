@@ -1,5 +1,6 @@
 package com.swyp.backend.product.service;
 
+import com.swyp.backend.common.BrowseProperties;
 import com.swyp.backend.common.Distance;
 import com.swyp.backend.common.response.PageResponse;
 import com.swyp.backend.product.dto.NearbyProductResponse;
@@ -20,7 +21,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import org.springframework.beans.factory.annotation.Value;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -28,6 +29,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ProductBrowseService {
 
@@ -35,18 +37,10 @@ public class ProductBrowseService {
 
 	private final ProductRepository productRepository;
 	private final Clock clock;
-	private final int radiusMeters;
-
-	public ProductBrowseService(
-			ProductRepository productRepository,
-			Clock clock,
-			@Value("${browse.nearby-radius-meters}") int radiusMeters) {
-		this.productRepository = productRepository;
-		this.clock = clock;
-		this.radiusMeters = radiusMeters;
-	}
+	private final BrowseProperties browseProperties;
 
 	public NearbyProductsResponse findNearby(NearbyProductsRequest request) {
+		int radiusMeters = browseProperties.nearbyRadiusMeters();
 		double originLatitude = request.lat().doubleValue();
 		BigDecimal latitudeDelta = Distance.latitudeDelta(radiusMeters);
 		BigDecimal longitudeDelta = Distance.longitudeDelta(radiusMeters, originLatitude);
