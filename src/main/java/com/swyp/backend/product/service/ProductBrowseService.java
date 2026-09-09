@@ -3,23 +3,20 @@ package com.swyp.backend.product.service;
 import com.swyp.backend.common.BrowseProperties;
 import com.swyp.backend.common.Distance;
 import com.swyp.backend.common.response.PageResponse;
-import com.swyp.backend.product.dto.SellableProductResponse;
 import com.swyp.backend.product.dto.NearbyProductSort;
 import com.swyp.backend.product.dto.NearbyProductsRequest;
 import com.swyp.backend.product.dto.NearbyProductsResponse;
 import com.swyp.backend.product.dto.NearbyStoreGroupResponse;
-import com.swyp.backend.product.dto.StoreProductSummary;
+import com.swyp.backend.product.dto.SellableProductResponse;
 import com.swyp.backend.product.entity.Product;
-import com.swyp.backend.product.repository.ProductRepository;
+import com.swyp.backend.product.function.ProductFunction;
 import com.swyp.backend.store.entity.Store;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
-import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -35,7 +32,7 @@ public class ProductBrowseService {
 
 	private static final int MAX_PRODUCTS_PER_STORE = 10;
 
-	private final ProductRepository productRepository;
+	private final ProductFunction productFunction;
 	private final Clock clock;
 	private final BrowseProperties browseProperties;
 
@@ -45,7 +42,7 @@ public class ProductBrowseService {
 		BigDecimal latitudeDelta = Distance.latitudeDelta(radiusMeters);
 		BigDecimal longitudeDelta = Distance.longitudeDelta(radiusMeters, originLatitude);
 
-		List<Product> sellable = productRepository.findSellableWithinBounds(
+		List<Product> sellable = productFunction.findSellableWithinBounds(
 				LocalDateTime.now(clock),
 				request.category(),
 				request.lat().subtract(latitudeDelta),
@@ -73,21 +70,6 @@ public class ProductBrowseService {
 				new PageImpl<>(groups.subList(fromIndex, toIndex), pageRequest, groups.size());
 		return new NearbyProductsResponse(
 				totalProductCount, PageResponse.of(page.getContent(), page));
-	}
-
-	public Map<Long, StoreProductSummary> summarizeSellableByStore(Collection<Long> storeIds) {
-		if (storeIds.isEmpty()) {
-			return Map.of();
-		}
-		return productRepository
-				.summarizeSellableByStoreIds(LocalDateTime.now(clock), storeIds).stream()
-				.collect(Collectors.toMap(StoreProductSummary::storeId, summary -> summary));
-	}
-
-	public List<SellableProductResponse> findSellableByStore(Long storeId) {
-		return productRepository.findSellableByStoreId(storeId, LocalDateTime.now(clock)).stream()
-				.map(SellableProductResponse::from)
-				.toList();
 	}
 
 	private NearbyStoreGroupResponse toStoreGroup(

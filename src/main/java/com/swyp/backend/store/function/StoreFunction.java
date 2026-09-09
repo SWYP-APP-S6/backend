@@ -5,6 +5,8 @@ import com.swyp.backend.store.entity.Store;
 import com.swyp.backend.store.entity.StoreStatus;
 import com.swyp.backend.store.exception.StoreErrorCode;
 import com.swyp.backend.store.repository.StoreRepository;
+import java.math.BigDecimal;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -34,6 +36,15 @@ public class StoreFunction {
 		return status == null
 				? storeRepository.findAllBy(pageable)
 				: storeRepository.findByStatus(status, pageable);
+	}
+
+	public List<Store> findApprovedWithinBounds(
+			BigDecimal minLatitude,
+			BigDecimal maxLatitude,
+			BigDecimal minLongitude,
+			BigDecimal maxLongitude) {
+		return storeRepository.findByStatusAndLatitudeBetweenAndLongitudeBetween(
+				StoreStatus.APPROVED, minLatitude, maxLatitude, minLongitude, maxLongitude);
 	}
 
 	public Store save(Store store) {

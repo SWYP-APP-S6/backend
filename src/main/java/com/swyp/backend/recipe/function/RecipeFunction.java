@@ -15,6 +15,7 @@ import com.swyp.backend.recipe.repository.RecipeStepRepository;
 import com.swyp.backend.recipe.repository.RecipeTagRepository;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -60,8 +61,12 @@ public class RecipeFunction {
 		return recipeNutritionRepository.findById(recipeId);
 	}
 
-	public long countIngredientsByIds(Collection<Integer> ingredientIds) {
-		return ingredientRepository.countByIdIn(ingredientIds);
+	public boolean allIngredientsExist(Collection<Integer> ingredientIds) {
+		Set<Integer> distinctIds = Set.copyOf(ingredientIds);
+		if (distinctIds.isEmpty()) {
+			return true;
+		}
+		return ingredientRepository.countByIdIn(distinctIds) == distinctIds.size();
 	}
 
 	public List<RecipeTag> findTags(Long recipeId) {
