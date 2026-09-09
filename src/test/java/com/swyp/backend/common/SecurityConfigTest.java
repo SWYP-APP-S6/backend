@@ -57,13 +57,20 @@ class SecurityConfigTest {
 	}
 
 	@Test
-	void recipes_areBrowsableByGuestUserAndAdminRealms() throws Exception {
+	void recipes_areBrowsableByGuestsConsumersAndAdmins() throws Exception {
 		mockMvc.perform(get("/recipes/categories").header("Authorization", bearer(TokenRealm.GUEST, "GUEST")))
 			.andExpect(status().isOk());
 		mockMvc.perform(get("/recipes/categories").header("Authorization", bearer(TokenRealm.USER, "CONSUMER")))
 			.andExpect(status().isOk());
 		mockMvc.perform(get("/recipes/categories").header("Authorization", bearer(TokenRealm.ADMIN, "SUPER")))
 			.andExpect(status().isOk());
+	}
+
+	@Test
+	void browseEndpoints_rejectOwnerTokens() throws Exception {
+		mockMvc.perform(get("/recipes/categories").header("Authorization", bearer(TokenRealm.USER, "OWNER")))
+			.andExpect(status().isForbidden())
+			.andExpect(jsonPath("$.code").value("FORBIDDEN"));
 	}
 
 	@Test
