@@ -187,6 +187,32 @@ class OwnerProductControllerTest {
 	}
 
 	@Test
+	void registerProduct_withAnUnknownIngredientTag_isRejected() throws Exception {
+		mockMvc.perform(post("/owner/products")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"name":"당근","category":"VEGETABLE","initialQty":10,"originalPrice":1000,"salePrice":800,\
+					"photoUrl":"https://example.com/a.jpg","ingredientTags":[999999]}"""))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("INGREDIENT_NOT_FOUND"));
+	}
+
+	@Test
+	void registerProduct_withAPhotoUrlLongerThanTheColumnLimit_isRejected() throws Exception {
+		String tooLongPhotoUrl = "https://example.com/" + "a".repeat(500);
+
+		mockMvc.perform(post("/owner/products")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"name":"당근","category":"VEGETABLE","initialQty":10,"originalPrice":1000,"salePrice":800,\
+					"photoUrl":"%s"}""".formatted(tooLongPhotoUrl)))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+	}
+
+	@Test
 	void registerProduct_withoutAStore_isRejected() throws Exception {
 		User ownerWithoutStore = userRepository.saveAndFlush(
 			new User(UserRole.OWNER, "가게없는점주", null, false, Instant.now()));

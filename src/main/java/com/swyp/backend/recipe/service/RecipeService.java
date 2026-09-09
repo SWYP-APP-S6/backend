@@ -10,12 +10,15 @@ import com.swyp.backend.recipe.dto.RecipeSummaryResponse;
 import com.swyp.backend.recipe.entity.Recipe;
 import com.swyp.backend.recipe.entity.RecipeTag;
 import com.swyp.backend.recipe.exception.RecipeErrorCode;
+import com.swyp.backend.recipe.repository.IngredientRepository;
 import com.swyp.backend.recipe.repository.RecipeIngredientRepository;
 import com.swyp.backend.recipe.repository.RecipeNutritionRepository;
 import com.swyp.backend.recipe.repository.RecipeRepository;
 import com.swyp.backend.recipe.repository.RecipeStepRepository;
 import com.swyp.backend.recipe.repository.RecipeTagRepository;
+import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -33,6 +36,15 @@ public class RecipeService {
 	private final RecipeIngredientRepository recipeIngredientRepository;
 	private final RecipeNutritionRepository recipeNutritionRepository;
 	private final RecipeTagRepository recipeTagRepository;
+	private final IngredientRepository ingredientRepository;
+
+	public boolean allIngredientsExist(Collection<Integer> ingredientIds) {
+		Set<Integer> distinctIds = Set.copyOf(ingredientIds);
+		if (distinctIds.isEmpty()) {
+			return true;
+		}
+		return ingredientRepository.countByIdIn(distinctIds) == distinctIds.size();
+	}
 
 	public RecipeDetailResponse getRecipe(Long id) {
 		Recipe recipe = validateAndGetRecipe(id);

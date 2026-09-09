@@ -17,6 +17,7 @@ import com.swyp.backend.product.entity.Product;
 import com.swyp.backend.product.entity.ProductCategory;
 import com.swyp.backend.product.exception.ProductErrorCode;
 import com.swyp.backend.product.repository.ProductRepository;
+import com.swyp.backend.recipe.service.RecipeService;
 import com.swyp.backend.store.entity.Store;
 import com.swyp.backend.store.service.StoreService;
 import java.time.Clock;
@@ -41,6 +42,7 @@ public class ProductService {
 	private final HoldRepository holdRepository;
 	private final StoreService storeService;
 	private final NotificationService notificationService;
+	private final RecipeService recipeService;
 	private final Clock clock;
 
 	@Transactional
@@ -56,6 +58,9 @@ public class ProductService {
 				: defaultPickupEndAt(store, now);
 		if (!pickupEndAt.isAfter(now) || pickupEndAt.isAfter(now.plusHours(MAX_PICKUP_WINDOW_HOURS))) {
 			throw new BusinessException(ProductErrorCode.INVALID_PICKUP_WINDOW);
+		}
+		if (request.ingredientTags() != null && !recipeService.allIngredientsExist(request.ingredientTags())) {
+			throw new BusinessException(ProductErrorCode.INGREDIENT_NOT_FOUND);
 		}
 
 		Product product = new Product(

@@ -14,7 +14,7 @@ public record ProductRegisterRequest(
 		@Min(1) int initialQty,
 		@Positive int originalPrice,
 		@Positive int salePrice,
-		@NotBlank String photoUrl,
+		@NotBlank @Size(max = 512) String photoUrl,
 		@Size(max = 5) List<Integer> ingredientTags,
 		LocalDateTime pickupEndAt) {
 }
