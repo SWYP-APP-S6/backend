@@ -1,230 +1,122 @@
 # SWYP Backend
 
-SWYP 앱의 백엔드 REST API 서버. (프로덕트 한 줄 설명은 확정되면 여기 채우기.)
-
-이 저장소의 개발 프로세스·컨벤션은 아래를 따른다. **이 지침은 기본 동작보다 우선한다.**
-
 ## Stack
 
-- Java 25 (LTS) · Spring Boot 4.1 · Gradle (Kotlin DSL, `build.gradle.kts`)
-- Spring Web MVC · Spring Data JPA · Spring Security · PostgreSQL (`org.postgresql:postgresql`)
-- JUnit 5 (`./gradlew test`)
+- Java 25 (LTS) · Spring Boot 4.1 · Gradle (Kotlin DSL, `build.gradle.kts`) · PostgreSQL · Redis
+- Spring Web MVC · Spring Data JPA · Spring Security · Flyway · JUnit 5 (`./gradlew test`)
 - Base package `com.swyp.backend`
-- **Lombok** — 엔티티 보일러플레이트용. 엔티티엔 **`@Getter` + `@NoArgsConstructor(access = PROTECTED)`만**
-  쓴다. **금지**: `@Data`·전면 `@Setter`·기본 `@EqualsAndHashCode`(JPA에서 양방향 무한재귀·lazy 트리거·
-  가변 hashCode 버그원). `@Builder`를 쓰면 초기화 컬렉션 필드에 `@Builder.Default` 필수(없으면 null).
-  불변 DTO는 Lombok이 아니라 `record`(아래 Architecture). 규칙 12의 명시적 예외(규칙 12 참조).
-- 스키마 마이그레이션: **Flyway** (`spring-boot-starter-flyway` + `org.flywaydb:flyway-database-postgresql`).
-  자세한 규약은 아래 Database 섹션.
-- **외부 API 호출**: `RestClient`. Boot 4는 클라이언트 자동설정이 별도 모듈이라
-  **`spring-boot-starter-restclient`가 있어야** `RestClient.Builder` 빈이 생긴다(webmvc 스타터만으론 없음).
-  타임아웃은 `spring.http.clients.{connect,read}-timeout`으로 전역 설정한다.
-- **Jackson 3** (`tools.jackson.databind`) — Boot 4 의 HTTP 메시지 컨버터가 쓰는 건 이쪽이다.
-  `com.fasterxml.jackson`(2.x)도 전이 의존성으로 클래스패스에 **함께 있어서** 잘못 import 해도
-  컴파일은 된다. 그 경우 `JsonNode` 가 트리가 아니라 **POJO 로 직렬화**된다
-  (`{"array":false,"bigDecimal":false,…}`) — 응답이 조용히 망가지므로 import 를 확인할 것.
-- **ArchUnit**: 레이어 경계를 테스트로 강제(`ArchitectureTest`). Java 25 바이트코드 파싱 위해 **1.5.0+** 필요.
-- **API 문서**: springdoc-openapi (`/swagger-ui`, `/v3/api-docs`). **Boot 4 → springdoc 3.x**(2.x는 Boot 3용). 인증은 `bearerAuth` 스킴.
-- **도입 예정 (Phase 2)**: Spotless(포맷) · Checkstyle(스타일). 미리 안 깔고 마찰 생기면 추가.
+- **Lombok** — 엔티티 보일러플레이트 한정(규칙 12의 명시적 예외). 상세 규칙은
+  `.claude/rules/{entity,dto}.md`.
+- **외부 API 호출**: `RestClient`. **`spring-boot-starter-restclient`가 있어야** `RestClient.Builder`
+  빈이 생긴다(Boot 4는 클라이언트 자동설정이 별도 모듈 — webmvc 스타터만으론 없다).
+  타임아웃은 `spring.http.clients.{connect,read}-timeout`으로 전역 설정.
+- **Jackson 3**(`tools.jackson.databind`)만 import한다 — 2.x(`com.fasterxml.jackson`)도 전이
+  의존성으로 함께 있어 잘못 써도 컴파일은 되고, 그 경우 `JsonNode`가 트리가 아니라
+  **POJO로 직렬화**돼(`{"array":false,…}`) 응답이 조용히 망가진다.
+- **API 문서**: springdoc-openapi **3.x**(2.x는 Boot 3용) — `/swagger-ui`, `/v3/api-docs`, 인증은 `bearerAuth`.
 
 ## Architecture
 
-팀 합의된 현행 컨벤션. 팀 논의로 바뀌면 규칙 17에 따라 이 파일을 같은 세션에 갱신하고,
-`ArchitectureTest`(ArchUnit) 규칙도 함께 맞춘다.
-
-- **Package-by-feature + 레이어 서브패키지**: `com.swyp.backend.<feature>` (예: `.admin`, `.ping`) 아래
-  존재하는 레이어를 각각 서브패키지로 둔다 — `controller` / `service` / `repository` / `entity` / `dto`.
-- **`com.swyp.backend.common`**: feature가 아닌 **여러 feature가 공유하는 타입**만 둔다
-  (예: `BaseTimeEntity`, `JpaAuditingConfig`). 특정 feature 것은 여기 넣지 않는다.
-- **감사 타임스탬프**: 엔티티는 `BaseTimeEntity`(`@MappedSuperclass`)를 상속해 `createdAt`/`updatedAt`을
-  얻는다. 값은 **Spring Data JPA Auditing**이 채운다(`JpaAuditingConfig`의 `@EnableJpaAuditing`).
-  DB default/trigger가 아니므로 **쓰기는 JPA를 통해야** 채워진다(현재 앱이 유일 writer).
-- **레이어 경계** (`ArchitectureTest`(ArchUnit)가 빌드에서 강제):
-  - `controller → service → repository` 단방향. controller가 repository를 직접 호출하지 않는다.
-  - **`repository`만 JPA 영속성 API**(`JpaRepository`/`EntityManager`)에 접근한다. service·controller는
-    엔티티 영속성 API를 직접 쓰지 않는다.
-  - feature 간 접근은 상대 feature의 **`service`를 통해서만** — 남의 `repository`를 직접 호출하지 않는다.
-  - **`@Entity`는 controller 경계를 넘지 않는다** — 요청/응답은 DTO. 엔티티↔DTO 매핑은 service.
+- **Package-by-feature + 레이어 서브패키지**: `com.swyp.backend.<feature>`(예: `.admin`, `.ping`) 아래
+  `controller` / `service` / `repository` / `entity` / `dto`. `com.swyp.backend.common`에는 **여러
+  feature가 공유하는 타입만** 둔다(`BaseTimeEntity`, `JpaAuditingConfig` 등).
+- **레이어 경계** — 앞 3개는 `ArchitectureTest`(ArchUnit)가 빌드에서 강제, 뒤 2개는 규약(미강제):
+  - `controller → service → repository` 단방향.
+  - **`repository`만 JPA 영속성 API**(`JpaRepository`/`EntityManager`)에 접근한다.
+  - **`@Entity`는 controller 경계를 넘지 않는다** — 요청/응답은 DTO(기본 `record`), 매핑은 service.
+  - feature 간 접근은 상대 feature의 **`service`를 통해서만**.
   - `@Transactional`은 **service 계층**에 둔다.
-- **DTO는 `record`가 기본** — 요청/응답 및 대부분의 계층 간 전달 객체는 불변 값이라 `record`로 둔다
-  (Jackson이 record 직렬화/역직렬화를 네이티브 지원). `class`는 **가변 누적·상속·프레임워크가
-  클래스를 요구할 때**만 예외로 쓴다. 레퍼런스: `PingResponse`.
-- **API 응답은 표준 envelope로 통일**: 성공 = `ApiResponse<T>{status,code,message,data}`(`SuccessCode`),
-  실패 = `ErrorResponse{status,code,message,fieldErrors}`를 `@RestControllerAdvice`
-  (`GlobalExceptionHandler`)가 생성. 컨트롤러가 성공을 envelope로 감싼다. 비즈니스 예외는
-  **`BusinessException(ApiCode)` 하나**로 던지고, **에러 코드는 각 feature가 자기 enum
-  (`implements ApiCode`)에 소유**한다(제네릭만 `common.response.ErrorCode` — global→feature 역결합 회피).
-  `GlobalExceptionHandler`는 `ResponseEntityExceptionHandler`를 상속해 **프레임워크 클라이언트 에러**
-  (잘못된 메서드 405·깨진 JSON 400·미디어타입 415 등)도 올바른 status로 envelope화한다(그 경우 `code`는
-  HTTP status명). `@Valid`/Bean Validation 실패는 `VALIDATION_FAILED`(fieldErrors)로 매핑된다(활성화됨).
-  (`com.swyp.backend.common.response`/`.common.exception`, 레퍼런스: `PingController`.)
-- **레퍼런스 구현**: `com.swyp.backend.ping` (controller→service→dto + `@WebMvcTest` 슬라이스
-  테스트)이 이 컨벤션의 walking skeleton이다. 새 feature는 이 형태를 복사해 시작한다.
-- **레이어별 상세 작성 규칙**은 `.claude/rules/{entity,repository,service,controller,dto}.md`에
-  path-scoped로 있다 — 해당 레이어 파일을 작성/수정할 때만 자동 로드된다(파일명 접미사·`dto/`·`domain/`
-  글로브 기준). 이 CLAUDE.md는 **전역 규약**, `rules/`는 **레이어별 체크리스트**. 둘이 모순되면 이 파일 갱신.
+- **API 응답은 표준 envelope**: 성공 `ApiResponse<T>{status,code,message,data}`(컨트롤러가 감싼다),
+  실패 `ErrorResponse{status,code,message,fieldErrors}`(`GlobalExceptionHandler`가 생성 —
+  `ResponseEntityExceptionHandler`를 상속해 프레임워크
+  클라이언트 에러 405·400·415도 포함). 비즈니스 예외는 **`BusinessException(ApiCode)` 하나**로 던지고,
+  **에러 코드는 각 feature가 자기 enum(`implements ApiCode`)에 소유**한다(제네릭만
+  `common.response.ErrorCode` — global→feature 역결합 회피).
+- `createdAt`/`updatedAt`은 Spring Data JPA Auditing이 채운다 — DB default/trigger가 아니므로 **쓰기가
+  JPA를 거쳐야** 채워진다(현재 앱이 유일 writer).
+- **레퍼런스 구현**: `com.swyp.backend.ping`(controller→service→dto + 슬라이스 테스트)이 walking
+  skeleton이다. 새 feature는 이 형태를 복사해 시작한다.
 
 ## Auth
 
-- **admin(백오피스)**: email+password(BCrypt) → **JWT access(무상태) + rotating refresh(Redis)**.
-  엔드포인트 `/admin/auth/{login,refresh,logout}`(public), 그 외는 bearer access 토큰 필요. 구성:
-  `common.SecurityConfig`(STATELESS·JWT 필터·`RestAuthenticationEntryPoint`가 401을 error envelope로),
-  `common.security.*`(`JwtTokenProvider`·`RefreshTokenService`·`JwtProperties`·`JwtAuthenticationFilter`).
-  역할 = `ROLE_<AdminType>`(SUPER/MANAGER/DEVELOPER). 시드 SUPER admin은 V0001(DEV ONLY, 프로덕션 전 교체).
-- **앱 유저(소비자·점주)**: **카카오 로그인만** 쓴다(관리자 백오피스는 해당 없음 — 위 email+password 유지).
-  **소비자 앱과 점주 앱은 별개의 카카오 앱**이다(콘솔의 플랫폼 등록이 앱마다 필요하고, 한 카카오 앱에
-  패키지명·번들ID를 여러 개 넣으려면 '멀티 앱' 권한 신청이 별도로 필요해서). 앱이 카카오 SDK로 받은
-  access token을 넘기면 서버가 `/v1/user/access_token_info`로 **app_id가 그 역할의 카카오 앱인지
-  검증**한 뒤(`kakao.consumer-app-id`/`kakao.owner-app-id`) `/v2/user/me`로 닉네임을 읽는다 —
-  다른 앱 토큰으로 남의 계정에 로그인하는 토큰 치환을 막고, 소비자 앱 토큰을 점주 엔드포인트에
-  쓰는 것도 여기서 걸린다. **카카오 토큰은 저장하지 않는다** — 로그인 순간 신원 확인용으로만 쓴다.
-  엔드포인트는 앱별로 분리 — `/auth/consumer/kakao`·`/auth/owner/kakao`(role을 클라이언트가 정하지
-  못한다) + `/auth/{signup,refresh,logout}`. 구성: `user.controller.UserAuthController`,
-  `user.service.{UserAuthService,KakaoOauthClient,KakaoRestOauthClient,SignupTokenProvider}`.
-- **신규 가입은 2단계** — 첫 카카오 로그인은 `registered:false` + 단기 **signupToken**만 주고 `users`
-  row를 만들지 않는다. 약관 동의 후 `/auth/signup`이 계정을 만든다(기능명세서 C-002: "인증됐으나 약관
-  미동의인 계정이 남으면 안 됨" — 이탈하면 아무것도 남지 않는다). 필수 약관 3건은
-  `SignupRequest`의 `@AssertTrue`로 강제하고, 스키마에는 `terms_agreed_at` 한 건으로 기록한다
-  (항목별 동의 이력이 필요해지면 별도 테이블).
-  **유저 식별자는 `(oauth_provider, oauth_provider_id, role)`**(V0015의 `uq_users_oauth_identity`) —
-  카카오 회원번호는 **앱마다 다르게 발급**되므로 서로 다른 두 사람이 각 앱에서 같은 번호를 가질 수
-  있다. `role`이 곧 '어느 카카오 앱에서 온 번호인가'라서 식별자에 들어간다. 그 결과 한 사람이 소비자
-  계정과 점주 계정을 각각 가질 수 있다(앱이 분리돼 있으니 정상 동작).
-- **realm 분리(admin ↔ 앱 유저)**: 두 주체가 같은 JWT/Redis 인프라를 쓰므로 access 토큰에 `realm`
-  클레임(`TokenRealm` = ADMIN/USER)을 넣고, refresh 토큰도 Redis 키를 `refresh:<realm>:<token>`으로
-  나눈다. `/admin/**`는 `REALM_ADMIN` authority를 요구한다 — **앱 유저 토큰으로는 관리자 API에 닿지
-  못하고**, 앱 유저 refresh 토큰을 `/admin/auth/refresh`에 넣어도 회전되지 않는다(id가 겹치는 admin
-  토큰이 발급되던 문제). 인가 거부는 `RestAccessDeniedHandler`가 403 error envelope로 만든다.
-  access 토큰은 `typ=access`라서 가입 토큰(`typ=signup`)을 bearer로 써도 통과하지 못한다.
-  **앱 유저 전용 엔드포인트를 새로 만들면 `SecurityConfig`에 `REALM_USER` 요구를 함께 등록한다** —
-  `authenticated()`만 걸면 admin·guest 토큰으로도 들어올 수 있고, 그 id가 `users` 의 다른 사람을
-  가리킨다(`anyRequest()`의 기본이 `REALM_USER`라 안 적으면 그쪽으로 떨어진다).
-- **realm 위에 role도 요구한다** — realm 은 '앱 유저인가'만 가르고 소비자/점주를 구분하지 않는다.
-  그래서 `/owner/**`는 `REALM_USER` **와 `ROLE_OWNER`를 둘 다** 요구한다(`AuthorizationManagers.allOf`).
-  realm 만 걸면 소비자 토큰으로 점주 API를 전부 호출할 수 있다. 역할이 갈리는 엔드포인트를 추가할
-  때마다 같은 형태로 등록한다 — 회귀는 `SecurityConfigTest`가 잡는다.
-- **비회원 구경하기(guest)**: 소비자 앱은 카카오 로그인 없이도 조회 API를 쓸 수 있다. `POST /auth/guest`
-  (installId)가 `realm=GUEST`·`role=GUEST` access 토큰을 준다(refresh 없음, 수명은 `jwt.guest-access-ttl` — TTL은 `JwtProperties.accessTtlFor(realm)`이 realm으로 정한다). principal은
-  서버가 만든 무작위 long이고 **`users` row는 없다** — `@AuthenticationPrincipal Long`으로 유저를 찾는
-  엔드포인트에 guest가 닿으면 안 되므로 조회 외 엔드포인트는 반드시 `REALM_USER`를 요구한다.
-  **조회 엔드포인트(`/recipes/**`·`/products/nearby` 등)는 `BROWSE_ENDPOINTS`에 등록**해 **GET만**
-  GUEST·ADMIN·(`REALM_USER`+`ROLE_CONSUMER`) 셋에 연다 — **점주는 제외된다.** realm 만 걸면
-  `REALM_USER` 가 소비자와 점주를 함께 통과시켜, `/owner/**` 와 대칭인 구멍이 반대 방향으로 남는다.
-  `permitAll`은 `/ping`과 인증 엔드포인트에만 쓴다(익명 대량 요청의 구멍을 남기지 않기 위해).
-  guest가 회원 전용을 부르면 `RestAccessDeniedHandler`가 **403 `LOGIN_REQUIRED`**(그 외 거부는
-  `FORBIDDEN`)를 내려 앱이 가입 안내로 분기한다. guest 토큰은 인증 수단이 아니라 **rate limit 키**다.
-- **과다 요청 방지 2겹**: (1) nginx `limit_req`(IP 기준, VM 수동 설정 — **적용 예정**,
-  `docs/guest-browsing-design.md` §4.1), (2)
-  `RateLimitFilter`가 인증된 주체(realm+principal) 단위로 Redis 고정 창(`ratelimit:<realm>:<id>:<분>`,
-  `INCR`+`EXPIRE`) 한도(`ratelimit.per-minute.{guest,user,admin}`)를 넘기면 **429 `TOO_MANY_REQUESTS`**
-  + `Retry-After`. Redis 장애 시 fail-open(WARN 로그). `/auth/guest`는 installId당 하루
-  `auth.guest-issue-limit-per-day`회까지만 발급(초과 시 429 `GUEST_ISSUE_LIMIT_EXCEEDED`).
-  배경·근거는 `docs/guest-browsing-design.md`.
-- 토큰 정책: access/refresh TTL은 `jwt.*`, 가입 토큰 TTL은 `auth.signup-ttl`(application.properties),
-  secret은 `JWT_SECRET` env(dev 기본값 커밋). refresh는 Redis에 저장·회전(1회용)·로그아웃 시 폐기.
-  카카오 앱 검증용 `KAKAO_CONSUMER_APP_ID`·`KAKAO_OWNER_APP_ID`(콘솔의 **숫자 앱 ID**, REST API 키가
-  아님)는 미설정이면 0이 되어 **그 앱의 카카오 로그인이 전부 거부된다**(fail-closed, 기동은 된다).
-  웹 인가 코드 교환(`/kakao-test`)은 `KAKAO_*_REST_API_KEY`에 더해, 콘솔에서 그 REST API 키의
-  **클라이언트 시크릿이 켜져 있으면 `KAKAO_*_CLIENT_SECRET`도 필수**다 — 없으면 카카오가 401
-  (`invalid_client`/KOE010)로 거부한다. 꺼진 앱이면 비워 두면 되고, 값이 있을 때만 전송된다.
+- 주체는 셋이다 — **admin**(백오피스, email+password), **앱 유저**(소비자·점주, **카카오 로그인만**),
+  **guest**(비회원 구경, `users` row 없음). 셋 다 JWT access + `realm` 클레임(`TokenRealm` =
+  ADMIN/USER/GUEST)을 쓰고, refresh(admin·앱 유저)는 Redis에 저장·회전한다.
+- 소비자 앱과 점주 앱은 **별개의 카카오 앱**이라 회원번호도 앱마다 다르게 발급된다 — 그래서 유저
+  식별자가 `(oauth_provider, oauth_provider_id, role)`이고, 한 사람이 소비자 계정과 점주 계정을
+  각각 가질 수 있다.
+- **새 엔드포인트를 만들면 `SecurityConfig`에 realm과 role을 함께 등록해야 한다** — 빠뜨리면 다른
+  주체가 통과한다. 등록 규칙·카카오 검증·가입 2단계·guest·rate limit 상세는
+  **`.claude/rules/security.md`**(보안·컨트롤러 파일 작성 시 자동 로드), env 변수는
+  [`DEPLOY.md`](DEPLOY.md).
 
 ## Workflow (rules)
 
-1. **논의 후 바로 구현한다.** 문제 정의와 접근을 충분히 합의한 뒤 코드로 들어간다 — 이 프로젝트
-   규모에서는 GitHub 이슈 트래킹 없이 진행한다.
-2. **큰 작업: 계획 → 단계별 실행.** 각 단계 안에서 investigate → 코드 → 테스트 → self-review까지
-   끝내고 다음으로 — **커밋은 포함하지 않는다** (아래 규칙 5).
-3. **검증 강도는 변경의 리스크에 맞춘다.** 런타임 동작이 바뀌지 않는 변경(문서·설정·주석 정리 등)은
-   컴파일 체크 정도로 충분하다 — 실제 동작이 바뀌는 변경에만 전체 빌드/테스트/curl 같은 완전한
-   검증을 돌린다. 매번 같은 강도로 반복 검증하지 않는다.
-4. 가장 단순한 동작을 먼저 구현한다. 최적화는 측정 후 별도로 (premature optimization 금지).
-5. **커밋 / `git push` / PR 생성·merge는 전부 사용자의 명시적 요청이 있을 때만 한다 — 절대
-   자동으로 하지 않는다.** 구현·테스트·리뷰가 끝났다고 자동으로 커밋하지 않는다: 코드 생성과
-   "커밋 → 푸시 → PR"은 완전히 분리된 별도 단계다. (아직 자동 배포 파이프라인이 없으므로 PR
-   merge가 통합 지점이다.)
-6. 코드 변경 후 리뷰한다: `./gradlew build`(컴파일 + 테스트) 통과 → cross-cutting(인증/인가,
-   입력 검증, 트랜잭션 경계, 에러 처리, 로깅, 보안) → 코드 품질(타입·중복·네이밍·단일 책임).
+1. **논의 후 바로 구현한다** — 문제 정의와 접근을 합의한 뒤 코드로 들어간다. 이 규모에선 GitHub
+   이슈 트래킹을 쓰지 않는다.
+2. **큰 작업은 계획 → 단계별 실행.** 각 단계에서 investigate → 코드 → 테스트 → self-review까지
+   끝내고 다음으로 (커밋은 제외 — 규칙 5).
+3. **검증 강도는 변경의 리스크에 맞춘다** — 런타임 동작이 안 바뀌는 변경(문서·설정·주석)은 컴파일
+   체크로 충분하다. 전체 빌드/테스트/curl은 동작이 바뀔 때만, 매번 같은 강도로 반복하지 않는다.
+4. 가장 단순한 동작을 먼저 구현한다. 최적화는 측정 후 별도로(premature optimization 금지).
+5. **커밋 / `git push` / PR 생성·merge는 사용자의 명시적 요청이 있을 때만 한다.** 구현·테스트·리뷰가
+   끝났다고 자동으로 커밋하지 않는다 — 코드 생성과 "커밋 → 푸시 → PR"은 완전히 별개 단계다.
+6. 코드 변경 후 리뷰한다: `./gradlew build`(컴파일+테스트 — Testcontainers가 실제 PostgreSQL을
+   띄우므로 **Docker 필요**) 통과 → cross-cutting(인증/인가, 입력 검증, 트랜잭션 경계, 에러 처리,
+   로깅, 보안) → 코드 품질(타입·중복·네이밍·단일 책임). CI가 PR·main push마다 같은 `build`를 돌린다.
 7. 리팩터 전, 회귀를 잡을 테스트가 있는지 확인한다. 얇으면 테스트를 먼저 쓴다.
-8. 선행 리팩터는 기능과 분리한다 — 별도 커밋 단위로 나눌 수 있게 작업한다(커밋 자체는 규칙 5에
-   따라 요청 시에만): refactor → review → feature.
-9. 리뷰 중 발견한 범위 밖 개선은 묻어두지 않는다. **발견마다 지금 고칠지 / 넘어갈지 판단하고,
-   이유와 함께 사용자에게 알린다.** 지금 로드된 컨텍스트는 다음 세션엔 없으니, 사소해도 언급
-   없이 넘어가지 않는다.
-10. 린트/경고는 점진적으로 배수한다. 기존 경고를 작업 중간에 고치지 않는다(본인 diff가
-    만든 경고는 커밋 전 수정).
-11. **외부 API/프레임워크 기능을 건드리기 전 공식 문서를 확인한다**(Spring, Spring Data JPA,
-    Spring Security 등). 기억/추측에 의존하지 않는다.
-12. **라이브러리 채택은 런타임 동작 근거로만 정당화한다** — "코드가 줄어듦/DX 좋음"은 근거가
-    아니다. 손으로 짠 것과 런타임 동작이 같으면 도입하지 않는다. **(예외: Lombok — 런타임
-    의존성이 아니라 컴파일타임 코드생성기라 이 규칙의 대상이 아니며, 팀이 보일러플레이트 감소
-    편익을 받아들여 도입 결정(2026-08-12). 사용 범위는 Stack의 Lombok 규약을 따른다.)**
-13. **버그 픽스는 버그 클래스 제거까지 제안한다** — 회귀 테스트, ArchUnit 규칙, 타입/제약으로
-    같은 부류를 원천 차단할 수 있는지. 픽스가 먼저, 예방은 후속(사소하면 같은 세션에).
-14. **추상화 정직성**: 패턴/알고리즘 이름을 빌렸으면 런타임 의미가 그 계약과 실제로 일치해야
-    한다. 아니면 실제 동작을 서술하는 정직한 이름으로.
-15. **Java 코드에는 주석을 달지 않는다** — Javadoc 포함, 클래스/메서드 설명 주석도 금지. 맥락·이유가
-    필요하면 커밋 메시지/PR 본문에 남긴다.
-16. **완료 판정은 "돌아가는 동작"으로 한다** — 엔드포인트라면 통합 테스트(`@SpringBootTest`/
-    `MockMvc`)나 실제 요청(`./gradlew bootRun` + `curl localhost`)으로 확인한다. 컴파일 통과 ≠ 완료.
-17. **아키텍처/컨벤션/공유 규약을 바꾸면 이 파일(또는 docs)을 같은 세션에 갱신한다.** 코드가
-    문서와 모순된 채 방치되면 완료가 아니다.
-18. **구현 중 사고를 짧게 브리핑한다** — 무엇을·왜 바꾸는지, 어떤 트레이드오프를 택하는지 —
+8. 선행 리팩터는 기능과 분리한다 — refactor → review → feature로 쪼갤 수 있게 작업한다.
+9. **리뷰 중 발견한 범위 밖 개선은 묻어두지 않는다** — 발견마다 지금 고칠지/넘어갈지 판단하고 이유와
+   함께 알린다. 지금 로드된 컨텍스트는 다음 세션엔 없으니 사소해도 언급 없이 넘어가지 않는다.
+10. 린트/경고는 점진적으로 배수한다 — 기존 경고는 작업 중간에 건드리지 않고, 본인 diff가 만든
+    경고만 고친다.
+11. **외부 API/프레임워크를 건드리기 전 공식 문서를 확인한다**(Spring · Spring Data JPA ·
+    Spring Security 등). 기억이나 추측에 의존하지 않는다.
+12. **라이브러리 채택은 런타임 동작 근거로만 정당화한다** — "코드가 줄어듦/DX 좋음"은 근거가 아니다.
+    손으로 짠 것과 런타임 동작이 같으면 도입하지 않는다. (예외: Lombok — 런타임 의존성이 아니라
+    컴파일타임 코드생성기라 이 규칙의 대상이 아니며, 팀 도입 결정 2026-08-12.)
+13. **버그 픽스는 버그 클래스 제거까지 제안한다** — 회귀 테스트·ArchUnit 규칙·타입/제약으로 같은
+    부류를 원천 차단할 수 있는지. 픽스가 먼저, 예방은 후속(사소하면 같은 세션에).
+14. **추상화 정직성** — 패턴/알고리즘 이름을 빌렸으면 런타임 의미가 그 계약과 일치해야 한다.
+    아니면 실제 동작을 서술하는 정직한 이름으로.
+15. **Java 코드에는 주석을 달지 않는다**(Javadoc·클래스/메서드 설명 포함). 맥락·이유가 필요하면
+    커밋 메시지나 PR 본문에 남긴다.
+16. **완료 판정은 "돌아가는 동작"으로 한다** — 엔드포인트라면 통합 테스트(`@SpringBootTest`/`MockMvc`)나
+    실제 요청(`./gradlew bootRun` + `curl`)으로 확인한다. 컴파일 통과 ≠ 완료.
+17. **아키텍처/컨벤션/공유 규약을 바꾸면 이 파일을 같은 세션에 갱신한다.** 코드가 문서와 모순된 채
+    방치되면 완료가 아니다.
+18. **구현 중 사고를 짧게 브리핑한다** — 무엇을·왜 바꾸는지, 어떤 트레이드오프를 택하는지.
     사용자가 중간에 교정할 수 있도록.
 
 ## Database
 
-- 스키마는 **Flyway** 순차 마이그레이션(`src/main/resources/db/migration/`, 파일명 `V0000__<desc>.sql`)
-  으로만 바꾼다. **`ddl-auto=validate`** — Flyway가 스키마 단일 소유자, Hibernate는 검증만.
-- 마이그레이션 작성 상세(네이밍·불변성·expand→contract)는 `.claude/rules/database.md`(마이그레이션 파일
-  작성 시 자동 로드). **시간 타입·소프트 삭제** 규약은 `.claude/rules/entity.md`.
-- 영속성 관심사는 `repository`와 service의 `@Transactional` 경계 안에 가둔다.
-- **앱 타임존은 `Asia/Seoul`로 고정한다.** `products.pickup_{start,end}_at`은 점주가 입력한 **벽시계**
-  시각이라 `LocalDateTime`+`timestamp`인데(규약은 `.claude/rules/entity.md`), `LocalDateTime.now()`가
-  다른 존이면 마감 판정과 마감임박순 정렬이 통째로 어긋난다 — 컨테이너 기본은 UTC라 KST보다 9시간
-  뒤처진다. 런타임은 `Dockerfile`의 `ENV TZ`, 테스트는 `build.gradle.kts`의 `user.timezone`이 고정한다.
-  절대시각(`Instant`+`timestamptz`)은 영향을 받지 않는다.
-
-## Local development
-
-- 로컬 실행·인프라(Docker Compose, `./gradlew bootRun`, 전체 스택 도커, `bootTestRun`, Redis 접두)는
-  `.claude/docs/local-development.md` 참고. (**로컬 실행엔 Docker 필요.**)
+- **스키마는 Flyway 마이그레이션으로만 바꾼다** — `ddl-auto=validate`라 엔티티만 고치면 DDL이 나가지
+  않고 부팅이 실패한다. 작성 규칙은 `.claude/rules/database.md`.
+- **앱 타임존은 `Asia/Seoul`**, 현재 시각은 **`Clock` 빈을 주입해** 얻는다 — 인자 없는 `now()`는 운영
+  컨테이너의 UTC를 따라 9시간 어긋난다(로컬은 KST라 테스트로 안 잡힌다). 시간 타입·소프트 삭제와
+  함께 `.claude/rules/entity.md`.
 
 ## Deployment
 
-- **NCP 단일 VM + `docker compose`**(app/postgres/redis), 앞단에 nginx 리버스 프록시. 개념·필수 env
-  변수·운영 명령어는 [`DEPLOY.md`](DEPLOY.md), 서버 `.env` 템플릿은 `deploy.env.example`.
-- **배포는 서버가 끌어온다(pull)** — `ssh deploy@<서버>` → `cd ~/backend && ./scripts/deploy.sh`.
-  **GitHub Actions로 배포하지 않는다**: 이 저장소는 public이고, public 저장소에 self-hosted
-  runner를 붙이면 fork의 PR이 배포 호스트에서 코드를 실행할 수 있다(GitHub 공식 권고도 러너는
-  private 전용). public을 유지하는 이유는 Free 플랜에서 **CodeQL이 public에서만 무료**이고
-  **Actions 분도 public만 무제한**이기 때문 — 자세한 근거는 `DEPLOY.md`.
-- public이라 서버가 인증 없이 clone한다 → 서버에 레포 토큰·배포 키가 없고 인바운드도 없다.
-  `build` job(컴파일+테스트)은 PR·push마다 계속 자동으로 돈다.
-- `compose.yaml`은 **로컬과 운영이 같은 파일**을 쓴다. 운영 전용 값(`SPRING_PROFILES_ACTIVE=prod`,
-  비밀번호)은 서버 `.env`로만 주입하고, 파일에 적힌 기본값은 전부 로컬용이다.
-- 작은 VM 전제의 안전장치는 `compose.yaml`에 박혀 있다 — 로그 rotation·`mem_limit`·redis
-  `maxmemory`. **swap/swappiness는 OS 레벨이라 레포로 관리되지 않는 서버별 수동 설정**(DEPLOY.md).
-
-## Tests
-
-- JUnit 5 + **Testcontainers 실제 PostgreSQL**(Docker 필요). `./gradlew build` = 컴파일+테스트 로컬 게이트(규칙 6).
-- **CI** (`.github/workflows/ci.yml`): PR·main push마다 `./gradlew build`(Docker ubuntu 러너에서 Testcontainers 동작).
-- 테스트 작성 상세(슬라이스 선택·standaloneSetup·Boot 4.1 애노테이션 패키지)는 `.claude/rules/testing.md`
-  (`src/test/**` 작성 시 자동 로드).
+- **NCP 단일 VM + `docker compose`**(app/postgres/redis) + 앞단 nginx. 배포는 **서버가 끌어온다** —
+  `ssh deploy@<서버>` → `cd ~/backend && ./scripts/deploy.sh`. 절차·필수 env·운영 명령어·메모리
+  배분은 [`DEPLOY.md`](DEPLOY.md), 서버 `.env` 템플릿은 `deploy.env.example`.
+- **GitHub Actions로 배포하지 않는다** — 저장소가 public이라 self-hosted runner를 붙이면 fork의 PR이
+  배포 호스트에서 코드를 실행할 수 있다(근거는 DEPLOY.md). CI의 `build` job은 PR·push마다 계속 돈다.
+- `compose.yaml`은 **로컬과 운영이 같은 파일**이다 — 운영 전용 값은 서버 `.env`로만 주입하고, 파일에
+  적힌 기본값은 전부 로컬용이다.
 
 ## Language policy
 
-- **코드 / 커밋 메시지 / 테스트 이름: 영어.**
-- PR 설명: 한국어 허용.
+- **코드 / 커밋 메시지 / 테스트 이름: 영어.** PR 설명은 한국어 허용.
 
 ## Commit convention
 
 - 커밋 메시지는 **영어**, conventional (`feat`/`fix`/`refactor`/`chore`/`docs`/`test`). 본문은
   ~72자에서 hard-wrap.
-- **AI/Claude 트레일러(`Co-Authored-By`, `Reviewed-by` 등)를 넣지 않는다** — 커밋은 단독 작성
-  (HHsungmoon). 이 저장소의 git 정체성은 개인 계정(로컬 `git config`에 설정됨). 이 규칙은
-  **`.githooks/commit-msg` 훅이 기계적으로 강제**한다(AI 트레일러 자동 제거; 인간 co-author는
-  유지). 신규 clone은 `git config core.hooksPath .githooks`를 한 번 실행해 활성화한다.
+- **AI/Claude 트레일러(`Co-Authored-By`, `Reviewed-by` 등)를 넣지 않는다** — 커밋은 단독 작성.
+  `.githooks/commit-msg` 훅이 기계적으로 강제한다(AI 트레일러 자동 제거, 인간 co-author는 유지).
+  신규 clone은 `git config core.hooksPath .githooks`를 한 번 실행해 활성화한다.
 - 변경이 여러 관심사를 걸치면 의미 단위(기능/버그/리팩터)로 커밋을 분리한다.
 - **테스트 코드는 별도 커밋으로 쌓는다** — 기능 커밋과 테스트 커밋을 나눠, 리뷰어가 "무엇을
   바꿨나"와 "무엇으로 지켰나"를 따로 읽게 한다.
@@ -233,10 +125,16 @@ SWYP 앱의 백엔드 REST API 서버. (프로덕트 한 줄 설명은 확정되
   가리켜 `ddl-auto=validate`가 기동을 막고, `main`이 merge commit 방식이라 그 커밋들이 히스토리에
   영구히 남아 `git bisect`가 무관한 회귀를 쫓을 때 통째로 걸린다. 앞에 두면 순수 추가·nullable
   스키마는 구 코드와 공존하므로(`.claude/rules/database.md`의 expand→contract) 모든 커밋이 기동한다.
-- 배포가 필요 없는 변경(문서·설정)은 제목에 `[skip ci]` 접두(향후 CI 도입 시).
+- 배포가 필요 없는 변경(문서·설정)은 제목에 `[skip ci]` 접두.
 
 ## Harness
 
-`.claude/`에 개발 워크플로가 슬래시커맨드로 들어있다: `/go`(작업 end-to-end: 분석→구현→테스트→리뷰),
-`/code-review`(리뷰), `/pr`(PR 올리기). 권한·훅 근거는
-[.claude/SETTINGS.md](.claude/SETTINGS.md). 워크트리·배포·정적분석 가드는 필요해지면 추가한다.
+**이 파일엔 "항상 참인 것"만 둔다.** 특정 레이어·파일에서만 필요한 규칙은 `rules/`로, 특정 절차에서만
+필요한 건 `commands/`로 보낸다(규칙 17에 따라 같은 세션에 갱신).
+
+- **`.claude/rules/`** — `paths:` 매칭 파일을 작성/수정할 때 **자동 로드**:
+  `entity` · `repository` · `service` · `controller` · `dto` · `security` · `database` · `testing`.
+- **`.claude/commands/`** — 슬래시 커맨드로 **호출할 때만** 로드: `/go`(분석→구현→테스트→리뷰) ·
+  `/code-review` · `/pr` · `/issue`.
+- 로컬 실행·인프라(Docker Compose, `bootRun`, `bootTestRun`)는 `.claude/docs/local-development.md`
+  (**로컬 실행엔 Docker 필요**), 권한·훅 근거는 [.claude/SETTINGS.md](.claude/SETTINGS.md).
