@@ -65,5 +65,9 @@ class ArchitectureTest {
 
 	@ArchTest
 	static final ArchRule features_are_free_of_cycles =
-		slices().matching("com.swyp.backend.(*)..").should().beFreeOfCycles();
+		slices().matching("com.swyp.backend.(*).(controller|service|function|repository)..")
+			.should().beFreeOfCycles()
+			.because("cycles form between behaviour, not between rows -- a @ManyToOne across "
+				+ "features is the domain saying two tables are related, and no layering "
+				+ "removes it");
 }
