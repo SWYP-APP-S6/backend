@@ -27,6 +27,7 @@ class KakaoRestOauthClientTest {
 	private static final long CONSUMER_APP_ID = 123456L;
 	private static final long OWNER_APP_ID = 654321L;
 	private static final String CONSUMER_REST_API_KEY = "consumer-rest-api-key";
+	private static final String CONSUMER_CLIENT_SECRET = "consumer-client-secret";
 	private static final String BASE_URL = "https://kapi.kakao.test";
 	private static final String AUTH_BASE_URL = "https://kauth.kakao.test";
 	private static final String TOKEN_INFO_URL = BASE_URL + "/v1/user/access_token_info";
@@ -42,7 +43,7 @@ class KakaoRestOauthClientTest {
 		RestClient.Builder builder = RestClient.builder();
 		server = MockRestServiceServer.bindTo(builder).build();
 		client = new KakaoRestOauthClient(
-			builder, BASE_URL, AUTH_BASE_URL, CONSUMER_APP_ID, OWNER_APP_ID, CONSUMER_REST_API_KEY, "");
+			builder, BASE_URL, AUTH_BASE_URL, CONSUMER_APP_ID, OWNER_APP_ID, CONSUMER_REST_API_KEY, "", "", "");
 	}
 
 	private void expectTokenInfo(String body) {
@@ -146,6 +147,28 @@ class KakaoRestOauthClientTest {
 
 		assertThat(accessToken).isEqualTo("kakao-issued-token");
 		server.verify();
+	}
+
+	@Test
+	void exchangeAuthorizationCode_includesClientSecretWhenConfigured() {
+		RestClient.Builder secretBuilder = RestClient.builder();
+		MockRestServiceServer secretServer = MockRestServiceServer.bindTo(secretBuilder).build();
+		KakaoRestOauthClient clientWithSecret = new KakaoRestOauthClient(secretBuilder, BASE_URL,
+			AUTH_BASE_URL, CONSUMER_APP_ID, OWNER_APP_ID, CONSUMER_REST_API_KEY, "", CONSUMER_CLIENT_SECRET, "");
+		secretServer.expect(requestTo(TOKEN_URL))
+			.andExpect(content().formData(formOf(
+				"grant_type", "authorization_code",
+				"client_id", CONSUMER_REST_API_KEY,
+				"redirect_uri", "http://localhost:5173/kakao-test",
+				"code", "auth-code-123",
+				"client_secret", CONSUMER_CLIENT_SECRET)))
+			.andRespond(withSuccess("""
+				{"access_token":"kakao-issued-token"}""", MediaType.APPLICATION_JSON));
+
+		clientWithSecret.exchangeAuthorizationCode(
+			UserRole.CONSUMER, "auth-code-123", "http://localhost:5173/kakao-test");
+
+		secretServer.verify();
 	}
 
 	@Test

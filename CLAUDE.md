@@ -106,6 +106,9 @@ SWYP 앱의 백엔드 REST API 서버. (프로덕트 한 줄 설명은 확정되
   secret은 `JWT_SECRET` env(dev 기본값 커밋). refresh는 Redis에 저장·회전(1회용)·로그아웃 시 폐기.
   카카오 앱 검증용 `KAKAO_CONSUMER_APP_ID`·`KAKAO_OWNER_APP_ID`(콘솔의 **숫자 앱 ID**, REST API 키가
   아님)는 미설정이면 0이 되어 **그 앱의 카카오 로그인이 전부 거부된다**(fail-closed, 기동은 된다).
+  웹 인가 코드 교환(`/kakao-test`)은 `KAKAO_*_REST_API_KEY`에 더해, 콘솔에서 그 REST API 키의
+  **클라이언트 시크릿이 켜져 있으면 `KAKAO_*_CLIENT_SECRET`도 필수**다 — 없으면 카카오가 401
+  (`invalid_client`/KOE010)로 거부한다. 꺼진 앱이면 비워 두면 되고, 값이 있을 때만 전송된다.
 
 ## Workflow (rules)
 

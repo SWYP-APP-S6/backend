@@ -29,6 +29,7 @@ public class KakaoRestOauthClient implements KakaoOauthClient {
 	private final RestClient authClient;
 	private final Map<UserRole, Long> appIds;
 	private final Map<UserRole, String> restApiKeys;
+	private final Map<UserRole, String> clientSecrets;
 
 	public KakaoRestOauthClient(
 			RestClient.Builder builder,
@@ -37,12 +38,16 @@ public class KakaoRestOauthClient implements KakaoOauthClient {
 			@Value("${kakao.consumer-app-id}") long consumerAppId,
 			@Value("${kakao.owner-app-id}") long ownerAppId,
 			@Value("${kakao.consumer-rest-api-key:}") String consumerRestApiKey,
-			@Value("${kakao.owner-rest-api-key:}") String ownerRestApiKey) {
+			@Value("${kakao.owner-rest-api-key:}") String ownerRestApiKey,
+			@Value("${kakao.consumer-client-secret:}") String consumerClientSecret,
+			@Value("${kakao.owner-client-secret:}") String ownerClientSecret) {
 		this.apiClient = builder.clone().baseUrl(apiBaseUrl).build();
 		this.authClient = builder.clone().baseUrl(authBaseUrl).build();
 		this.appIds = new EnumMap<>(Map.of(UserRole.CONSUMER, consumerAppId, UserRole.OWNER, ownerAppId));
 		this.restApiKeys = new EnumMap<>(
 			Map.of(UserRole.CONSUMER, consumerRestApiKey, UserRole.OWNER, ownerRestApiKey));
+		this.clientSecrets = new EnumMap<>(
+			Map.of(UserRole.CONSUMER, consumerClientSecret, UserRole.OWNER, ownerClientSecret));
 		this.appIds.forEach((role, appId) -> {
 			if (appId <= 0) {
 				log.warn("No Kakao app id configured for {} — those logins are rejected until one is set", role);
@@ -81,6 +86,10 @@ public class KakaoRestOauthClient implements KakaoOauthClient {
 		form.add("client_id", restApiKeys.get(role));
 		form.add("redirect_uri", redirectUri);
 		form.add("code", code);
+		String clientSecret = clientSecrets.get(role);
+		if (!clientSecret.isBlank()) {
+			form.add("client_secret", clientSecret);
+		}
 		try {
 			TokenExchangeResult result = authClient.post()
 				.uri(TOKEN_PATH)
