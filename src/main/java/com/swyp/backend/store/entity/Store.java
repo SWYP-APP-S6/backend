@@ -2,7 +2,9 @@ package com.swyp.backend.store.entity;
 
 import com.swyp.backend.common.BaseTimeEntity;
 import com.swyp.backend.user.entity.User;
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -15,7 +17,12 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
 import java.time.LocalTime;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -25,6 +32,8 @@ import lombok.NoArgsConstructor;
 @Table(name = "stores", uniqueConstraints = @UniqueConstraint(columnNames = "owner_user_id"))
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Store extends BaseTimeEntity {
+
+	private static final int MAX_CATEGORIES = 3;
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -36,6 +45,9 @@ public class Store extends BaseTimeEntity {
 
 	@Column(nullable = false, length = 100)
 	private String name;
+
+	@Column(name = "postal_code", length = 10)
+	private String postalCode;
 
 	@Column(nullable = false, length = 255)
 	private String address;
@@ -68,9 +80,26 @@ public class Store extends BaseTimeEntity {
 	@Column(name = "application_note", columnDefinition = "text")
 	private String applicationNote;
 
+	@ElementCollection
+	@CollectionTable(
+			name = "store_categories",
+			joinColumns = @JoinColumn(name = "store_id"))
+	@Enumerated(EnumType.STRING)
+	@Column(name = "category", nullable = false, length = 20)
+	private Set<StoreCategory> categories = new LinkedHashSet<>();
+
+	@ElementCollection
+	@CollectionTable(
+			name = "store_business_days",
+			joinColumns = @JoinColumn(name = "store_id"))
+	@Enumerated(EnumType.STRING)
+	@Column(name = "day_of_week", nullable = false, length = 10)
+	private Set<DayOfWeek> businessDays = new LinkedHashSet<>();
+
 	public Store(
 			User owner,
 			String name,
+			String postalCode,
 			String address,
 			String addressDetail,
 			String phone,
@@ -80,6 +109,7 @@ public class Store extends BaseTimeEntity {
 			LocalTime businessCloseTime) {
 		this.owner = owner;
 		this.name = name;
+		this.postalCode = postalCode;
 		this.address = address;
 		this.addressDetail = addressDetail;
 		this.phone = phone;
@@ -90,8 +120,32 @@ public class Store extends BaseTimeEntity {
 		this.status = StoreStatus.PENDING;
 	}
 
-	public void updateProfile(String name, String address, String addressDetail, String phone) {
+	public Set<StoreCategory> getCategories() {
+		return Collections.unmodifiableSet(categories);
+	}
+
+	public Set<DayOfWeek> getBusinessDays() {
+		return Collections.unmodifiableSet(businessDays);
+	}
+
+	public void replaceCategories(Collection<StoreCategory> categories) {
+		if (categories.isEmpty() || categories.size() > MAX_CATEGORIES) {
+			throw new IllegalArgumentException(
+					"store categories must be between 1 and " + MAX_CATEGORIES);
+		}
+		this.categories.clear();
+		this.categories.addAll(categories);
+	}
+
+	public void replaceBusinessDays(Collection<DayOfWeek> businessDays) {
+		this.businessDays.clear();
+		this.businessDays.addAll(businessDays);
+	}
+
+	public void updateProfile(
+			String name, String postalCode, String address, String addressDetail, String phone) {
 		this.name = name;
+		this.postalCode = postalCode;
 		this.address = address;
 		this.addressDetail = addressDetail;
 		this.phone = phone;

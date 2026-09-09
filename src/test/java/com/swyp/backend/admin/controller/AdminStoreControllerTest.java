@@ -79,7 +79,7 @@ class AdminStoreControllerTest {
 
 	private Store newStore(User owner, String name) {
 		return new Store(
-			owner, name, "서울특별시 강남구 역삼로 1", null, "0212341234",
+			owner, name, "06236", "서울특별시 강남구 역삼로 1", null, "0212341234",
 			new BigDecimal("37.500600"), new BigDecimal("127.036500"),
 			LocalTime.of(9, 0), LocalTime.of(21, 0));
 	}

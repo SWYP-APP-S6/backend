@@ -14,6 +14,7 @@ import com.swyp.backend.user.entity.UserRole;
 import com.swyp.backend.user.service.UserService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -26,6 +27,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class StoreService {
 
+	private static final String OWNER_UNIQUE_CONSTRAINT = "uq_stores_owner";
+
 	private final StoreRepository storeRepository;
 	private final UserService userService;
 	private final GeocodingClient geocodingClient;
@@ -36,7 +39,7 @@ public class StoreService {
 		if (owner.getRole() != UserRole.OWNER) {
 			throw new BusinessException(StoreErrorCode.OWNER_ROLE_REQUIRED);
 		}
-		if (storeRepository.findByOwnerId(ownerId).isPresent()) {
+		if (storeRepository.existsByOwnerId(ownerId)) {
 			throw new BusinessException(StoreErrorCode.STORE_ALREADY_REGISTERED);
 		}
 
@@ -44,6 +47,7 @@ public class StoreService {
 		Store store = new Store(
 				owner,
 				request.name(),
+				request.postalCode(),
 				request.address(),
 				request.addressDetail(),
 				request.phone(),
@@ -51,13 +55,23 @@ public class StoreService {
 				coordinates.longitude(),
 				request.businessOpenTime(),
 				request.businessCloseTime());
+		store.replaceCategories(request.categories());
+		store.replaceBusinessDays(request.businessDays());
 		store.submitApplication(request.businessRegistrationNumber(), request.applicationNote());
 		try {
 			storeRepository.saveAndFlush(store);
 		} catch (DataIntegrityViolationException e) {
-			throw new BusinessException(StoreErrorCode.STORE_ALREADY_REGISTERED);
+			if (isOwnerConflict(e)) {
+				throw new BusinessException(StoreErrorCode.STORE_ALREADY_REGISTERED);
+			}
+			throw e;
 		}
 		return StoreDetailResponse.from(store);
+	}
+
+	private static boolean isOwnerConflict(DataIntegrityViolationException e) {
+		return e.getCause() instanceof ConstraintViolationException violation
+				&& OWNER_UNIQUE_CONSTRAINT.equalsIgnoreCase(violation.getConstraintName());
 	}
 
 	public StoreDetailResponse getMyStore(Long ownerId) {
