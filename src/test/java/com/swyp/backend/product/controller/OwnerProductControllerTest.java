@@ -367,6 +367,23 @@ class OwnerProductControllerTest {
 	}
 
 	@Test
+	void updateAvailableQty_onAClosedProduct_isRejected() throws Exception {
+		Product product = createProduct("당근", 10);
+		product.close();
+		productRepository.saveAndFlush(product);
+
+		mockMvc.perform(patch("/owner/products/" + product.getId() + "/available-qty")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"availableQty":5}"""))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("PRODUCT_CLOSED"));
+
+		assertThat(productRepository.findById(product.getId()).orElseThrow().getAvailableQty()).isEqualTo(10);
+	}
+
+	@Test
 	void updateAvailableQty_aboveZero_doesNotTouchExistingHolds() throws Exception {
 		Product product = createProduct("당근", 10);
 		User consumer = createConsumer();

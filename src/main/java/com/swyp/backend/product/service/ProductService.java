@@ -15,6 +15,7 @@ import com.swyp.backend.product.dto.ProductRegisterRequest;
 import com.swyp.backend.product.dto.ProductSummaryResponse;
 import com.swyp.backend.product.entity.Product;
 import com.swyp.backend.product.entity.ProductCategory;
+import com.swyp.backend.product.entity.ProductStatus;
 import com.swyp.backend.product.exception.ProductErrorCode;
 import com.swyp.backend.product.repository.ProductRepository;
 import com.swyp.backend.recipe.service.RecipeService;
@@ -115,6 +116,9 @@ public class ProductService {
 			Long ownerId, Long productId, ProductAvailableQtyUpdateRequest request) {
 		Store store = storeService.validateAndGetStoreByOwnerId(ownerId);
 		Product product = validateAndGetProduct(productId, store.getId());
+		if (product.getStatus() == ProductStatus.CLOSED) {
+			throw new BusinessException(ProductErrorCode.PRODUCT_CLOSED);
+		}
 
 		if (request.availableQty() == 0) {
 			applyZeroQtyDisposition(product, request.disposition());
