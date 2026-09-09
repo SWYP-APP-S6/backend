@@ -117,7 +117,7 @@ class StoreMapControllerTest {
 		mockMvc.perform(get("/stores/nearby?" + BOUNDS)
 				.header("Authorization", bearer(TokenRealm.GUEST, "GUEST")))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.totalCount").value(2))
+			.andExpect(jsonPath("$.data.totalStoreCount").value(2))
 			.andExpect(jsonPath("$.data.truncated").value(false))
 			.andExpect(jsonPath("$.data.stores.length()").value(2))
 			.andExpect(jsonPath("$.data.stores[0].name").value("청과마을"))
@@ -138,7 +138,7 @@ class StoreMapControllerTest {
 		mockMvc.perform(get("/stores/nearby?" + BOUNDS)
 				.header("Authorization", bearer(TokenRealm.GUEST, "GUEST")))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.totalCount").value(2));
+			.andExpect(jsonPath("$.data.totalStoreCount").value(2));
 	}
 
 	@Test

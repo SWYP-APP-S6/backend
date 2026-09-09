@@ -51,8 +51,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 	List<Product> findByStoreIdOrderByCreatedAtDesc(Long storeId);
 
 	@Query("""
-			select new com.swyp.backend.product.dto.StoreProductSummary(
-					p.store.id, count(p), min(p.pickupEndAt))
+			select new com.swyp.backend.product.dto.StoreProductSummary(p.store.id, count(p))
 			from Product p
 			""" + WHERE_SELLABLE_AS_OF_NOW + """
 			and p.store.id in :storeIds

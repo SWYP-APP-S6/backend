@@ -11,4 +11,4 @@ public record NearbyStoreGroupResponse(
 		int productCount,
 		boolean hasMoreProducts,
 		LocalDateTime earliestPickupEndAt,
-		List<NearbyProductResponse> products) {}
+		List<SellableProductResponse> products) {}

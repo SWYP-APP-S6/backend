@@ -23,7 +23,7 @@ public final class Distance {
 		return EARTH_RADIUS_METERS * 2 * Math.asin(Math.min(1d, Math.sqrt(a)));
 	}
 
-	public static int walkingMinutes(int meters) {
+	public static int straightLineWalkingMinutes(int meters) {
 		return Math.max(1, (int) Math.ceil(meters / WALKING_METERS_PER_MINUTE));
 	}
 

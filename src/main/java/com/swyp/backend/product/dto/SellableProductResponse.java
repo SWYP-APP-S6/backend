@@ -4,7 +4,7 @@ import com.swyp.backend.product.entity.Product;
 import com.swyp.backend.product.entity.ProductCategory;
 import java.time.LocalDateTime;
 
-public record NearbyProductResponse(
+public record SellableProductResponse(
 		Long id,
 		String name,
 		String photoUrl,
@@ -15,8 +15,8 @@ public record NearbyProductResponse(
 		int availableQty,
 		LocalDateTime pickupEndAt) {
 
-	public static NearbyProductResponse from(Product product) {
-		return new NearbyProductResponse(
+	public static SellableProductResponse from(Product product) {
+		return new SellableProductResponse(
 				product.getId(),
 				product.getName(),
 				product.getPhotoUrl(),

@@ -82,7 +82,7 @@ class StoreMapMarkerLimitTest {
 				.header("Authorization",
 					"Bearer " + tokenProvider.createAccessToken(TokenRealm.GUEST, 1L, "GUEST")))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.totalCount").value(2))
+			.andExpect(jsonPath("$.data.totalStoreCount").value(2))
 			.andExpect(jsonPath("$.data.truncated").value(true))
 			.andExpect(jsonPath("$.data.stores.length()").value(1))
 			.andExpect(jsonPath("$.data.stores[0].name").value("중심가게"));

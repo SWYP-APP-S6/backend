@@ -3,7 +3,7 @@ package com.swyp.backend.product.service;
 import com.swyp.backend.common.BrowseProperties;
 import com.swyp.backend.common.Distance;
 import com.swyp.backend.common.response.PageResponse;
-import com.swyp.backend.product.dto.NearbyProductResponse;
+import com.swyp.backend.product.dto.SellableProductResponse;
 import com.swyp.backend.product.dto.NearbyProductSort;
 import com.swyp.backend.product.dto.NearbyProductsRequest;
 import com.swyp.backend.product.dto.NearbyProductsResponse;
@@ -84,9 +84,9 @@ public class ProductBrowseService {
 				.collect(Collectors.toMap(StoreProductSummary::storeId, summary -> summary));
 	}
 
-	public List<NearbyProductResponse> findSellableByStore(Long storeId) {
+	public List<SellableProductResponse> findSellableByStore(Long storeId) {
 		return productRepository.findSellableByStoreId(storeId, LocalDateTime.now(clock)).stream()
-				.map(NearbyProductResponse::from)
+				.map(SellableProductResponse::from)
 				.toList();
 	}
 
@@ -98,15 +98,15 @@ public class ProductBrowseService {
 				originLongitude.doubleValue(),
 				store.getLatitude().doubleValue(),
 				store.getLongitude().doubleValue()));
-		List<NearbyProductResponse> visible = products.stream()
+		List<SellableProductResponse> visible = products.stream()
 				.limit(MAX_PRODUCTS_PER_STORE)
-				.map(NearbyProductResponse::from)
+				.map(SellableProductResponse::from)
 				.toList();
 		return new NearbyStoreGroupResponse(
 				store.getId(),
 				store.getName(),
 				distanceMeters,
-				Distance.walkingMinutes(distanceMeters),
+				Distance.straightLineWalkingMinutes(distanceMeters),
 				products.size(),
 				products.size() > visible.size(),
 				products.stream()
