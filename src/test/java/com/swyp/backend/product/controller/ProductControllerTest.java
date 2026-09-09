@@ -8,6 +8,8 @@ import com.swyp.backend.RedisTestcontainersConfiguration;
 import com.swyp.backend.TestcontainersConfiguration;
 import com.swyp.backend.common.security.JwtTokenProvider;
 import com.swyp.backend.common.security.TokenRealm;
+import com.swyp.backend.hold.repository.HoldRepository;
+import com.swyp.backend.notification.repository.NotificationRepository;
 import com.swyp.backend.product.entity.Product;
 import com.swyp.backend.product.entity.ProductCategory;
 import com.swyp.backend.product.repository.ProductRepository;
@@ -51,12 +53,20 @@ class ProductControllerTest {
 	ProductRepository productRepository;
 
 	@Autowired
+	HoldRepository holdRepository;
+
+	@Autowired
+	NotificationRepository notificationRepository;
+
+	@Autowired
 	JwtTokenProvider tokenProvider;
 
 	private LocalDateTime now;
 
 	@BeforeEach
 	void setUp() {
+		holdRepository.deleteAll();
+		notificationRepository.deleteAll();
 		productRepository.deleteAll();
 		storeRepository.deleteAll();
 		userRepository.deleteAll();
