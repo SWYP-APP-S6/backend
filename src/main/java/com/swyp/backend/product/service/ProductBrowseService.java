@@ -10,6 +10,7 @@ import com.swyp.backend.product.entity.Product;
 import com.swyp.backend.product.repository.ProductRepository;
 import com.swyp.backend.store.entity.Store;
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -33,12 +34,15 @@ public class ProductBrowseService {
 	private static final int MAX_PRODUCTS_PER_STORE = 10;
 
 	private final ProductRepository productRepository;
+	private final Clock clock;
 	private final int radiusMeters;
 
 	public ProductBrowseService(
 			ProductRepository productRepository,
+			Clock clock,
 			@Value("${browse.nearby-radius-meters}") int radiusMeters) {
 		this.productRepository = productRepository;
+		this.clock = clock;
 		this.radiusMeters = radiusMeters;
 	}
 
@@ -50,7 +54,7 @@ public class ProductBrowseService {
 						* Math.max(Math.cos(Math.toRadians(originLatitude)), MIN_LONGITUDE_SCALE)));
 
 		List<Product> sellable = productRepository.findSellableWithinBounds(
-				LocalDateTime.now(),
+				LocalDateTime.now(clock),
 				request.category(),
 				request.lat().subtract(latitudeDelta),
 				request.lat().add(latitudeDelta),
