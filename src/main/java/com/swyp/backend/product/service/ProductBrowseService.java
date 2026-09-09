@@ -1,5 +1,6 @@
 package com.swyp.backend.product.service;
 
+import com.swyp.backend.common.Distance;
 import com.swyp.backend.common.response.PageResponse;
 import com.swyp.backend.product.dto.NearbyProductResponse;
 import com.swyp.backend.product.dto.NearbyProductSort;
@@ -27,10 +28,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class ProductBrowseService {
 
-	private static final double EARTH_RADIUS_METERS = 6_371_000d;
-	private static final double METERS_PER_LATITUDE_DEGREE = 111_320d;
-	private static final double MIN_LONGITUDE_SCALE = 0.01d;
-	private static final double WALKING_METERS_PER_MINUTE = 67d;
 	private static final int MAX_PRODUCTS_PER_STORE = 10;
 
 	private final ProductRepository productRepository;
@@ -48,10 +45,8 @@ public class ProductBrowseService {
 
 	public NearbyProductsResponse findNearby(NearbyProductsRequest request) {
 		double originLatitude = request.lat().doubleValue();
-		BigDecimal latitudeDelta = BigDecimal.valueOf(radiusMeters / METERS_PER_LATITUDE_DEGREE);
-		BigDecimal longitudeDelta = BigDecimal.valueOf(radiusMeters
-				/ (METERS_PER_LATITUDE_DEGREE
-						* Math.max(Math.cos(Math.toRadians(originLatitude)), MIN_LONGITUDE_SCALE)));
+		BigDecimal latitudeDelta = Distance.latitudeDelta(radiusMeters);
+		BigDecimal longitudeDelta = Distance.longitudeDelta(radiusMeters, originLatitude);
 
 		List<Product> sellable = productRepository.findSellableWithinBounds(
 				LocalDateTime.now(clock),
@@ -86,7 +81,7 @@ public class ProductBrowseService {
 	private NearbyStoreGroupResponse toStoreGroup(
 			List<Product> products, BigDecimal originLatitude, BigDecimal originLongitude) {
 		Store store = products.getFirst().getStore();
-		int distanceMeters = (int) Math.round(distanceMeters(
+		int distanceMeters = (int) Math.round(Distance.metersBetween(
 				originLatitude.doubleValue(),
 				originLongitude.doubleValue(),
 				store.getLatitude().doubleValue(),
@@ -99,7 +94,7 @@ public class ProductBrowseService {
 				store.getId(),
 				store.getName(),
 				distanceMeters,
-				walkingMinutes(distanceMeters),
+				Distance.walkingMinutes(distanceMeters),
 				products.size(),
 				products.size() > visible.size(),
 				products.stream()
@@ -117,20 +112,5 @@ public class ProductBrowseService {
 					.comparing(NearbyStoreGroupResponse::earliestPickupEndAt)
 					.thenComparing(NearbyStoreGroupResponse::storeId);
 		};
-	}
-
-	private static int walkingMinutes(int distanceMeters) {
-		return Math.max(1, (int) Math.ceil(distanceMeters / WALKING_METERS_PER_MINUTE));
-	}
-
-	private static double distanceMeters(
-			double originLatitude, double originLongitude, double latitude, double longitude) {
-		double latitudeDelta = Math.toRadians(latitude - originLatitude);
-		double longitudeDelta = Math.toRadians(longitude - originLongitude);
-		double a = Math.pow(Math.sin(latitudeDelta / 2), 2)
-				+ Math.cos(Math.toRadians(originLatitude))
-						* Math.cos(Math.toRadians(latitude))
-						* Math.pow(Math.sin(longitudeDelta / 2), 2);
-		return EARTH_RADIUS_METERS * 2 * Math.asin(Math.min(1d, Math.sqrt(a)));
 	}
 }
