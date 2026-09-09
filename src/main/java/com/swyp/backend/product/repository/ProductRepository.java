@@ -61,6 +61,15 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 	List<StoreProductSummary> summarizeSellableByStoreIds(
 			@Param("now") LocalDateTime now, @Param("storeIds") Collection<Long> storeIds);
 
+	@Query("""
+			select p from Product p
+			""" + WHERE_SELLABLE_AS_OF_NOW + """
+			and p.store.id = :storeId
+			order by p.pickupEndAt asc, p.id asc
+			""")
+	List<Product> findSellableByStoreId(
+			@Param("storeId") Long storeId, @Param("now") LocalDateTime now);
+
 	Optional<Product> findByIdAndStoreId(Long id, Long storeId);
 
 	List<Product> findByStatusNotAndPickupEndAtLessThanEqual(

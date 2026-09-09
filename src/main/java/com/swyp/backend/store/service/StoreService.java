@@ -3,12 +3,14 @@ package com.swyp.backend.store.service;
 import com.swyp.backend.common.Distance;
 import com.swyp.backend.common.exception.BusinessException;
 import com.swyp.backend.common.response.PageResponse;
+import com.swyp.backend.product.dto.NearbyProductResponse;
 import com.swyp.backend.product.dto.StoreProductSummary;
 import com.swyp.backend.product.service.ProductBrowseService;
 import com.swyp.backend.store.dto.NearbyStoreMarkerResponse;
 import com.swyp.backend.store.dto.NearbyStoresRequest;
 import com.swyp.backend.store.dto.NearbyStoresResponse;
 import com.swyp.backend.store.dto.StoreDetailResponse;
+import com.swyp.backend.store.dto.StoreProductsResponse;
 import com.swyp.backend.store.dto.StoreRegisterRequest;
 import com.swyp.backend.store.dto.StoreSummaryResponse;
 import com.swyp.backend.store.entity.Store;
@@ -124,6 +126,38 @@ public class StoreService {
 				markers.size(),
 				markers.size() > mapMarkerLimit,
 				markers.stream().limit(mapMarkerLimit).toList());
+	}
+
+	public StoreProductsResponse getStoreProducts(Long storeId, BigDecimal lat, BigDecimal lng) {
+		Store store = validateAndGetStore(storeId);
+		if (store.getStatus() != StoreStatus.APPROVED) {
+			throw new BusinessException(StoreErrorCode.STORE_NOT_FOUND);
+		}
+		List<NearbyProductResponse> products = productBrowseService.findSellableByStore(storeId);
+
+		Integer distanceMeters = null;
+		Integer walkingMinutes = null;
+		if (lat != null && lng != null) {
+			distanceMeters = (int) Math.round(Distance.metersBetween(
+					lat.doubleValue(), lng.doubleValue(),
+					store.getLatitude().doubleValue(), store.getLongitude().doubleValue()));
+			walkingMinutes = Distance.walkingMinutes(distanceMeters);
+		}
+
+		return new StoreProductsResponse(
+				store.getId(),
+				store.getName(),
+				store.getLatitude(),
+				store.getLongitude(),
+				distanceMeters,
+				walkingMinutes,
+				store.getBusinessCloseTime(),
+				products.stream()
+						.map(NearbyProductResponse::pickupEndAt)
+						.min(Comparator.naturalOrder())
+						.orElse(null),
+				products.size(),
+				products);
 	}
 
 	public StoreDetailResponse getMyStore(Long ownerId) {

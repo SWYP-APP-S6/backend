@@ -90,6 +90,12 @@ public class ProductBrowseService {
 				.collect(Collectors.toMap(StoreProductSummary::storeId, summary -> summary));
 	}
 
+	public List<NearbyProductResponse> findSellableByStore(Long storeId) {
+		return productRepository.findSellableByStoreId(storeId, LocalDateTime.now(clock)).stream()
+				.map(NearbyProductResponse::from)
+				.toList();
+	}
+
 	private NearbyStoreGroupResponse toStoreGroup(
 			List<Product> products, BigDecimal originLatitude, BigDecimal originLongitude) {
 		Store store = products.getFirst().getStore();
