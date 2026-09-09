@@ -75,8 +75,9 @@ class StoreMapMarkerLimitTest {
 
 	@Test
 	void aViewportWithMoreStoresThanTheLimit_isTruncatedToTheClosestToItsCenter() throws Exception {
-		sellingStore("중심가게", "37.560000", "126.900000");
-		sellingStore("가장자리가게", "37.569000", "126.909000");
+		store("가장자리가게", "37.569000", "126.909000", true);
+		store("재고없는가게", "37.560000", "126.900000", false);
+		store("중심가게", "37.560500", "126.900000", true);
 
 		mockMvc.perform(get("/stores/nearby?minLat=37.55&maxLat=37.57&minLng=126.89&maxLng=126.91")
 				.header("Authorization",
@@ -88,7 +89,7 @@ class StoreMapMarkerLimitTest {
 			.andExpect(jsonPath("$.data.stores[0].name").value("중심가게"));
 	}
 
-	private void sellingStore(String name, String latitude, String longitude) {
+	private void store(String name, String latitude, String longitude, boolean withStock) {
 		User owner = userRepository.saveAndFlush(
 				new User(UserRole.OWNER, name + "사장", null, false, Instant.now()));
 		Store store = new Store(
@@ -99,8 +100,11 @@ class StoreMapMarkerLimitTest {
 		store.replaceBusinessDays(EnumSet.allOf(DayOfWeek.class));
 		store.approve();
 		storeRepository.saveAndFlush(store);
-		productRepository.saveAndFlush(new Product(
-				store, "양파 1.5kg", ProductCategory.VEGETABLE, 3, 10_000, 4_000,
-				LocalDateTime.now(), LocalDateTime.now().plusHours(2), "https://cdn.example.com/a.jpg"));
+		if (withStock) {
+			productRepository.saveAndFlush(new Product(
+					store, "양파 1.5kg", ProductCategory.VEGETABLE, 3, 10_000, 4_000,
+					LocalDateTime.now(), LocalDateTime.now().plusHours(2),
+					"https://cdn.example.com/a.jpg"));
+		}
 	}
 }

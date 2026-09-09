@@ -102,8 +102,8 @@ class StoreMapControllerTest {
 	}
 
 	private Store seedTwoSellingStores() {
-		Store fruitVillage = store("청과마을", "37.560000", "126.900000", true);
 		Store hydroponics = store("수경야채", "37.566000", "126.908000", true);
+		Store fruitVillage = store("청과마을", "37.560000", "126.900000", true);
 		product(fruitVillage, "알배기 배추 2통", now.plusHours(3));
 		product(fruitVillage, "대파 1단", now.plusHours(4));
 		product(hydroponics, "양파 1.5kg", now.plusHours(1));
@@ -122,8 +122,12 @@ class StoreMapControllerTest {
 			.andExpect(jsonPath("$.data.stores.length()").value(2))
 			.andExpect(jsonPath("$.data.stores[0].name").value("청과마을"))
 			.andExpect(jsonPath("$.data.stores[0].sellableProductCount").value(2))
+			.andExpect(jsonPath("$.data.stores[0].latitude").value(37.560000))
+			.andExpect(jsonPath("$.data.stores[0].longitude").value(126.900000))
 			.andExpect(jsonPath("$.data.stores[1].name").value("수경야채"))
-			.andExpect(jsonPath("$.data.stores[1].sellableProductCount").value(1));
+			.andExpect(jsonPath("$.data.stores[1].sellableProductCount").value(1))
+			.andExpect(jsonPath("$.data.stores[1].latitude").value(37.566000))
+			.andExpect(jsonPath("$.data.stores[1].longitude").value(126.908000));
 	}
 
 	@Test
@@ -166,12 +170,64 @@ class StoreMapControllerTest {
 				.header("Authorization", bearer(TokenRealm.GUEST, "GUEST")))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.name").value("수경야채"))
+			.andExpect(jsonPath("$.data.latitude").value(37.566000))
+			.andExpect(jsonPath("$.data.longitude").value(126.908000))
 			.andExpect(jsonPath("$.data.productCount").value(1))
 			.andExpect(jsonPath("$.data.products[0].name").value("양파 1.5kg"))
 			.andExpect(jsonPath("$.data.businessCloseTime").value("21:00:00"))
-			.andExpect(jsonPath("$.data.earliestPickupEndAt").exists())
-			.andExpect(jsonPath("$.data.distanceMeters").value(org.hamcrest.Matchers.greaterThan(0)))
-			.andExpect(jsonPath("$.data.walkingMinutes").value(org.hamcrest.Matchers.greaterThan(0)));
+			.andExpect(jsonPath("$.data.distanceMeters")
+				.value(org.hamcrest.Matchers.both(
+					org.hamcrest.Matchers.greaterThan(1260))
+					.and(org.hamcrest.Matchers.lessThan(1285))))
+			.andExpect(jsonPath("$.data.walkingMinutes").value(19));
+	}
+
+	@Test
+	void storeProducts_reportTheEarliestDeadlineAcrossTheStore() throws Exception {
+		seedTwoSellingStores();
+		Long fruitVillageId = storeRepository.findAll().stream()
+			.filter(store -> store.getName().equals("청과마을"))
+			.findFirst().orElseThrow().getId();
+
+		mockMvc.perform(get("/stores/" + fruitVillageId + "/products")
+				.header("Authorization", bearer(TokenRealm.GUEST, "GUEST")))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.productCount").value(2))
+			.andExpect(jsonPath("$.data.earliestPickupEndAt").value(org.hamcrest.Matchers.startsWith(
+				now.plusHours(3).truncatedTo(java.time.temporal.ChronoUnit.MINUTES)
+					.toString().substring(0, 16))));
+	}
+
+	@Test
+	void aPositionOutOfRangeOrHalfGiven_failsValidation() throws Exception {
+		Store hydroponics = seedTwoSellingStores();
+		String base = "/stores/" + hydroponics.getId() + "/products";
+
+		mockMvc.perform(get(base + "?lat=37.556")
+				.header("Authorization", bearer(TokenRealm.GUEST, "GUEST")))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.fieldErrors.positionComplete").exists());
+		mockMvc.perform(get(base + "?lat=1e999&lng=1e999")
+				.header("Authorization", bearer(TokenRealm.GUEST, "GUEST")))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+	}
+
+	@Test
+	void aCoordinateWithAnAbsurdScale_isRejectedNotServerError() throws Exception {
+		mockMvc.perform(get("/stores/nearby?minLat=1E-2000000000&maxLat=37.57"
+					+ "&minLng=126.89&maxLng=126.91")
+				.header("Authorization", bearer(TokenRealm.GUEST, "GUEST")))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+	}
+
+	@Test
+	void aViewportWiderThanTheLimit_isRejected() throws Exception {
+		mockMvc.perform(get("/stores/nearby?minLat=37.0&maxLat=38.0&minLng=126.89&maxLng=126.91")
+				.header("Authorization", bearer(TokenRealm.GUEST, "GUEST")))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("VIEWPORT_TOO_LARGE"));
 	}
 
 	@Test
@@ -197,16 +253,19 @@ class StoreMapControllerTest {
 
 	@Test
 	void mapEndpoints_areOpenToConsumersAndAdmins_butNotOwners() throws Exception {
-		String url = "/stores/nearby?" + BOUNDS;
-
-		mockMvc.perform(get(url).header("Authorization", bearer(TokenRealm.USER, "CONSUMER")))
-			.andExpect(status().isOk());
-		mockMvc.perform(get(url).header("Authorization", bearer(TokenRealm.ADMIN, "SUPER")))
-			.andExpect(status().isOk());
-		mockMvc.perform(get(url).header("Authorization", bearer(TokenRealm.USER, "OWNER")))
-			.andExpect(status().isForbidden())
-			.andExpect(jsonPath("$.code").value("FORBIDDEN"));
-		mockMvc.perform(get(url))
-			.andExpect(status().isUnauthorized());
+		Store hydroponics = seedTwoSellingStores();
+		for (String url : new String[] {
+				"/stores/nearby?" + BOUNDS,
+				"/stores/" + hydroponics.getId() + "/products"}) {
+			mockMvc.perform(get(url).header("Authorization", bearer(TokenRealm.USER, "CONSUMER")))
+				.andExpect(status().isOk());
+			mockMvc.perform(get(url).header("Authorization", bearer(TokenRealm.ADMIN, "SUPER")))
+				.andExpect(status().isOk());
+			mockMvc.perform(get(url).header("Authorization", bearer(TokenRealm.USER, "OWNER")))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.code").value("FORBIDDEN"));
+			mockMvc.perform(get(url))
+				.andExpect(status().isUnauthorized());
+		}
 	}
 }
