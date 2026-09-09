@@ -56,6 +56,7 @@ public class SecurityConfig {
 	private static final String[] BROWSE_ENDPOINTS = {
 		"/recipes",
 		"/recipes/**",
+		"/products/nearby",
 	};
 
 	private static final String[] API_DOCS_ENDPOINTS = {

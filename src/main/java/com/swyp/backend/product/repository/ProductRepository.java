@@ -1,6 +1,7 @@
 package com.swyp.backend.product.repository;
 
 import com.swyp.backend.product.entity.Product;
+import com.swyp.backend.product.entity.ProductCategory;
 import com.swyp.backend.product.entity.ProductStatus;
 import jakarta.persistence.LockModeType;
 import java.math.BigDecimal;
@@ -27,9 +28,12 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 				and s.status = com.swyp.backend.store.entity.StoreStatus.APPROVED
 				and s.latitude between :minLatitude and :maxLatitude
 				and s.longitude between :minLongitude and :maxLongitude
+				and (:category is null or p.category = :category)
+			order by p.pickupEndAt asc, p.id asc
 			""")
 	List<Product> findSellableWithinBounds(
 			@Param("now") LocalDateTime now,
+			@Param("category") ProductCategory category,
 			@Param("minLatitude") BigDecimal minLatitude,
 			@Param("maxLatitude") BigDecimal maxLatitude,
 			@Param("minLongitude") BigDecimal minLongitude,
