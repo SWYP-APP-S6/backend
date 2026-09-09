@@ -32,6 +32,10 @@
   클라이언트 에러 405·400·415도 포함). 비즈니스 예외는 **`BusinessException(ApiCode)` 하나**로 던지고,
   **에러 코드는 각 feature가 자기 enum(`implements ApiCode`)에 소유**한다(제네릭만
   `common.response.ErrorCode` — global→feature 역결합 회피).
+- **제약 메시지는 `src/main/resources/ValidationMessages.properties`가 소유한다** — 없으면 Hibernate
+  Validator 기본 번들이 **JVM 로케일에 따라** 골라져 로컬(ko)은 한국어, 운영 컨테이너
+  (`eclipse-temurin`의 `LANG=en_US.UTF-8`)는 영어가 나간다. 이 번들은 로케일 접미사가 없어 모든
+  환경에서 이긴다. 제약별 문구가 따로 필요하면 애노테이션의 `message`가 우선한다.
 - `createdAt`/`updatedAt`은 Spring Data JPA Auditing이 채운다 — DB default/trigger가 아니므로 **쓰기가
   JPA를 거쳐야** 채워진다(현재 앱이 유일 writer).
 - **레퍼런스 구현**: `com.swyp.backend.ping`(controller→service→dto + 슬라이스 테스트)이 walking
