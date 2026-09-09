@@ -40,6 +40,8 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
 	List<Product> findByStoreIdOrderByCreatedAtDesc(Long storeId);
 
+	Optional<Product> findByIdAndStoreId(Long id, Long storeId);
+
 	List<Product> findByStatusNotAndPickupEndAtLessThanEqual(
 			ProductStatus status, LocalDateTime pickupEndAt);
 
