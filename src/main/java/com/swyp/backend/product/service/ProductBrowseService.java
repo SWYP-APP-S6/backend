@@ -7,15 +7,18 @@ import com.swyp.backend.product.dto.NearbyProductSort;
 import com.swyp.backend.product.dto.NearbyProductsRequest;
 import com.swyp.backend.product.dto.NearbyProductsResponse;
 import com.swyp.backend.product.dto.NearbyStoreGroupResponse;
+import com.swyp.backend.product.dto.StoreProductSummary;
 import com.swyp.backend.product.entity.Product;
 import com.swyp.backend.product.repository.ProductRepository;
 import com.swyp.backend.store.entity.Store;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
@@ -76,6 +79,15 @@ public class ProductBrowseService {
 				new PageImpl<>(groups.subList(fromIndex, toIndex), pageRequest, groups.size());
 		return new NearbyProductsResponse(
 				totalProductCount, PageResponse.of(page.getContent(), page));
+	}
+
+	public Map<Long, StoreProductSummary> summarizeSellableByStore(Collection<Long> storeIds) {
+		if (storeIds.isEmpty()) {
+			return Map.of();
+		}
+		return productRepository
+				.summarizeSellableByStoreIds(LocalDateTime.now(clock), storeIds).stream()
+				.collect(Collectors.toMap(StoreProductSummary::storeId, summary -> summary));
 	}
 
 	private NearbyStoreGroupResponse toStoreGroup(

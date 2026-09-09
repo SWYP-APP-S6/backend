@@ -57,6 +57,7 @@ public class SecurityConfig {
 		"/recipes",
 		"/recipes/**",
 		"/products/nearby",
+		"/stores/nearby",
 	};
 
 	private static final String[] API_DOCS_ENDPOINTS = {
