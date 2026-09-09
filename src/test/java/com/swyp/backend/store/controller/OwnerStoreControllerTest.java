@@ -80,9 +80,19 @@ class OwnerStoreControllerTest {
 
 	private static String registerBody() {
 		return """
-			{"name":"청과왕","address":"%s","addressDetail":"1층","phone":"02-1234-5678",\
+			{"name":"청과왕","categories":["VEGETABLE","FRUIT"],"postalCode":"06236",\
+			"address":"%s","addressDetail":"1층","phone":"02-1234-5678",\
 			"businessOpenTime":"09:00:00","businessCloseTime":"21:00:00",\
+			"businessDays":["MONDAY","TUESDAY","WEDNESDAY","THURSDAY","FRIDAY"],\
 			"businessRegistrationNumber":"123-45-67890","applicationNote":"메모"}""".formatted(ADDRESS);
+	}
+
+	private static String registerBody(String categories, String postalCode, String businessDays) {
+		return """
+			{"name":"청과왕","categories":%s,"postalCode":%s,\
+			"address":"%s","addressDetail":"1층","phone":"02-1234-5678",\
+			"businessOpenTime":"09:00:00","businessCloseTime":"21:00:00",\
+			"businessDays":%s}""".formatted(categories, postalCode, ADDRESS, businessDays);
 	}
 
 	@Test
@@ -144,8 +154,10 @@ class OwnerStoreControllerTest {
 				.header("Authorization", "Bearer " + tokenFor(owner))
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
-					{"name":"청과왕","address":"%s","addressDetail":"1층","phone":"%s",\
-					"businessOpenTime":"09:00:00","businessCloseTime":"21:00:00"}""".formatted(ADDRESS, tooLongPhone)))
+					{"name":"청과왕","categories":["VEGETABLE"],"postalCode":"06236",\
+					"address":"%s","addressDetail":"1층","phone":"%s",\
+					"businessOpenTime":"09:00:00","businessCloseTime":"21:00:00",\
+					"businessDays":["MONDAY"]}""".formatted(ADDRESS, tooLongPhone)))
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
 	}
@@ -216,6 +228,114 @@ class OwnerStoreControllerTest {
 		mockMvc.perform(get("/owner/stores/me").header("Authorization", "Bearer " + token))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.name").value("청과왕"));
+	}
+
+	private void stubGeocoding() {
+		geocodingClient.register(ADDRESS,
+			new GeocodingClient.Coordinates(new BigDecimal("37.500600"), new BigDecimal("127.036500")));
+	}
+
+	@Test
+	void registerStore_returnsTheSelectedCategoriesAndBusinessDays() throws Exception {
+		User owner = createUser(UserRole.OWNER);
+		stubGeocoding();
+
+		mockMvc.perform(post("/owner/stores")
+				.header("Authorization", "Bearer " + tokenFor(owner))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(registerBody()))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.data.postalCode").value("06236"))
+			.andExpect(jsonPath("$.data.categories.length()").value(2))
+			.andExpect(jsonPath("$.data.categories[0]").value("VEGETABLE"))
+			.andExpect(jsonPath("$.data.categories[1]").value("FRUIT"))
+			.andExpect(jsonPath("$.data.businessDays.length()").value(5))
+			.andExpect(jsonPath("$.data.businessDays[0]").value("MONDAY"))
+			.andExpect(jsonPath("$.data.businessDays[4]").value("FRIDAY"));
+	}
+
+	@Test
+	void registerStore_rejectsMoreThanThreeCategories() throws Exception {
+		User owner = createUser(UserRole.OWNER);
+		stubGeocoding();
+
+		mockMvc.perform(post("/owner/stores")
+				.header("Authorization", "Bearer " + tokenFor(owner))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(registerBody(
+					"[\"VEGETABLE\",\"FRUIT\",\"MEAT\",\"SEAFOOD\"]", "\"06236\"", "[\"MONDAY\"]")))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+			.andExpect(jsonPath("$.fieldErrors.categories")
+				.value("가게 종류는 최대 3개까지 선택할 수 있습니다."));
+	}
+
+	@Test
+	void registerStore_withNoCategorySelected_failsValidation() throws Exception {
+		User owner = createUser(UserRole.OWNER);
+		stubGeocoding();
+
+		mockMvc.perform(post("/owner/stores")
+				.header("Authorization", "Bearer " + tokenFor(owner))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(registerBody("[]", "\"06236\"", "[\"MONDAY\"]")))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+			.andExpect(jsonPath("$.fieldErrors.categories").exists());
+	}
+
+	@Test
+	void registerStore_withNoBusinessDaySelected_failsValidation() throws Exception {
+		User owner = createUser(UserRole.OWNER);
+		stubGeocoding();
+
+		mockMvc.perform(post("/owner/stores")
+				.header("Authorization", "Bearer " + tokenFor(owner))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(registerBody("[\"VEGETABLE\"]", "\"06236\"", "[]")))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+			.andExpect(jsonPath("$.fieldErrors.businessDays").exists());
+	}
+
+	@Test
+	void registerStore_withAnUnknownCategory_isRejected() throws Exception {
+		User owner = createUser(UserRole.OWNER);
+		stubGeocoding();
+
+		mockMvc.perform(post("/owner/stores")
+				.header("Authorization", "Bearer " + tokenFor(owner))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(registerBody("[\"FLOWER\"]", "\"06236\"", "[\"MONDAY\"]")))
+			.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void registerStore_withAMalformedPostalCode_failsValidation() throws Exception {
+		User owner = createUser(UserRole.OWNER);
+		stubGeocoding();
+
+		mockMvc.perform(post("/owner/stores")
+				.header("Authorization", "Bearer " + tokenFor(owner))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(registerBody("[\"VEGETABLE\"]", "\"1234\"", "[\"MONDAY\"]")))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+			.andExpect(jsonPath("$.fieldErrors.postalCode").value("우편번호는 5자리 숫자여야 합니다."));
+	}
+
+	@Test
+	void registerStore_withoutAPostalCode_succeeds() throws Exception {
+		User owner = createUser(UserRole.OWNER);
+		stubGeocoding();
+
+		mockMvc.perform(post("/owner/stores")
+				.header("Authorization", "Bearer " + tokenFor(owner))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(registerBody("[\"VEGETABLE\"]", "null", "[\"MONDAY\"]")))
+			.andExpect(status().isCreated());
+
+		assertThat(storeRepository.findByOwnerId(owner.getId()).orElseThrow().getPostalCode()).isNull();
 	}
 
 	@TestConfiguration
