@@ -98,6 +98,10 @@ SWYP 앱의 백엔드 REST API 서버. (프로덕트 한 줄 설명은 확정되
   access 토큰은 `typ=access`라서 가입 토큰(`typ=signup`)을 bearer로 써도 통과하지 못한다.
   **앱 유저 전용 엔드포인트를 새로 만들면 `SecurityConfig`에 `REALM_USER` 요구를 함께 등록한다** —
   `authenticated()`만 걸면 admin 토큰으로도 들어올 수 있고, 그 id가 `users` 의 다른 사람을 가리킨다.
+- **realm 위에 role도 요구한다** — realm 은 '앱 유저인가'만 가르고 소비자/점주를 구분하지 않는다.
+  그래서 `/owner/**`는 `REALM_USER` **와 `ROLE_OWNER`를 둘 다** 요구한다(`AuthorizationManagers.allOf`).
+  realm 만 걸면 소비자 토큰으로 점주 API를 전부 호출할 수 있다. 역할이 갈리는 엔드포인트를 추가할
+  때마다 같은 형태로 등록한다 — 회귀는 `SecurityConfigTest`가 잡는다.
 - 토큰 정책: access/refresh TTL은 `jwt.*`, 가입 토큰 TTL은 `auth.signup-ttl`(application.properties),
   secret은 `JWT_SECRET` env(dev 기본값 커밋). refresh는 Redis에 저장·회전(1회용)·로그아웃 시 폐기.
   카카오 앱 검증용 `KAKAO_CONSUMER_APP_ID`·`KAKAO_OWNER_APP_ID`(콘솔의 **숫자 앱 ID**, REST API 키가

@@ -8,6 +8,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.swyp.backend.RedisTestcontainersConfiguration;
 import com.swyp.backend.TestcontainersConfiguration;
+import com.swyp.backend.common.security.JwtTokenProvider;
+import com.swyp.backend.common.security.TokenRealm;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -22,6 +24,13 @@ class SecurityConfigTest {
 
 	@Autowired
 	MockMvc mockMvc;
+
+	@Autowired
+	JwtTokenProvider tokenProvider;
+
+	private String accessTokenFor(TokenRealm realm, String role) {
+		return tokenProvider.createAccessToken(realm, 1L, role);
+	}
 
 	@Test
 	void ping_isReachableThroughSecurityFilterChain() throws Exception {
@@ -42,6 +51,27 @@ class SecurityConfigTest {
 				.header("Access-Control-Request-Method", "GET"))
 			.andExpect(status().isOk())
 			.andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5173"));
+	}
+
+	@Test
+	void ownerPath_withConsumerToken_isForbidden() throws Exception {
+		mockMvc.perform(get("/owner/stores/me")
+				.header("Authorization", "Bearer " + accessTokenFor(TokenRealm.USER, "CONSUMER")))
+			.andExpect(status().isForbidden());
+	}
+
+	@Test
+	void ownerPath_withAdminToken_isForbidden() throws Exception {
+		mockMvc.perform(get("/owner/stores/me")
+				.header("Authorization", "Bearer " + accessTokenFor(TokenRealm.ADMIN, "SUPER")))
+			.andExpect(status().isForbidden());
+	}
+
+	@Test
+	void ownerPath_withOwnerToken_passesAuthorization() throws Exception {
+		mockMvc.perform(get("/owner/anything")
+				.header("Authorization", "Bearer " + accessTokenFor(TokenRealm.USER, "OWNER")))
+			.andExpect(status().isNotFound());
 	}
 
 	@Test

@@ -11,6 +11,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authorization.AuthorityAuthorizationManager;
+import org.springframework.security.authorization.AuthorizationManagers;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -27,6 +29,8 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @EnableConfigurationProperties(JwtProperties.class)
 @EnableWebSecurity
 public class SecurityConfig {
+
+	private static final String OWNER_ROLE = "OWNER";
 
 	private static final String[] PUBLIC_ENDPOINTS = {
 		"/ping",
@@ -85,7 +89,9 @@ public class SecurityConfig {
 					auth.requestMatchers(API_DOCS_ENDPOINTS).permitAll();
 				}
 				auth.requestMatchers("/admin/**").hasAuthority(TokenRealm.ADMIN.authority());
-				auth.requestMatchers("/owner/**").hasAuthority(TokenRealm.USER.authority());
+				auth.requestMatchers("/owner/**").access(AuthorizationManagers.allOf(
+					AuthorityAuthorizationManager.hasAuthority(TokenRealm.USER.authority()),
+					AuthorityAuthorizationManager.hasRole(OWNER_ROLE)));
 				auth.anyRequest().authenticated();
 			})
 			.exceptionHandling(exception -> exception

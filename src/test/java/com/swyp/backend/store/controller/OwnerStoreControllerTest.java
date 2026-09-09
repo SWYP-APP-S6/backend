@@ -126,15 +126,13 @@ class OwnerStoreControllerTest {
 	@Test
 	void registerStore_rejectsAConsumerAccount() throws Exception {
 		User consumer = createUser(UserRole.CONSUMER);
-		geocodingClient.register(ADDRESS,
-			new GeocodingClient.Coordinates(new BigDecimal("37.500600"), new BigDecimal("127.036500")));
 
 		mockMvc.perform(post("/owner/stores")
 				.header("Authorization", "Bearer " + tokenFor(consumer))
 				.contentType(MediaType.APPLICATION_JSON)
 				.content(registerBody()))
 			.andExpect(status().isForbidden())
-			.andExpect(jsonPath("$.code").value("OWNER_ROLE_REQUIRED"));
+			.andExpect(jsonPath("$.code").value("FORBIDDEN"));
 	}
 
 	@Test
