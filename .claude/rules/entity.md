@@ -15,6 +15,10 @@ paths:
 - **상태 변경은 setter 금지 → 도메인 메서드**로 표현.
 - `@Builder`를 쓰면 초기화 컬렉션/기본값 필드에 **`@Builder.Default` 필수**(없으면 null).
 - 시간 타입: 절대·기록·계산된 순간 = `Instant`+`timestamptz`, 사람 벽시계 = `LocalDateTime`+`timestamp`.
+- **현재 시각은 `Clock` 빈을 주입해 얻는다**(`LocalDateTime.now(clock)`/`Instant.now(clock)`) —
+  `ClockConfig`가 `Asia/Seoul`로 고정한다. 인자 없는 `now()`는 JVM 기본 시간대를 쓰는데 운영
+  컨테이너는 UTC라 벽시계 값이 9시간 어긋난다(로컬은 KST라 테스트로 안 잡힌다). 테스트는
+  `Clock.fixed`를 `@Primary`로 올려 검증한다.
 - 소프트삭제가 필요하면: `deleted_at` nullable + `@SQLDelete` + `@SQLRestriction("deleted_at is null")`,
   유니크 컬럼은 부분 유니크 인덱스(`where deleted_at is null`).
 - `@Entity`는 controller 경계를 넘지 않는다 — 요청/응답은 DTO(매핑은 service).

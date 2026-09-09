@@ -19,6 +19,7 @@ import com.swyp.backend.product.exception.ProductErrorCode;
 import com.swyp.backend.product.repository.ProductRepository;
 import com.swyp.backend.store.entity.Store;
 import com.swyp.backend.store.service.StoreService;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -39,6 +40,7 @@ public class ProductService {
 	private final HoldRepository holdRepository;
 	private final StoreService storeService;
 	private final NotificationService notificationService;
+	private final Clock clock;
 
 	@Transactional
 	public ProductDetailResponse registerProduct(Long ownerId, ProductRegisterRequest request) {
@@ -47,7 +49,7 @@ public class ProductService {
 			throw new BusinessException(ProductErrorCode.INVALID_PRICE);
 		}
 
-		LocalDateTime now = LocalDateTime.now();
+		LocalDateTime now = LocalDateTime.now(clock);
 		LocalDateTime pickupEndAt = request.pickupEndAt() != null
 				? request.pickupEndAt()
 				: defaultPickupEndAt(store, now);
@@ -121,7 +123,7 @@ public class ProductService {
 			throw new BusinessException(ProductErrorCode.DISPOSITION_REQUIRED);
 		}
 		if (disposition == HoldDisposition.CANCEL_ALL) {
-			Instant now = Instant.now();
+			Instant now = Instant.now(clock);
 			for (Hold hold : activeHolds) {
 				hold.cancelByOwner(now, OWNER_CANCEL_REASON);
 				notificationService.notify(

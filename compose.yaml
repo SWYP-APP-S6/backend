@@ -72,6 +72,10 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-swyp}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: "6379"
+      # 베이스 이미지에 TZ 설정이 없어 JVM 기본 시간대가 UTC 다. 벽시계 기반 값(픽업 마감 시간
+      # 등)은 `ClockConfig` 의 Clock 빈이 Asia/Seoul 로 고정하지만, 로그 타임스탬프처럼 JVM
+      # 기본 시간대를 쓰는 것들까지 맞추려면 컨테이너 TZ 도 함께 줘야 한다.
+      TZ: Asia/Seoul
       # compose 는 프로젝트 루트 .env 를 변수 치환에만 쓰고 컨테이너에 자동 주입하지 않으므로,
       # 카카오 앱 ID도 다른 항목들처럼 여기서 명시적으로 넘겨야 한다(빠져 있으면 .env 에 값이
       # 있어도 컨테이너는 못 보고 "앱 ID 미설정"으로 기동한다). long 에 바인딩되므로(
