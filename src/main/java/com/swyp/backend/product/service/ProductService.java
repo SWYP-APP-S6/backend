@@ -35,6 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ProductService {
 
 	private static final String OWNER_CANCEL_REASON = "점주가 판매를 종료해 찜이 취소됐어요.";
+	private static final int MAX_PICKUP_WINDOW_HOURS = 24;
 
 	private final ProductRepository productRepository;
 	private final HoldRepository holdRepository;
@@ -53,6 +54,9 @@ public class ProductService {
 		LocalDateTime pickupEndAt = request.pickupEndAt() != null
 				? request.pickupEndAt()
 				: defaultPickupEndAt(store, now);
+		if (!pickupEndAt.isAfter(now) || pickupEndAt.isAfter(now.plusHours(MAX_PICKUP_WINDOW_HOURS))) {
+			throw new BusinessException(ProductErrorCode.INVALID_PICKUP_WINDOW);
+		}
 
 		Product product = new Product(
 				store,

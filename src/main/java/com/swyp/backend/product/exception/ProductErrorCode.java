@@ -11,6 +11,7 @@ public enum ProductErrorCode implements ApiCode {
 
 	PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다."),
 	INVALID_PRICE(HttpStatus.BAD_REQUEST, "할인가는 정가보다 낮아야 합니다."),
+	INVALID_PICKUP_WINDOW(HttpStatus.BAD_REQUEST, "픽업 마감 시간은 현재 시각 이후 24시간 이내여야 합니다."),
 	DISPOSITION_REQUIRED(HttpStatus.BAD_REQUEST, "진행 중인 찜이 있어 처리 방법을 선택해야 합니다.");
 
 	private final HttpStatus status;

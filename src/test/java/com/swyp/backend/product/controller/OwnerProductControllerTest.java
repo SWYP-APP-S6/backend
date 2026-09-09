@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.jayway.jsonpath.JsonPath;
 import com.swyp.backend.RedisTestcontainersConfiguration;
 import com.swyp.backend.TestcontainersConfiguration;
+import com.swyp.backend.common.ClockConfig;
 import com.swyp.backend.common.security.JwtTokenProvider;
 import com.swyp.backend.common.security.TokenRealm;
 import com.swyp.backend.hold.entity.Hold;
@@ -29,6 +30,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.temporal.ChronoUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -90,6 +92,12 @@ class OwnerProductControllerTest {
 			"photoUrl":"https://example.com/a.jpg","ingredientTags":[]}""".formatted(name, originalPrice, salePrice);
 	}
 
+	private static String registerBodyWithPickupEndAt(LocalDateTime pickupEndAt) {
+		return """
+			{"name":"당근","category":"VEGETABLE","initialQty":10,"originalPrice":1000,"salePrice":800,\
+			"photoUrl":"https://example.com/a.jpg","pickupEndAt":"%s"}""".formatted(pickupEndAt);
+	}
+
 	private Product createProduct(String name, int initialQty) {
 		Product product = new Product(
 			store, name, ProductCategory.VEGETABLE, initialQty, 1000, 800,
@@ -138,14 +146,44 @@ class OwnerProductControllerTest {
 
 	@Test
 	void registerProduct_withAnExplicitPickupEndAt_overridesTheStoreDefault() throws Exception {
+		LocalDateTime pickupEndAt = LocalDateTime.now(ClockConfig.SERVICE_ZONE)
+			.plusHours(2).truncatedTo(ChronoUnit.SECONDS);
+
+		String body = mockMvc.perform(post("/owner/products")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(registerBodyWithPickupEndAt(pickupEndAt)))
+			.andExpect(status().isCreated())
+			.andReturn().getResponse().getContentAsString();
+
+		long productId = ((Number) JsonPath.read(body, "$.data.id")).longValue();
+		assertThat(productRepository.findById(productId).orElseThrow().getPickupEndAt()).isEqualTo(pickupEndAt);
+	}
+
+	@Test
+	void registerProduct_withAPickupEndAtInThePast_isRejected() throws Exception {
+		LocalDateTime pastPickupEndAt = LocalDateTime.now(ClockConfig.SERVICE_ZONE)
+			.minusHours(1).truncatedTo(ChronoUnit.SECONDS);
+
 		mockMvc.perform(post("/owner/products")
 				.header("Authorization", "Bearer " + token)
 				.contentType(MediaType.APPLICATION_JSON)
-				.content("""
-					{"name":"당근","category":"VEGETABLE","initialQty":10,"originalPrice":1000,"salePrice":800,\
-					"photoUrl":"https://example.com/a.jpg","pickupEndAt":"2099-01-01T18:00:00"}"""))
-			.andExpect(status().isCreated())
-			.andExpect(jsonPath("$.data.pickupEndAt").value("2099-01-01T18:00:00"));
+				.content(registerBodyWithPickupEndAt(pastPickupEndAt)))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("INVALID_PICKUP_WINDOW"));
+	}
+
+	@Test
+	void registerProduct_withAPickupEndAtBeyond24Hours_isRejected() throws Exception {
+		LocalDateTime tooLatePickupEndAt = LocalDateTime.now(ClockConfig.SERVICE_ZONE)
+			.plusHours(25).truncatedTo(ChronoUnit.SECONDS);
+
+		mockMvc.perform(post("/owner/products")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(registerBodyWithPickupEndAt(tooLatePickupEndAt)))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("INVALID_PICKUP_WINDOW"));
 	}
 
 	@Test
