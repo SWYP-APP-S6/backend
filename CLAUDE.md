@@ -18,14 +18,23 @@
 ## Architecture
 
 - **Package-by-feature + 레이어 서브패키지**: `com.swyp.backend.<feature>`(예: `.admin`, `.ping`) 아래
-  `controller` / `service` / `repository` / `entity` / `dto`. `com.swyp.backend.common`에는 **여러
-  feature가 공유하는 타입만** 둔다(`BaseTimeEntity`, `JpaAuditingConfig` 등).
-- **레이어 경계** — 앞 3개는 `ArchitectureTest`(ArchUnit)가 빌드에서 강제, 뒤 2개는 규약(미강제):
-  - `controller → service → repository` 단방향.
-  - **`repository`만 JPA 영속성 API**(`JpaRepository`/`EntityManager`)에 접근한다.
+  `controller` / `service` / `function` / `repository` / `entity` / `dto`. `com.swyp.backend.common`에는
+  **여러 feature가 공유하는 타입만** 둔다(`BaseTimeEntity`, `JpaAuditingConfig` 등).
+- **`function` = 그 feature가 남에게 내주는 재사용 단위.** repository 호출과 "찾거나 예외"를 여기서
+  끝내고(`get{Entity}ById` → 없으면 `BusinessException`), service는 트랜잭션·유스케이스 조합·DTO
+  매핑만 맡는다. 파사드를 위에 얹는 대신 공용 계층을 **아래**에 둔 것 — 파사드는 service끼리의
+  호출을 막지 못하지만, function은 애초에 부를 것이 repository밖에 없다.
+- **레이어 경계** — `ArchitectureTest`(ArchUnit)가 빌드에서 강제한다:
+  - `controller → service → function → repository` 단방향. 한 칸씩만 내려간다.
+  - **`repository`만 JPA 영속성 API**(`JpaRepository`/`EntityManager`)에 접근하고, repository를 부르는
+    건 **`function`뿐**이다.
+  - **feature 간 접근은 상대 feature의 `function`을 통해서만** — 남의 `service`·`repository`는 부르지
+    않는다. service끼리 부르기 시작하면 사슬이 생기고 반대 방향 호출 하나로 순환이 된다.
+    **`function`은 잎(leaf)이라 순환이 구조적으로 불가능하다.**
+  - **`function`은 다른 `function`도, 어떤 `service`도 부르지 않는다.** 두 feature를 조합하는 건
+    service의 일이다.
   - **`@Entity`는 controller 경계를 넘지 않는다** — 요청/응답은 DTO(기본 `record`), 매핑은 service.
-  - feature 간 접근은 상대 feature의 **`service`를 통해서만**.
-  - `@Transactional`은 **service 계층**에 둔다.
+  - `@Transactional`은 **service 계층**에 둔다 — function은 트랜잭션 경계를 열지 않는다.
 - **API 응답은 표준 envelope**: 성공 `ApiResponse<T>{status,code,message,data}`(컨트롤러가 감싼다),
   실패 `ErrorResponse{status,code,message,fieldErrors}`(`GlobalExceptionHandler`가 생성 —
   `ResponseEntityExceptionHandler`를 상속해 프레임워크

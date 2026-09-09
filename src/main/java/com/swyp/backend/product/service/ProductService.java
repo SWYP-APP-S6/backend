@@ -20,7 +20,7 @@ import com.swyp.backend.product.exception.ProductErrorCode;
 import com.swyp.backend.product.repository.ProductRepository;
 import com.swyp.backend.recipe.service.RecipeService;
 import com.swyp.backend.store.entity.Store;
-import com.swyp.backend.store.service.StoreService;
+import com.swyp.backend.store.function.StoreFunction;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -41,14 +41,14 @@ public class ProductService {
 
 	private final ProductRepository productRepository;
 	private final HoldRepository holdRepository;
-	private final StoreService storeService;
+	private final StoreFunction storeFunction;
 	private final NotificationService notificationService;
 	private final RecipeService recipeService;
 	private final Clock clock;
 
 	@Transactional
 	public ProductDetailResponse registerProduct(Long ownerId, ProductRegisterRequest request) {
-		Store store = storeService.validateAndGetStoreByOwnerId(ownerId);
+		Store store = storeFunction.getByOwnerId(ownerId);
 		if (request.salePrice() >= request.originalPrice()) {
 			throw new BusinessException(ProductErrorCode.INVALID_PRICE);
 		}
@@ -82,7 +82,7 @@ public class ProductService {
 	}
 
 	public OwnerHomeResponse getHome(Long ownerId) {
-		Store store = storeService.validateAndGetStoreByOwnerId(ownerId);
+		Store store = storeFunction.getByOwnerId(ownerId);
 		List<Product> products = productRepository.findByStoreIdOrderByCreatedAtDesc(store.getId());
 		Map<Long, Long> activeHoldQtyByProduct = holdRepository.findActiveHoldQtyByStoreId(store.getId()).stream()
 				.collect(Collectors.toMap(ActiveHoldQty::productId, ActiveHoldQty::qty));
@@ -106,7 +106,7 @@ public class ProductService {
 	}
 
 	public ProductDetailResponse getMyProduct(Long ownerId, Long productId) {
-		Store store = storeService.validateAndGetStoreByOwnerId(ownerId);
+		Store store = storeFunction.getByOwnerId(ownerId);
 		Product product = validateAndGetProduct(productId, store.getId());
 		return ProductDetailResponse.from(product, completedQtyOf(productId));
 	}
@@ -114,7 +114,7 @@ public class ProductService {
 	@Transactional
 	public ProductDetailResponse updateAvailableQty(
 			Long ownerId, Long productId, ProductAvailableQtyUpdateRequest request) {
-		Store store = storeService.validateAndGetStoreByOwnerId(ownerId);
+		Store store = storeFunction.getByOwnerId(ownerId);
 		Product product = validateAndGetProduct(productId, store.getId());
 		if (product.getStatus() == ProductStatus.CLOSED) {
 			throw new BusinessException(ProductErrorCode.PRODUCT_CLOSED);
