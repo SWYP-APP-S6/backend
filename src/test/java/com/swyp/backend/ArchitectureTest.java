@@ -6,7 +6,6 @@ import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.sli
 
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
-import com.tngtech.archunit.junit.ArchIgnore;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
 import jakarta.persistence.Entity;
@@ -15,7 +14,6 @@ import jakarta.persistence.Entity;
 class ArchitectureTest {
 
 	@ArchTest
-	@ArchIgnore(reason = "product, notification and hold have no function yet -- enabled by the pull request that converts them")
 	static final ArchRule dependencies_flow_controller_to_service_to_function_to_repository =
 		layeredArchitecture()
 			.consideringOnlyDependenciesInLayers()
@@ -29,7 +27,6 @@ class ArchitectureTest {
 			.whereLayer("Repository").mayOnlyBeAccessedByLayers("Function");
 
 	@ArchTest
-	@ArchIgnore(reason = "product, notification and hold have no function yet -- enabled by the pull request that converts them")
 	static final ArchRule services_of_different_features_do_not_call_each_other =
 		slices().matching("com.swyp.backend.(*).service..")
 			.should().notDependOnEachOther()
@@ -49,7 +46,6 @@ class ArchitectureTest {
 		.because("a function that calls a service reopens the cycle it exists to prevent");
 
 	@ArchTest
-	@ArchIgnore(reason = "product, notification and hold have no function yet -- enabled by the pull request that converts them")
 	static final ArchRule repository_is_reached_only_through_function = noClasses()
 		.that().resideInAnyPackage("..controller..", "..service..")
 		.should().dependOnClassesThat().resideInAPackage("..repository..")
