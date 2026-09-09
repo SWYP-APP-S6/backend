@@ -1,6 +1,7 @@
 package com.swyp.backend.store.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -11,6 +12,8 @@ import com.swyp.backend.TestcontainersConfiguration;
 import com.swyp.backend.common.exception.BusinessException;
 import com.swyp.backend.common.security.JwtTokenProvider;
 import com.swyp.backend.common.security.TokenRealm;
+import com.swyp.backend.store.entity.Store;
+import com.swyp.backend.store.entity.StoreCategory;
 import com.swyp.backend.store.exception.StoreErrorCode;
 import com.swyp.backend.store.repository.StoreRepository;
 import com.swyp.backend.store.service.GeocodingClient;
@@ -18,10 +21,14 @@ import com.swyp.backend.user.entity.User;
 import com.swyp.backend.user.entity.UserRole;
 import com.swyp.backend.user.repository.UserRepository;
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
 import java.time.Instant;
+import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
@@ -93,6 +100,64 @@ class OwnerStoreControllerTest {
 			"address":"%s","addressDetail":"1층","phone":"02-1234-5678",\
 			"businessOpenTime":"09:00:00","businessCloseTime":"21:00:00",\
 			"businessDays":%s}""".formatted(categories, postalCode, ADDRESS, businessDays);
+	}
+
+	private Store newStore(User owner) {
+		return new Store(
+			owner, "청과왕", "06236", ADDRESS, "1층", "02-1234-5678",
+			new BigDecimal("37.500600"), new BigDecimal("127.036500"),
+			LocalTime.of(9, 0), LocalTime.of(21, 0));
+	}
+
+	@Test
+	void registerStore_treatsABlankPostalCodeAsAbsent() throws Exception {
+		User owner = createUser(UserRole.OWNER);
+		geocodingClient.register(ADDRESS,
+			new GeocodingClient.Coordinates(new BigDecimal("37.500600"), new BigDecimal("127.036500")));
+
+		mockMvc.perform(post("/owner/stores")
+				.header("Authorization", "Bearer " + tokenFor(owner))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(registerBody("[\"VEGETABLE\"]", "\"\"", "[\"MONDAY\"]")))
+			.andExpect(status().isCreated());
+
+		assertThat(storeRepository.findByOwnerId(owner.getId()).orElseThrow().getPostalCode()).isNull();
+	}
+
+	@Test
+	void registerStore_rejectsEmptySelectionsInKorean() throws Exception {
+		User owner = createUser(UserRole.OWNER);
+
+		mockMvc.perform(post("/owner/stores")
+				.header("Authorization", "Bearer " + tokenFor(owner))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(registerBody("[]", "\"06236\"", "[]")))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.fieldErrors.categories").value("가게 종류를 1개 이상 선택해 주세요."))
+			.andExpect(jsonPath("$.fieldErrors.businessDays").value("영업 요일을 1개 이상 선택해 주세요."));
+	}
+
+	@Test
+	void everyCategoryAndBusinessDayValue_satisfiesTheSchemaCheck() {
+		for (StoreCategory category : StoreCategory.values()) {
+			Store store = newStore(createUser(UserRole.OWNER));
+			store.replaceCategories(Set.of(category));
+			store.replaceBusinessDays(EnumSet.allOf(DayOfWeek.class));
+			storeRepository.saveAndFlush(store);
+		}
+
+		assertThat(storeRepository.count()).isEqualTo(StoreCategory.values().length);
+	}
+
+	@Test
+	void replaceCategories_rejectsAnEmptyOrOversizedSelection() {
+		Store store = newStore(createUser(UserRole.OWNER));
+
+		assertThatThrownBy(() -> store.replaceCategories(Set.of()))
+			.isInstanceOf(IllegalArgumentException.class);
+		assertThatThrownBy(() -> store.replaceCategories(EnumSet.of(
+				StoreCategory.VEGETABLE, StoreCategory.FRUIT, StoreCategory.MEAT, StoreCategory.SEAFOOD)))
+			.isInstanceOf(IllegalArgumentException.class);
 	}
 
 	@Test
