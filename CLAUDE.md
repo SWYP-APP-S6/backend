@@ -176,6 +176,11 @@ SWYP 앱의 백엔드 REST API 서버. (프로덕트 한 줄 설명은 확정되
 - 마이그레이션 작성 상세(네이밍·불변성·expand→contract)는 `.claude/rules/database.md`(마이그레이션 파일
   작성 시 자동 로드). **시간 타입·소프트 삭제** 규약은 `.claude/rules/entity.md`.
 - 영속성 관심사는 `repository`와 service의 `@Transactional` 경계 안에 가둔다.
+- **앱 타임존은 `Asia/Seoul`로 고정한다.** `products.pickup_{start,end}_at`은 점주가 입력한 **벽시계**
+  시각이라 `LocalDateTime`+`timestamp`인데(규약은 `.claude/rules/entity.md`), `LocalDateTime.now()`가
+  다른 존이면 마감 판정과 마감임박순 정렬이 통째로 어긋난다 — 컨테이너 기본은 UTC라 KST보다 9시간
+  뒤처진다. 런타임은 `Dockerfile`의 `ENV TZ`, 테스트는 `build.gradle.kts`의 `user.timezone`이 고정한다.
+  절대시각(`Instant`+`timestamptz`)은 영향을 받지 않는다.
 
 ## Local development
 

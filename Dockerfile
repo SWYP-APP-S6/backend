@@ -16,6 +16,9 @@ RUN ./gradlew --no-daemon clean bootJar -x test
 # --- runtime stage: run the jar on a slim JRE ---
 FROM eclipse-temurin:25-jre AS runtime
 WORKDIR /app
+# products.pickup_{start,end}_at are wall-clock timestamps (no zone). The base image
+# defaults to UTC, which would put LocalDateTime.now() 9 hours behind every stored value.
+ENV TZ=Asia/Seoul
 COPY --from=build /workspace/build/libs/*.jar app.jar
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]
