@@ -1,11 +1,13 @@
 package com.swyp.backend.product.repository;
 
+import com.swyp.backend.product.dto.StoreProductSummary;
 import com.swyp.backend.product.entity.Product;
 import com.swyp.backend.product.entity.ProductCategory;
 import com.swyp.backend.product.entity.ProductStatus;
 import jakarta.persistence.LockModeType;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -15,6 +17,12 @@ import org.springframework.data.repository.query.Param;
 
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
+	String WHERE_SELLABLE_AS_OF_NOW = """
+			where p.status = com.swyp.backend.product.entity.ProductStatus.ON_SALE
+			and p.availableQty >= 1
+			and p.pickupEndAt > :now
+			""";
+
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	@Query("select p from Product p where p.id = :id")
 	Optional<Product> findByIdForUpdate(@Param("id") Long id);
@@ -22,13 +30,11 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 	@Query("""
 			select p from Product p
 			join fetch p.store s
-			where p.status = com.swyp.backend.product.entity.ProductStatus.ON_SALE
-				and p.availableQty >= 1
-				and p.pickupEndAt > :now
-				and s.status = com.swyp.backend.store.entity.StoreStatus.APPROVED
-				and s.latitude between :minLatitude and :maxLatitude
-				and s.longitude between :minLongitude and :maxLongitude
-				and (:category is null or p.category = :category)
+			""" + WHERE_SELLABLE_AS_OF_NOW + """
+			and s.status = com.swyp.backend.store.entity.StoreStatus.APPROVED
+			and s.latitude between :minLatitude and :maxLatitude
+			and s.longitude between :minLongitude and :maxLongitude
+			and (:category is null or p.category = :category)
 			order by p.pickupEndAt asc, p.id asc
 			""")
 	List<Product> findSellableWithinBounds(
@@ -43,6 +49,25 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 	Optional<Product> findWithStoreById(@Param("id") Long id);
 
 	List<Product> findByStoreIdOrderByCreatedAtDesc(Long storeId);
+
+	@Query("""
+			select new com.swyp.backend.product.dto.StoreProductSummary(p.store.id, count(p))
+			from Product p
+			""" + WHERE_SELLABLE_AS_OF_NOW + """
+			and p.store.id in :storeIds
+			group by p.store.id
+			""")
+	List<StoreProductSummary> summarizeSellableByStoreIds(
+			@Param("now") LocalDateTime now, @Param("storeIds") Collection<Long> storeIds);
+
+	@Query("""
+			select p from Product p
+			""" + WHERE_SELLABLE_AS_OF_NOW + """
+			and p.store.id = :storeId
+			order by p.pickupEndAt asc, p.id asc
+			""")
+	List<Product> findSellableByStoreId(
+			@Param("storeId") Long storeId, @Param("now") LocalDateTime now);
 
 	Optional<Product> findByIdAndStoreId(Long id, Long storeId);
 

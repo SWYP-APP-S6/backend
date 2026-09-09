@@ -138,6 +138,21 @@ class OwnerStoreControllerTest {
 	}
 
 	@Test
+	void registerStore_rejectsAnOmittedCategoryList() throws Exception {
+		User owner = createUser(UserRole.OWNER);
+
+		mockMvc.perform(post("/owner/stores")
+				.header("Authorization", "Bearer " + tokenFor(owner))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"name":"청과왕","postalCode":"06236","address":"%s","addressDetail":"1층",\
+					"phone":"02-1234-5678","businessOpenTime":"09:00:00","businessCloseTime":"21:00:00",\
+					"businessDays":["MONDAY"]}""".formatted(ADDRESS)))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.fieldErrors.categories").value("가게 종류를 1개 이상 선택해 주세요."));
+	}
+
+	@Test
 	void everyCategoryAndBusinessDayValue_satisfiesTheSchemaCheck() {
 		for (StoreCategory category : StoreCategory.values()) {
 			Store store = newStore(createUser(UserRole.OWNER));
