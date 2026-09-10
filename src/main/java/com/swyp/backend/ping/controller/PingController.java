@@ -4,9 +4,11 @@ import com.swyp.backend.common.response.ApiResponse;
 import com.swyp.backend.common.response.SuccessCode;
 import com.swyp.backend.ping.dto.PingResponse;
 import com.swyp.backend.ping.service.PingService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+@Tag(name = "헬스체크")
 @RestController
 public class PingController {
 

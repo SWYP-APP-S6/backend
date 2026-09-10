@@ -4,6 +4,7 @@ import com.swyp.backend.product.entity.Product;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 
 public record ProductDetailResponse(
 		Long id,
@@ -21,8 +22,8 @@ public record ProductDetailResponse(
 		String photoUrl,
 		Set<Integer> ingredientTags,
 		String status,
-		Instant reconfirmSentAt,
-		Instant reconfirmAnsweredAt,
+		@Nullable Instant reconfirmSentAt,
+		@Nullable Instant reconfirmAnsweredAt,
 		Instant createdAt) {
 
 	public static ProductDetailResponse from(Product product, long completedQty) {

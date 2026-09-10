@@ -3,20 +3,21 @@ package com.swyp.backend.store.dto;
 import com.swyp.backend.store.entity.Store;
 import java.time.Instant;
 import java.time.LocalTime;
+import org.jspecify.annotations.Nullable;
 
 public record StoreSummaryResponse(
 		Long id,
 		String name,
 		String status,
 		String address,
-		String addressDetail,
+		@Nullable String addressDetail,
 		String phone,
 		LocalTime businessOpenTime,
 		LocalTime businessCloseTime,
 		Owner owner,
 		Instant createdAt) {
 
-	public record Owner(Long id, String nickname, String phone) {
+	public record Owner(Long id, String nickname, @Nullable String phone) {
 	}
 
 	public static StoreSummaryResponse from(Store store) {

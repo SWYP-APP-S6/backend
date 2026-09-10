@@ -2,22 +2,23 @@ package com.swyp.backend.recipe.dto;
 
 import com.swyp.backend.recipe.entity.Recipe;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 public record RecipeDetailResponse(
 		Long id,
 		String title,
-		String category,
-		String cookMethod,
-		Short cookTimeMinutes,
+		@Nullable String category,
+		@Nullable String cookMethod,
+		@Nullable Short cookTimeMinutes,
 		short servings,
-		String imageUrl,
-		String imageThumbUrl,
-		String sourceUrl,
+		@Nullable String imageUrl,
+		@Nullable String imageThumbUrl,
+		@Nullable String sourceUrl,
 		int viewCount,
 		int likeCount,
 		List<RecipeStepResponse> steps,
 		List<RecipeIngredientResponse> ingredients,
-		RecipeNutritionResponse nutrition,
+		@Nullable RecipeNutritionResponse nutrition,
 		List<String> tags) {
 
 	public static RecipeDetailResponse of(

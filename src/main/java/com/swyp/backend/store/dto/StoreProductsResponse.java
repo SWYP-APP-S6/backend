@@ -4,6 +4,7 @@ import com.swyp.backend.common.Distance;
 import com.swyp.backend.product.dto.SellableProductResponse;
 import com.swyp.backend.store.entity.Store;
 import java.math.BigDecimal;
+import org.jspecify.annotations.Nullable;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Comparator;
@@ -14,10 +15,10 @@ public record StoreProductsResponse(
 		String name,
 		BigDecimal latitude,
 		BigDecimal longitude,
-		Integer distanceMeters,
-		Integer walkingMinutes,
+		@Nullable Integer distanceMeters,
+		@Nullable Integer walkingMinutes,
 		LocalTime businessCloseTime,
-		LocalDateTime earliestPickupEndAt,
+		@Nullable LocalDateTime earliestPickupEndAt,
 		int productCount,
 		List<SellableProductResponse> products) {
 
