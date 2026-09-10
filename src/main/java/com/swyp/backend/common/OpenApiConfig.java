@@ -5,6 +5,7 @@ import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
+import com.swyp.backend.common.openapi.OpenApiErrorResponses;
 import org.springdoc.core.models.GroupedOpenApi;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -27,18 +28,20 @@ public class OpenApiConfig {
 	}
 
 	@Bean
-	GroupedOpenApi appApi() {
+	GroupedOpenApi appApi(OpenApiErrorResponses errorResponses) {
 		return GroupedOpenApi.builder()
 			.group("app")
 			.pathsToExclude(ADMIN_PATHS)
+			.addOpenApiCustomizer(errorResponses)
 			.build();
 	}
 
 	@Bean
-	GroupedOpenApi adminApi() {
+	GroupedOpenApi adminApi(OpenApiErrorResponses errorResponses) {
 		return GroupedOpenApi.builder()
 			.group("admin")
 			.pathsToMatch(ADMIN_PATHS)
+			.addOpenApiCustomizer(errorResponses)
 			.build();
 	}
 }
