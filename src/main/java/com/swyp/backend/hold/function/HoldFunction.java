@@ -5,6 +5,8 @@ import com.swyp.backend.hold.entity.Hold;
 import com.swyp.backend.hold.entity.HoldStatus;
 import com.swyp.backend.hold.repository.HoldRepository;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -14,23 +16,24 @@ public class HoldFunction {
 
 	private final HoldRepository holdRepository;
 
-	public List<ActiveHoldQty> findActiveQtyByStoreId(Long storeId) {
-		return holdRepository.findActiveHoldQtyByStoreId(storeId);
+	public Map<Long, Long> activeQtyByProductOfStore(Long storeId) {
+		return holdRepository.findActiveHoldQtyByStoreId(storeId).stream()
+				.collect(Collectors.toMap(ActiveHoldQty::productId, ActiveHoldQty::qty));
 	}
 
-	public List<Hold> findByProductIdAndStatus(Long productId, HoldStatus status) {
-		return holdRepository.findByProductIdAndStatus(productId, status);
+	public List<Hold> findActiveHoldsOfProduct(Long productId) {
+		return holdRepository.findByProductIdAndStatus(productId, HoldStatus.HOLDING);
 	}
 
-	public long sumQtyByStoreIdAndStatus(Long storeId, HoldStatus status) {
-		return holdRepository.sumQtyByStoreIdAndStatus(storeId, status);
+	public long activeHoldCountOfStore(Long storeId) {
+		return holdRepository.countByStoreIdAndStatus(storeId, HoldStatus.HOLDING);
 	}
 
-	public long sumQtyByProductIdAndStatus(Long productId, HoldStatus status) {
-		return holdRepository.sumQtyByProductIdAndStatus(productId, status);
+	public long completedQtyOfStore(Long storeId) {
+		return holdRepository.sumQtyByStoreIdAndStatus(storeId, HoldStatus.COMPLETED);
 	}
 
-	public long countByStoreIdAndStatus(Long storeId, HoldStatus status) {
-		return holdRepository.countByStoreIdAndStatus(storeId, status);
+	public long completedQtyOfProduct(Long productId) {
+		return holdRepository.sumQtyByProductIdAndStatus(productId, HoldStatus.COMPLETED);
 	}
 }

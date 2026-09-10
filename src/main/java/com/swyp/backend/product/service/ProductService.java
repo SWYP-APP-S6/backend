@@ -1,9 +1,7 @@
 package com.swyp.backend.product.service;
 
 import com.swyp.backend.common.exception.BusinessException;
-import com.swyp.backend.hold.dto.ActiveHoldQty;
 import com.swyp.backend.hold.entity.Hold;
-import com.swyp.backend.hold.entity.HoldStatus;
 import com.swyp.backend.hold.function.HoldFunction;
 import com.swyp.backend.notification.entity.NotificationType;
 import com.swyp.backend.notification.function.NotificationFunction;
@@ -26,7 +24,6 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -84,8 +81,7 @@ public class ProductService {
 	public OwnerHomeResponse getHome(Long ownerId) {
 		Store store = storeFunction.getByOwnerId(ownerId);
 		List<Product> products = productFunction.findByStoreIdNewestFirst(store.getId());
-		Map<Long, Long> activeHoldQtyByProduct = holdFunction.findActiveQtyByStoreId(store.getId()).stream()
-				.collect(Collectors.toMap(ActiveHoldQty::productId, ActiveHoldQty::qty));
+		Map<Long, Long> activeHoldQtyByProduct = holdFunction.activeQtyByProductOfStore(store.getId());
 
 		List<ProductSummaryResponse> productResponses = products.stream()
 				.map(product -> ProductSummaryResponse.from(product, activeHoldQtyByProduct.getOrDefault(product.getId(), 0L)))
@@ -95,8 +91,8 @@ public class ProductService {
 		int reconfirmPendingCount = (int) products.stream()
 				.filter(product -> product.getReconfirmSentAt() != null && product.getReconfirmAnsweredAt() == null)
 				.count();
-		long completedQty = holdFunction.sumQtyByStoreIdAndStatus(store.getId(), HoldStatus.COMPLETED);
-		long activeHoldCount = holdFunction.countByStoreIdAndStatus(store.getId(), HoldStatus.HOLDING);
+		long completedQty = holdFunction.completedQtyOfStore(store.getId());
+		long activeHoldCount = holdFunction.activeHoldCountOfStore(store.getId());
 
 		return new OwnerHomeResponse(
 				new OwnerHomeResponse.Summary(products.size(), heldQty, completedQty),
@@ -128,7 +124,7 @@ public class ProductService {
 	}
 
 	private void applyZeroQtyDisposition(Product product, HoldDisposition disposition) {
-		List<Hold> activeHolds = holdFunction.findByProductIdAndStatus(product.getId(), HoldStatus.HOLDING);
+		List<Hold> activeHolds = holdFunction.findActiveHoldsOfProduct(product.getId());
 		if (activeHolds.isEmpty()) {
 			return;
 		}
@@ -150,7 +146,7 @@ public class ProductService {
 	}
 
 	private long completedQtyOf(Long productId) {
-		return holdFunction.sumQtyByProductIdAndStatus(productId, HoldStatus.COMPLETED);
+		return holdFunction.completedQtyOfProduct(productId);
 	}
 
 

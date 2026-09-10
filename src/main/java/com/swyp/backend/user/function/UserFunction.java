@@ -4,7 +4,9 @@ import com.swyp.backend.common.exception.BusinessException;
 import com.swyp.backend.user.entity.User;
 import com.swyp.backend.user.entity.UserRole;
 import com.swyp.backend.user.exception.UserAuthErrorCode;
+import com.swyp.backend.user.exception.UserAuthErrorCode;
 import com.swyp.backend.user.repository.UserRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -33,6 +35,10 @@ public class UserFunction {
 	}
 
 	public User save(User user) {
-		return userRepository.saveAndFlush(user);
+		try {
+			return userRepository.saveAndFlush(user);
+		} catch (DataIntegrityViolationException e) {
+			throw new BusinessException(UserAuthErrorCode.ALREADY_REGISTERED);
+		}
 	}
 }

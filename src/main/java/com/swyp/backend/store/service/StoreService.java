@@ -14,9 +14,7 @@ import com.swyp.backend.user.entity.UserRole;
 import com.swyp.backend.user.function.UserFunction;
 import java.math.BigDecimal;
 import java.util.List;
-import org.hibernate.exception.ConstraintViolationException;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -27,8 +25,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class StoreService {
-
-	private static final String OWNER_UNIQUE_CONSTRAINT = "uq_stores_owner";
 
 	private final StoreFunction storeFunction;
 	private final UserFunction userFunction;
@@ -59,20 +55,8 @@ public class StoreService {
 		store.replaceCategories(request.categories());
 		store.replaceBusinessDays(request.businessDays());
 		store.submitApplication(request.businessRegistrationNumber(), request.applicationNote());
-		try {
-			storeFunction.save(store);
-		} catch (DataIntegrityViolationException e) {
-			if (isOwnerConflict(e)) {
-				throw new BusinessException(StoreErrorCode.STORE_ALREADY_REGISTERED);
-			}
-			throw e;
-		}
+		storeFunction.save(store);
 		return StoreDetailResponse.from(store);
-	}
-
-	private static boolean isOwnerConflict(DataIntegrityViolationException e) {
-		return e.getCause() instanceof ConstraintViolationException violation
-				&& OWNER_UNIQUE_CONSTRAINT.equalsIgnoreCase(violation.getConstraintName());
 	}
 
 	public StoreDetailResponse getMyStore(Long ownerId) {
