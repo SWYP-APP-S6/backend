@@ -1,13 +1,14 @@
 package com.swyp.backend.recipe.dto;
 
 import com.swyp.backend.recipe.entity.Recipe;
+import org.jspecify.annotations.Nullable;
 
 public record RecipeSummaryResponse(
 		Long id,
 		String title,
-		String category,
-		Short cookTimeMinutes,
-		String imageThumbUrl,
+		@Nullable String category,
+		@Nullable Short cookTimeMinutes,
+		@Nullable String imageThumbUrl,
 		int viewCount,
 		int likeCount) {
 

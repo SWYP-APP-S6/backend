@@ -2,6 +2,7 @@ package com.swyp.backend.store.dto;
 
 import com.swyp.backend.store.entity.Store;
 import com.swyp.backend.store.entity.StoreCategory;
+import org.jspecify.annotations.Nullable;
 import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalTime;
@@ -13,15 +14,15 @@ public record StoreDetailResponse(
 		String name,
 		String status,
 		List<StoreCategory> categories,
-		String postalCode,
+		@Nullable String postalCode,
 		String address,
-		String addressDetail,
+		@Nullable String addressDetail,
 		String phone,
 		LocalTime businessOpenTime,
 		LocalTime businessCloseTime,
 		List<DayOfWeek> businessDays,
-		String businessRegistrationNumber,
-		String applicationNote,
+		@Nullable String businessRegistrationNumber,
+		@Nullable String applicationNote,
 		StoreSummaryResponse.Owner owner,
 		Instant createdAt) {
 
