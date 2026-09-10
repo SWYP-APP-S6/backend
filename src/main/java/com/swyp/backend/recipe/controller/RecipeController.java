@@ -7,6 +7,7 @@ import com.swyp.backend.recipe.dto.RecipeDetailResponse;
 import com.swyp.backend.recipe.dto.RecipeSummaryResponse;
 import com.swyp.backend.recipe.service.RecipeService;
 import java.util.List;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+@Tag(name = "레시피")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/recipes")

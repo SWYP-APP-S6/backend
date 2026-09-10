@@ -15,6 +15,7 @@ import com.swyp.backend.user.entity.UserRole;
 import com.swyp.backend.user.service.GuestTokenService;
 import com.swyp.backend.user.service.UserAuthService;
 import jakarta.validation.Valid;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+@Tag(name = "앱 인증")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/auth")
