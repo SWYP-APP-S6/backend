@@ -142,7 +142,11 @@ public class Product extends BaseTimeEntity {
 		if (qty <= 0) {
 			throw new IllegalArgumentException("release qty must be positive");
 		}
+		if (qty > heldQty) {
+			throw new IllegalStateException("release qty exceeds held qty");
+		}
 		this.availableQty += qty;
+		this.heldQty -= qty;
 		syncStatusWithAvailableQty();
 	}
 
