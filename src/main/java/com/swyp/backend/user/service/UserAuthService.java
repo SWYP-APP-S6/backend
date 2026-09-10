@@ -14,7 +14,6 @@ import com.swyp.backend.user.exception.UserAuthErrorCode;
 import com.swyp.backend.user.function.UserFunction;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,11 +54,7 @@ public class UserAuthService {
 		}
 		User user = new User(ticket.role(), ticket.nickname(), null, request.marketingOptIn(), Instant.now());
 		user.linkOauthAccount(ticket.provider(), ticket.providerId());
-		try {
-			userFunction.save(user);
-		} catch (DataIntegrityViolationException e) {
-			throw new BusinessException(UserAuthErrorCode.ALREADY_REGISTERED);
-		}
+		userFunction.save(user);
 		return issueTokensFor(user);
 	}
 

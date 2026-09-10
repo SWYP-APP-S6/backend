@@ -3,13 +3,11 @@ package com.swyp.backend.user.service;
 import com.swyp.backend.common.response.PageResponse;
 import com.swyp.backend.user.dto.UserSummaryResponse;
 import com.swyp.backend.user.entity.User;
-import com.swyp.backend.user.entity.UserLocation;
 import com.swyp.backend.user.entity.UserRole;
 import com.swyp.backend.user.function.UserFunction;
 import com.swyp.backend.user.function.UserLocationFunction;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -27,7 +25,7 @@ public class UserService {
 	public PageResponse<UserSummaryResponse> getUsers(UserRole role, Pageable pageable) {
 		Page<User> users = userFunction.findAllByRole(role, pageable);
 
-		Map<Long, String> regions = regionNamesFor(users.getContent());
+		Map<Long, String> regions = userLocationFunction.regionNamesByUserId(users.getContent().stream().map(User::getId).toList());
 		List<UserSummaryResponse> content = users.getContent().stream()
 				.map(user -> UserSummaryResponse.of(user, regions.get(user.getId())))
 				.toList();
@@ -35,12 +33,4 @@ public class UserService {
 		return PageResponse.of(content, users);
 	}
 
-	private Map<Long, String> regionNamesFor(List<User> users) {
-		if (users.isEmpty()) {
-			return Map.of();
-		}
-		List<Long> userIds = users.stream().map(User::getId).toList();
-		return userLocationFunction.findByUserIdIn(userIds).stream()
-				.collect(Collectors.toMap(UserLocation::getUserId, UserLocation::getRegionName));
-	}
 }

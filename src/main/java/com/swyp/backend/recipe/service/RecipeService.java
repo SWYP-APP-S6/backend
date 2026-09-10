@@ -9,7 +9,6 @@ import com.swyp.backend.recipe.dto.RecipeSummaryResponse;
 import com.swyp.backend.recipe.entity.Recipe;
 import com.swyp.backend.recipe.entity.RecipeTag;
 import com.swyp.backend.recipe.function.RecipeFunction;
-import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -24,14 +23,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class RecipeService {
 
 	private final RecipeFunction recipeFunction;
-
-	public boolean allIngredientsExist(Collection<Integer> ingredientIds) {
-		Set<Integer> distinctIds = Set.copyOf(ingredientIds);
-		if (distinctIds.isEmpty()) {
-			return true;
-		}
-		return recipeFunction.countIngredientsByIds(distinctIds) == distinctIds.size();
-	}
 
 	public RecipeDetailResponse getRecipe(Long id) {
 		Recipe recipe = recipeFunction.getPublishedById(id);

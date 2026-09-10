@@ -4,8 +4,7 @@ import com.swyp.backend.common.BrowseProperties;
 import com.swyp.backend.common.Distance;
 import com.swyp.backend.common.exception.BusinessException;
 import com.swyp.backend.product.dto.SellableProductResponse;
-import com.swyp.backend.product.dto.StoreProductSummary;
-import com.swyp.backend.product.service.ProductBrowseService;
+import com.swyp.backend.product.function.ProductFunction;
 import com.swyp.backend.store.dto.NearbyStoreMarkerResponse;
 import com.swyp.backend.store.dto.NearbyStoresRequest;
 import com.swyp.backend.store.dto.NearbyStoresResponse;
@@ -14,7 +13,7 @@ import com.swyp.backend.store.dto.StoreProductsResponse;
 import com.swyp.backend.store.entity.Store;
 import com.swyp.backend.store.entity.StoreStatus;
 import com.swyp.backend.store.exception.StoreErrorCode;
-import com.swyp.backend.store.repository.StoreRepository;
+import com.swyp.backend.store.function.StoreFunction;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -28,8 +27,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class StoreBrowseService {
 
-	private final StoreRepository storeRepository;
-	private final ProductBrowseService productBrowseService;
+	private final StoreFunction storeFunction;
+	private final ProductFunction productFunction;
 	private final BrowseProperties browseProperties;
 
 	public NearbyStoresResponse findNearbyStores(NearbyStoresRequest request) {
@@ -37,10 +36,9 @@ public class StoreBrowseService {
 		double centerLongitude = request.centerLng().doubleValue();
 		requireViewportWithinSpan(request, centerLatitude);
 
-		List<Store> stores = storeRepository.findByStatusAndLatitudeBetweenAndLongitudeBetween(
-				StoreStatus.APPROVED,
+		List<Store> stores = storeFunction.findApprovedWithinBounds(
 				request.minLat(), request.maxLat(), request.minLng(), request.maxLng());
-		Map<Long, StoreProductSummary> summaries = productBrowseService.summarizeSellableByStore(
+		Map<Long, Long> sellableCounts = productFunction.countSellableByStore(
 				stores.stream().map(Store::getId).toList());
 
 		Map<Long, Double> distances = new HashMap<>();
@@ -51,11 +49,11 @@ public class StoreBrowseService {
 		}
 
 		List<NearbyStoreMarkerResponse> markers = stores.stream()
-				.filter(store -> summaries.containsKey(store.getId()))
+				.filter(store -> sellableCounts.containsKey(store.getId()))
 				.sorted(Comparator.comparingDouble((Store store) -> distances.get(store.getId()))
 					.thenComparing(Store::getId))
 				.map(store -> NearbyStoreMarkerResponse.from(
-						store, summaries.get(store.getId()).productCount().intValue()))
+						store, sellableCounts.get(store.getId()).intValue()))
 				.toList();
 
 		int limit = browseProperties.mapMarkerLimit();
@@ -65,7 +63,9 @@ public class StoreBrowseService {
 
 	public StoreProductsResponse getStoreProducts(Long storeId, StoreProductsRequest request) {
 		Store store = validateAndGetApprovedStore(storeId);
-		List<SellableProductResponse> products = productBrowseService.findSellableByStore(storeId);
+		List<SellableProductResponse> products = productFunction.findSellableByStore(storeId).stream()
+				.map(SellableProductResponse::from)
+				.toList();
 
 		Integer distanceMeters = null;
 		if (request.hasPosition()) {
@@ -89,8 +89,7 @@ public class StoreBrowseService {
 	}
 
 	private Store validateAndGetApprovedStore(Long storeId) {
-		Store store = storeRepository.findById(storeId)
-				.orElseThrow(() -> new BusinessException(StoreErrorCode.STORE_NOT_FOUND));
+		Store store = storeFunction.getById(storeId);
 		if (store.getStatus() != StoreStatus.APPROVED) {
 			throw new BusinessException(StoreErrorCode.STORE_NOT_FOUND);
 		}
