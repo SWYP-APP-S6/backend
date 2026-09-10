@@ -24,6 +24,10 @@
   끝내고(`get{Entity}ById` → 없으면 `BusinessException`), service는 트랜잭션·유스케이스 조합·DTO
   매핑만 맡는다. 파사드를 위에 얹는 대신 공용 계층을 **아래**에 둔 것 — 파사드는 service끼리의
   호출을 막지 못하지만, function은 애초에 부를 것이 repository밖에 없다.
+- **service는 "무엇을 하는가"만 읽히게 둔다.** 조회의 준비물(bounding box, 기준 시각)과 DB가 대신
+  못 해주는 조회 연산(반경 필터 등)은 function이 가져가고, service에는 유스케이스 조합·정렬·응답
+  조립만 남는다. function은 **의도 단위 파라미터**를 받고 **엔티티 또는 읽기 모델**을 돌려준다 —
+  응답 DTO를 만들면 그 function을 쓰는 모든 feature가 남의 API 계약에 묶인다.
 - **레이어 경계** — `ArchitectureTest`(ArchUnit)가 빌드에서 강제한다:
   - `controller → service → function → repository` 단방향. 한 칸씩만 내려간다.
   - **`repository`만 JPA 영속성 API**(`JpaRepository`/`EntityManager`)에 접근하고, repository를 부르는
