@@ -7,7 +7,9 @@ import com.swyp.backend.hold.entity.Hold;
 import com.swyp.backend.hold.entity.HoldStatus;
 import com.swyp.backend.hold.exception.HoldErrorCode;
 import com.swyp.backend.hold.repository.HoldRepository;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.Map;
@@ -20,6 +22,7 @@ import org.springframework.stereotype.Component;
 public class HoldFunction {
 
 	private final HoldRepository holdRepository;
+	private final Clock clock;
 
 	public Hold getByIdForUpdate(Long holdId) {
 		return holdRepository.findByIdForUpdate(holdId)
@@ -57,15 +60,23 @@ public class HoldFunction {
 		return holdRepository.findByProductIdAndStatus(productId, HoldStatus.HOLDING);
 	}
 
-	public long activeHoldCountOfStore(Long storeId) {
-		return holdRepository.countByStoreIdAndStatus(storeId, HoldStatus.HOLDING);
+	public List<Hold> findHoldingOfStore(Long storeId) {
+		return holdRepository.findStoreHoldsByStatus(storeId, HoldStatus.HOLDING);
 	}
 
-	public long completedQtyOfStore(Long storeId) {
-		return holdRepository.sumQtyByStoreIdAndStatus(storeId, HoldStatus.COMPLETED);
+	public long countCompletedTodayOfStore(Long storeId) {
+		return holdRepository.countCompletedSince(storeId, startOfToday());
+	}
+
+	public long countExpiredTodayOfStore(Long storeId) {
+		return holdRepository.countExpiredSince(storeId, startOfToday());
 	}
 
 	public long completedQtyOfProduct(Long productId) {
 		return holdRepository.sumQtyByProductIdAndStatus(productId, HoldStatus.COMPLETED);
+	}
+
+	private Instant startOfToday() {
+		return LocalDate.now(clock).atStartOfDay(clock.getZone()).toInstant();
 	}
 }

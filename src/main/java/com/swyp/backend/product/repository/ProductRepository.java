@@ -48,7 +48,17 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 	@Query("select p from Product p join fetch p.store where p.id = :id")
 	Optional<Product> findWithStoreById(@Param("id") Long id);
 
-	List<Product> findByStoreIdOrderByCreatedAtDesc(Long storeId);
+	@Query("""
+			select p from Product p
+			where p.store.id = :storeId
+				and p.status <> com.swyp.backend.product.entity.ProductStatus.CLOSED
+				and p.pickupEndAt > :now
+			order by p.createdAt desc, p.id desc
+			""")
+	List<Product> findSellingByStoreId(
+			@Param("storeId") Long storeId, @Param("now") LocalDateTime now);
+
+	boolean existsByStoreId(Long storeId);
 
 	@Query("""
 			select new com.swyp.backend.product.dto.StoreProductSummary(p.store.id, count(p))

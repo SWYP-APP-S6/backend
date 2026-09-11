@@ -51,8 +51,12 @@ public class ProductFunction {
 		return productRepository.save(product);
 	}
 
-	public List<Product> findByStoreIdNewestFirst(Long storeId) {
-		return productRepository.findByStoreIdOrderByCreatedAtDesc(storeId);
+	public List<Product> findSellingNowOfStore(Long storeId) {
+		return productRepository.findSellingByStoreId(storeId, LocalDateTime.now(clock));
+	}
+
+	public boolean hasAnyProduct(Long storeId) {
+		return productRepository.existsByStoreId(storeId);
 	}
 
 	public List<Product> findSellableByStore(Long storeId) {

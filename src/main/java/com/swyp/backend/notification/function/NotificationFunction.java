@@ -13,6 +13,10 @@ public class NotificationFunction {
 
 	private final NotificationRepository notificationRepository;
 
+	public long countUnread(Long userId) {
+		return notificationRepository.countByUserIdAndReadAtIsNull(userId);
+	}
+
 	public Notification notify(
 			User user, NotificationType type, String title, String body, String deepLink) {
 		return notificationRepository.save(new Notification(user, type, title, body, deepLink));

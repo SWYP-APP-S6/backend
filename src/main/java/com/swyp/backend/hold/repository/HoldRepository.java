@@ -46,11 +46,21 @@ public interface HoldRepository extends JpaRepository<Hold, Long> {
 	@Query("select coalesce(sum(h.qty), 0) from Hold h where h.product.id = :productId and h.status = :status")
 	long sumQtyByProductIdAndStatus(@Param("productId") Long productId, @Param("status") HoldStatus status);
 
-	@Query("select count(h) from Hold h where h.product.store.id = :storeId and h.status = :status")
-	long countByStoreIdAndStatus(@Param("storeId") Long storeId, @Param("status") HoldStatus status);
+	@Query("""
+			select count(h) from Hold h
+			where h.product.store.id = :storeId
+				and h.status = com.swyp.backend.hold.entity.HoldStatus.COMPLETED
+				and h.completedAt >= :since
+			""")
+	long countCompletedSince(@Param("storeId") Long storeId, @Param("since") Instant since);
 
-	@Query("select coalesce(sum(h.qty), 0) from Hold h where h.product.store.id = :storeId and h.status = :status")
-	long sumQtyByStoreIdAndStatus(@Param("storeId") Long storeId, @Param("status") HoldStatus status);
+	@Query("""
+			select count(h) from Hold h
+			where h.product.store.id = :storeId
+				and h.status = com.swyp.backend.hold.entity.HoldStatus.EXPIRED
+				and h.expiresAt >= :since
+			""")
+	long countExpiredSince(@Param("storeId") Long storeId, @Param("since") Instant since);
 
 	@Query("""
 			select h from Hold h
