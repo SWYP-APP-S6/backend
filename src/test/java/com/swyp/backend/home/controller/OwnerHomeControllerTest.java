@@ -29,6 +29,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -69,11 +70,7 @@ class OwnerHomeControllerTest {
 
 	@BeforeEach
 	void setUp() {
-		holdRepository.deleteAll();
-		notificationRepository.deleteAll();
-		productRepository.deleteAll();
-		storeRepository.deleteAll();
-		userRepository.deleteAll();
+		deleteAllRows();
 
 		owner = userRepository.saveAndFlush(new User(UserRole.OWNER, "테스트점주", null, false, Instant.now()));
 		Store newStore = new Store(
@@ -127,21 +124,37 @@ class OwnerHomeControllerTest {
 	}
 
 	@Test
-	void getOwnerHome_reportsOversoldQtyAndTodaysExpiredHoldsAsIssues() throws Exception {
+	void getOwnerHome_countsOnlyTodaysExpiredHoldsAsAnIssue() throws Exception {
 		Product carrot = createProduct("당근", 10);
 		User consumer = createConsumer();
-		holdRepository.saveAndFlush(new Hold(consumer, carrot, 3, Instant.now().plus(Duration.ofMinutes(15))));
-		carrot.adjustAvailableQty(1);
+		carrot.hold(3);
 		productRepository.saveAndFlush(carrot);
+		holdRepository.saveAndFlush(new Hold(consumer, carrot, 3, Instant.now().plus(Duration.ofMinutes(15))));
 		expiredHold(createConsumer(), carrot, 1, Instant.now());
 		expiredHold(createConsumer(), carrot, 1, Instant.now().minus(2, ChronoUnit.DAYS));
 
 		mockMvc.perform(get("/owner/home").header("Authorization", "Bearer " + token))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.issues.oversoldQty").value(2))
 			.andExpect(jsonPath("$.data.issues.expiredTodayCount").value(1))
 			.andExpect(jsonPath("$.data.products[0].activeHoldQty").value(3))
-			.andExpect(jsonPath("$.data.products[0].oversoldQty").value(2));
+			.andExpect(jsonPath("$.data.products[0].availableQty").value(7));
+	}
+
+	@Test
+	void getOwnerHome_reportsNoIssueWhenEveryRemainingUnitIsReserved() throws Exception {
+		Product carrot = createProduct("당근", 2);
+		User consumer = createConsumer();
+		carrot.hold(2);
+		productRepository.saveAndFlush(carrot);
+		holdRepository.saveAndFlush(new Hold(consumer, carrot, 2, Instant.now().plus(Duration.ofMinutes(15))));
+
+		mockMvc.perform(get("/owner/home").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.products[0].status").value("SOLD_OUT"))
+			.andExpect(jsonPath("$.data.products[0].availableQty").value(0))
+			.andExpect(jsonPath("$.data.products[0].activeHoldQty").value(2))
+			.andExpect(jsonPath("$.data.issues.expiredTodayCount").value(0))
+			.andExpect(jsonPath("$.data.summary.upcomingVisitCount").value(1));
 	}
 
 	@Test
@@ -240,6 +253,19 @@ class OwnerHomeControllerTest {
 		mockMvc.perform(get("/owner/home").header("Authorization", "Bearer " + otherToken))
 			.andExpect(status().isNotFound())
 			.andExpect(jsonPath("$.code").value("STORE_NOT_REGISTERED"));
+	}
+
+	@AfterEach
+	void tearDown() {
+		deleteAllRows();
+	}
+
+	private void deleteAllRows() {
+		holdRepository.deleteAll();
+		notificationRepository.deleteAll();
+		productRepository.deleteAll();
+		storeRepository.deleteAll();
+		userRepository.deleteAll();
 	}
 
 	private Product createProduct(String name, int initialQty) {
