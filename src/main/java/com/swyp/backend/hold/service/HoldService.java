@@ -53,7 +53,7 @@ public class HoldService {
 
 	@Transactional
 	public HoldDetailResponse cancel(Long userId, Long holdId) {
-		Long productId = holdFunction.getProductIdOfUserHold(holdId, userId);
+		Long productId = holdFunction.getProductIdOfUserHold(userId, holdId);
 		Product product = productFunction.getByIdForUpdate(productId);
 		Hold hold = holdFunction.getByIdForUpdate(holdId);
 		Instant now = Instant.now(clock);
@@ -66,8 +66,11 @@ public class HoldService {
 	}
 
 	private static void requireCancelable(Hold hold, Instant now) {
-		if (hold.getStatus() != HoldStatus.HOLDING || !hold.getExpiresAt().isAfter(now)) {
+		if (hold.getStatus() != HoldStatus.HOLDING) {
 			throw new BusinessException(HoldErrorCode.HOLD_ALREADY_RESOLVED);
+		}
+		if (!hold.getExpiresAt().isAfter(now)) {
+			throw new BusinessException(HoldErrorCode.HOLD_ALREADY_EXPIRED);
 		}
 	}
 

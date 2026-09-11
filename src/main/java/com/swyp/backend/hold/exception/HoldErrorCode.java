@@ -14,7 +14,8 @@ public enum HoldErrorCode implements ApiCode {
 	PRODUCT_NOT_SELLABLE(HttpStatus.CONFLICT, "지금은 찜할 수 없는 상품입니다."),
 	HOLD_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "한 번에 찜할 수 있는 수량을 넘었습니다."),
 	ALREADY_HOLDING(HttpStatus.CONFLICT, "이미 찜한 상품입니다."),
-	HOLD_ALREADY_RESOLVED(HttpStatus.CONFLICT, "이미 처리된 찜입니다.");
+	HOLD_ALREADY_RESOLVED(HttpStatus.CONFLICT, "이미 처리된 찜입니다."),
+	HOLD_ALREADY_EXPIRED(HttpStatus.CONFLICT, "찜 시간이 지나 취소할 수 없습니다.");
 
 	private final HttpStatus status;
 	private final String message;

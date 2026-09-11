@@ -390,7 +390,7 @@ class HoldControllerTest {
 		mockMvc.perform(post("/holds/{holdId}/cancel", overdue.getId())
 				.header("Authorization", bearer(consumer)))
 			.andExpect(status().isConflict())
-			.andExpect(jsonPath("$.code").value("HOLD_ALREADY_RESOLVED"));
+			.andExpect(jsonPath("$.code").value("HOLD_ALREADY_EXPIRED"));
 
 		assertThat(holdRepository.findById(overdue.getId()).orElseThrow().getStatus())
 			.as("the expiry batch owns the transition, so a late cancel must not record CANCELED")
