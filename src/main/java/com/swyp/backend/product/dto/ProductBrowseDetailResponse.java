@@ -43,6 +43,25 @@ public record ProductBrowseDetailResponse(
 			LocalTime businessOpenTime,
 			LocalTime businessCloseTime,
 			boolean openNow) {
+
+		static ProductStore of(
+				Store store, @Nullable Integer distanceMeters, boolean openNow) {
+			return new ProductStore(
+					store.getId(),
+					store.getName(),
+					store.getAddress(),
+					store.getAddressDetail(),
+					store.getPhone(),
+					store.getLatitude(),
+					store.getLongitude(),
+					distanceMeters,
+					distanceMeters == null
+							? null
+							: Distance.straightLineWalkingMinutes(distanceMeters),
+					store.getBusinessOpenTime(),
+					store.getBusinessCloseTime(),
+					openNow);
+		}
 	}
 
 	public static ProductBrowseDetailResponse of(
@@ -53,7 +72,6 @@ public record ProductBrowseDetailResponse(
 			boolean openNow,
 			boolean pickupWindowOpen,
 			List<RecipeSuggestionResponse> recipes) {
-		Store store = product.getStore();
 		return new ProductBrowseDetailResponse(
 				product.getId(),
 				product.getName(),
@@ -69,21 +87,7 @@ public record ProductBrowseDetailResponse(
 				product.getStatus(),
 				buttonStateOf(product, myHoldId, pickupWindowOpen),
 				myHoldId,
-				new ProductStore(
-						store.getId(),
-						store.getName(),
-						store.getAddress(),
-						store.getAddressDetail(),
-						store.getPhone(),
-						store.getLatitude(),
-						store.getLongitude(),
-						distanceMeters,
-						distanceMeters == null
-								? null
-								: Distance.straightLineWalkingMinutes(distanceMeters),
-						store.getBusinessOpenTime(),
-						store.getBusinessCloseTime(),
-						openNow),
+				ProductStore.of(product.getStore(), distanceMeters, openNow),
 				recipes);
 	}
 

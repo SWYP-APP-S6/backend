@@ -35,6 +35,17 @@ public record HoldDetailResponse(
 			int salePrice,
 			short discountRate,
 			ProductStatus status) {
+
+		static HoldProduct from(Product product) {
+			return new HoldProduct(
+					product.getId(),
+					product.getName(),
+					product.getPhotoUrl(),
+					product.getOriginalPrice(),
+					product.getSalePrice(),
+					product.getDiscountRate(),
+					product.getStatus());
+		}
 	}
 
 	public record HoldStore(
@@ -47,11 +58,23 @@ public record HoldDetailResponse(
 			BigDecimal longitude,
 			LocalTime businessOpenTime,
 			LocalTime businessCloseTime) {
+
+		static HoldStore from(Store store) {
+			return new HoldStore(
+					store.getId(),
+					store.getName(),
+					store.getAddress(),
+					store.getAddressDetail(),
+					store.getPhone(),
+					store.getLatitude(),
+					store.getLongitude(),
+					store.getBusinessOpenTime(),
+					store.getBusinessCloseTime());
+		}
 	}
 
 	public static HoldDetailResponse from(Hold hold, Instant serverTime) {
 		Product product = hold.getProduct();
-		Store store = product.getStore();
 		return new HoldDetailResponse(
 				hold.getId(),
 				hold.getStatus(),
@@ -65,23 +88,7 @@ public record HoldDetailResponse(
 				hold.getCanceledAt(),
 				hold.getCanceledBy(),
 				hold.getCancelReason(),
-				new HoldProduct(
-						product.getId(),
-						product.getName(),
-						product.getPhotoUrl(),
-						product.getOriginalPrice(),
-						product.getSalePrice(),
-						product.getDiscountRate(),
-						product.getStatus()),
-				new HoldStore(
-						store.getId(),
-						store.getName(),
-						store.getAddress(),
-						store.getAddressDetail(),
-						store.getPhone(),
-						store.getLatitude(),
-						store.getLongitude(),
-						store.getBusinessOpenTime(),
-						store.getBusinessCloseTime()));
+				HoldProduct.from(product),
+				HoldStore.from(product.getStore()));
 	}
 }
