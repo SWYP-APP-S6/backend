@@ -23,6 +23,9 @@ public interface HoldRepository extends JpaRepository<Hold, Long> {
 	@Query("select h from Hold h where h.id = :id")
 	Optional<Hold> findByIdForUpdate(@Param("id") Long id);
 
+	@Query("select h.product.id from Hold h where h.id = :id and h.user.id = :userId")
+	Optional<Long> findProductIdByIdAndUserId(@Param("id") Long id, @Param("userId") Long userId);
+
 	boolean existsByUserIdAndProductIdAndStatus(Long userId, Long productId, HoldStatus status);
 
 	@Query("select h from Hold h join fetch h.product p join fetch p.store "

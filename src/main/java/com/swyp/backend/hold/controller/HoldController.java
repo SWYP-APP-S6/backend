@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -30,5 +31,11 @@ public class HoldController {
 		HoldDetailResponse response = holdService.create(userId, request);
 		return ResponseEntity.status(HttpStatus.CREATED)
 				.body(ApiResponse.of(SuccessCode.CREATED, response));
+	}
+
+	@PostMapping("/{holdId}/cancel")
+	public ApiResponse<HoldDetailResponse> cancelHold(
+			@AuthenticationPrincipal Long userId, @PathVariable Long holdId) {
+		return ApiResponse.of(SuccessCode.OK, holdService.cancel(userId, holdId));
 	}
 }

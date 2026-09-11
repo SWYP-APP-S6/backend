@@ -5,6 +5,7 @@ import com.swyp.backend.hold.HoldProperties;
 import com.swyp.backend.hold.dto.HoldCreateRequest;
 import com.swyp.backend.hold.dto.HoldDetailResponse;
 import com.swyp.backend.hold.entity.Hold;
+import com.swyp.backend.hold.entity.HoldStatus;
 import com.swyp.backend.hold.exception.HoldErrorCode;
 import com.swyp.backend.hold.function.HoldFunction;
 import com.swyp.backend.product.entity.Product;
@@ -48,6 +49,26 @@ public class HoldService {
 		Hold hold = holdFunction.save(
 				new Hold(user, product, request.qty(), expiresAt(product, now)));
 		return HoldDetailResponse.from(hold, now);
+	}
+
+	@Transactional
+	public HoldDetailResponse cancel(Long userId, Long holdId) {
+		Long productId = holdFunction.getProductIdOfUserHold(holdId, userId);
+		Product product = productFunction.getByIdForUpdate(productId);
+		Hold hold = holdFunction.getByIdForUpdate(holdId);
+		Instant now = Instant.now(clock);
+
+		requireCancelable(hold, now);
+
+		hold.cancelByUser(now);
+		product.releaseHold(hold.getQty());
+		return HoldDetailResponse.from(hold, now);
+	}
+
+	private static void requireCancelable(Hold hold, Instant now) {
+		if (hold.getStatus() != HoldStatus.HOLDING || !hold.getExpiresAt().isAfter(now)) {
+			throw new BusinessException(HoldErrorCode.HOLD_ALREADY_RESOLVED);
+		}
 	}
 
 	private void releaseIfAlreadyOverdue(Long userId, Product product, Instant now) {

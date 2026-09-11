@@ -35,6 +35,11 @@ public class HoldFunction {
 				.orElseThrow(() -> new BusinessException(HoldErrorCode.HOLD_NOT_FOUND));
 	}
 
+	public Long getProductIdOfUserHold(Long holdId, Long userId) {
+		return holdRepository.findProductIdByIdAndUserId(holdId, userId)
+				.orElseThrow(() -> new BusinessException(HoldErrorCode.HOLD_NOT_FOUND));
+	}
+
 	public Optional<Hold> findHoldingOf(Long userId, Long productId) {
 		return holdRepository.findByUserIdAndProductIdAndStatus(
 				userId, productId, HoldStatus.HOLDING);
