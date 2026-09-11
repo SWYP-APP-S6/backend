@@ -73,11 +73,18 @@ public record HoldDetailResponse(
 		}
 	}
 
+	private static HoldStatus statusAt(Hold hold, Instant serverTime) {
+		if (hold.getStatus() == HoldStatus.HOLDING && !hold.getExpiresAt().isAfter(serverTime)) {
+			return HoldStatus.EXPIRED;
+		}
+		return hold.getStatus();
+	}
+
 	public static HoldDetailResponse from(Hold hold, Instant serverTime) {
 		Product product = hold.getProduct();
 		return new HoldDetailResponse(
 				hold.getId(),
-				hold.getStatus(),
+				statusAt(hold, serverTime),
 				hold.getQty(),
 				product.getSalePrice(),
 				product.getSalePrice() * hold.getQty(),

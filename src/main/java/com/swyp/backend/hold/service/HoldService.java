@@ -17,6 +17,7 @@ import com.swyp.backend.user.function.UserFunction;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -49,6 +50,18 @@ public class HoldService {
 		Hold hold = holdFunction.save(
 				new Hold(user, product, request.qty(), expiresAt(product, now)));
 		return HoldDetailResponse.from(hold, now);
+	}
+
+	public HoldDetailResponse getHold(Long userId, Long holdId) {
+		Instant now = Instant.now(clock);
+		return HoldDetailResponse.from(holdFunction.getDetailOfUserHold(userId, holdId), now);
+	}
+
+	public List<HoldDetailResponse> getActiveHolds(Long userId) {
+		Instant now = Instant.now(clock);
+		return holdFunction.findActiveOf(userId, now).stream()
+				.map(hold -> HoldDetailResponse.from(hold, now))
+				.toList();
 	}
 
 	@Transactional
