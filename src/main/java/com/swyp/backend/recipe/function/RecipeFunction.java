@@ -1,6 +1,7 @@
 package com.swyp.backend.recipe.function;
 
 import com.swyp.backend.common.exception.BusinessException;
+import com.swyp.backend.recipe.entity.Ingredient;
 import com.swyp.backend.recipe.entity.Recipe;
 import com.swyp.backend.recipe.entity.RecipeIngredient;
 import com.swyp.backend.recipe.entity.RecipeNutrition;
@@ -14,7 +15,11 @@ import com.swyp.backend.recipe.repository.RecipeRepository;
 import com.swyp.backend.recipe.repository.RecipeStepRepository;
 import com.swyp.backend.recipe.repository.RecipeTagRepository;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 import java.util.Set;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -67,6 +72,41 @@ public class RecipeFunction {
 			return true;
 		}
 		return ingredientRepository.countByIdIn(distinctIds) == distinctIds.size();
+	}
+
+	public List<String> ingredientNamesOf(Collection<Integer> ingredientIds) {
+		if (ingredientIds.isEmpty()) {
+			return List.of();
+		}
+		return ingredientRepository.findAllById(ingredientIds).stream()
+				.map(Ingredient::getName)
+				.toList();
+	}
+
+	public List<Recipe> findMatchingIngredients(Collection<Integer> ingredientIds, int limit) {
+		if (ingredientIds.isEmpty()) {
+			return List.of();
+		}
+		List<Long> orderedIds = recipeRepository.findIdsMatchingIngredients(ingredientIds, limit);
+		if (orderedIds.isEmpty()) {
+			return List.of();
+		}
+		Map<Long, Recipe> byId = recipeRepository.findAllByIdIn(orderedIds).stream()
+				.collect(Collectors.toMap(Recipe::getId, recipe -> recipe));
+		return orderedIds.stream().map(byId::get).filter(Objects::nonNull).toList();
+	}
+
+	public Map<Long, List<String>> ingredientNamesByRecipeId(Collection<Long> recipeIds) {
+		if (recipeIds.isEmpty()) {
+			return Map.of();
+		}
+		return recipeIngredientRepository.findByRecipeIdInWithIngredient(recipeIds).stream()
+				.filter(ingredient -> ingredient.getIngredient() != null)
+				.collect(Collectors.groupingBy(
+						ingredient -> ingredient.getRecipe().getId(),
+						LinkedHashMap::new,
+						Collectors.mapping(
+								ingredient -> ingredient.getIngredient().getName(), Collectors.toList())));
 	}
 
 	public List<RecipeTag> findTags(Long recipeId) {

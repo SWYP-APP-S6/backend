@@ -111,7 +111,10 @@ public class ProductService {
 	public ProductDetailResponse updateAvailableQty(
 			Long ownerId, Long productId, ProductAvailableQtyUpdateRequest request) {
 		Store store = storeFunction.getByOwnerId(ownerId);
-		Product product = productFunction.getByIdAndStoreId(productId, store.getId());
+		Product product = productFunction.getByIdForUpdate(productId);
+		if (!product.getStore().getId().equals(store.getId())) {
+			throw new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND);
+		}
 		if (product.getStatus() == ProductStatus.CLOSED) {
 			throw new BusinessException(ProductErrorCode.PRODUCT_CLOSED);
 		}

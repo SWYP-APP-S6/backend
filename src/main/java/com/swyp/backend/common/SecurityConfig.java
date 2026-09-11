@@ -53,10 +53,16 @@ public class SecurityConfig {
 		"/auth/logout",
 	};
 
+	private static final String[] CONSUMER_ENDPOINTS = {
+		"/holds",
+		"/holds/**",
+	};
+
 	private static final String[] BROWSE_ENDPOINTS = {
 		"/recipes",
 		"/recipes/**",
 		"/products/nearby",
+		"/products/*",
 		"/stores/nearby",
 		"/stores/*/products",
 	};
@@ -109,6 +115,9 @@ public class SecurityConfig {
 					AuthorizationManagers.allOf(
 						AuthorityAuthorizationManager.hasAuthority(TokenRealm.USER.authority()),
 						AuthorityAuthorizationManager.hasRole(CONSUMER_ROLE))));
+				auth.requestMatchers(CONSUMER_ENDPOINTS).access(AuthorizationManagers.allOf(
+					AuthorityAuthorizationManager.hasAuthority(TokenRealm.USER.authority()),
+					AuthorityAuthorizationManager.hasRole(CONSUMER_ROLE)));
 				auth.requestMatchers("/admin/**").hasAuthority(TokenRealm.ADMIN.authority());
 				auth.requestMatchers("/owner/**").access(AuthorizationManagers.allOf(
 					AuthorityAuthorizationManager.hasAuthority(TokenRealm.USER.authority()),
