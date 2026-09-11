@@ -1,6 +1,7 @@
 package com.swyp.backend.hold.repository;
 
 import com.swyp.backend.hold.dto.ActiveHoldQty;
+import com.swyp.backend.hold.dto.OverdueHold;
 import com.swyp.backend.hold.entity.Hold;
 import com.swyp.backend.hold.entity.HoldStatus;
 import jakarta.persistence.LockModeType;
@@ -21,6 +22,18 @@ public interface HoldRepository extends JpaRepository<Hold, Long> {
 	Optional<Hold> findByIdForUpdate(@Param("id") Long id);
 
 	boolean existsByUserIdAndProductIdAndStatus(Long userId, Long productId, HoldStatus status);
+
+	@Query("select h from Hold h join fetch h.product p join fetch p.store "
+			+ "where h.user.id = :userId and p.id = :productId and h.status = :status")
+	Optional<Hold> findByUserIdAndProductIdAndStatus(
+			@Param("userId") Long userId,
+			@Param("productId") Long productId,
+			@Param("status") HoldStatus status);
+
+	@Query("select new com.swyp.backend.hold.dto.OverdueHold(h.id, h.product.id) from Hold h "
+			+ "where h.status = :status and h.expiresAt <= :expiresAt order by h.product.id, h.id")
+	List<OverdueHold> findOverdueByStatus(
+			@Param("status") HoldStatus status, @Param("expiresAt") Instant expiresAt);
 
 	List<Hold> findByUserIdAndStatusOrderByExpiresAtAsc(Long userId, HoldStatus status);
 
