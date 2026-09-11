@@ -22,6 +22,14 @@ public interface HoldRepository extends JpaRepository<Hold, Long> {
 
 	boolean existsByUserIdAndProductIdAndStatus(Long userId, Long productId, HoldStatus status);
 
+	@Query("select h from Hold h join fetch h.product p join fetch p.store "
+			+ "where h.user.id = :userId and p.id = :productId and h.status = :status")
+	Optional<Hold> findByUserIdAndProductIdAndStatus(
+			@Param("userId") Long userId,
+			@Param("productId") Long productId,
+			@Param("status") HoldStatus status);
+
+
 	List<Hold> findByUserIdAndStatusOrderByExpiresAtAsc(Long userId, HoldStatus status);
 
 	Page<Hold> findByUserIdAndStatusNot(Long userId, HoldStatus status, Pageable pageable);
