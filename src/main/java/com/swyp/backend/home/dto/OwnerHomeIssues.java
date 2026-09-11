@@ -1,4 +1,4 @@
 package com.swyp.backend.home.dto;
 
-public record OwnerHomeIssues(long oversoldQty, long expiredTodayCount) {
+public record OwnerHomeIssues(long expiredTodayCount) {
 }

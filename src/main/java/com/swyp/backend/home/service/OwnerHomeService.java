@@ -49,9 +49,7 @@ public class OwnerHomeService {
 						upcomingVisits.size(),
 						holdFunction.countCompletedTodayOfStore(storeId),
 						sumAvailableQty(productCards)),
-				new OwnerHomeIssues(
-						sumOversoldQty(productCards),
-						holdFunction.countExpiredTodayOfStore(storeId)),
+				new OwnerHomeIssues(holdFunction.countExpiredTodayOfStore(storeId)),
 				notificationFunction.countUnread(ownerId),
 				countReconfirmPending(productCards),
 				productFunction.hasAnyProduct(storeId),
@@ -61,10 +59,6 @@ public class OwnerHomeService {
 
 	private static int sumAvailableQty(List<OwnerHomeProductCard> productCards) {
 		return productCards.stream().mapToInt(OwnerHomeProductCard::availableQty).sum();
-	}
-
-	private static long sumOversoldQty(List<OwnerHomeProductCard> productCards) {
-		return productCards.stream().mapToLong(OwnerHomeProductCard::oversoldQty).sum();
 	}
 
 	private static int countReconfirmPending(List<OwnerHomeProductCard> productCards) {
