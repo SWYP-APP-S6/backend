@@ -15,6 +15,8 @@ public class OpenApiConfig {
 
 	private static final String[] ADMIN_PATHS = {"/admin/**"};
 
+	private static final String[] NON_APP_PATHS = {"/admin/**", "/dev/**"};
+
 	@Bean
 	OpenAPI openAPI() {
 		SecurityScheme bearer = new SecurityScheme()
@@ -31,7 +33,7 @@ public class OpenApiConfig {
 	GroupedOpenApi appApi(OpenApiErrorResponses errorResponses) {
 		return GroupedOpenApi.builder()
 			.group("app")
-			.pathsToExclude(ADMIN_PATHS)
+			.pathsToExclude(NON_APP_PATHS)
 			.addOpenApiCustomizer(errorResponses)
 			.build();
 	}

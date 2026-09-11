@@ -61,6 +61,10 @@ public class SecurityConfig {
 		"/stores/*/products",
 	};
 
+	private static final String[] DEV_ENDPOINTS = {
+		"/dev/**",
+	};
+
 	private static final String[] API_DOCS_ENDPOINTS = {
 		"/v3/api-docs",
 		"/v3/api-docs/**",
@@ -92,7 +96,8 @@ public class SecurityConfig {
 			RateLimiter rateLimiter, ObjectMapper objectMapper,
 			RestAuthenticationEntryPoint authenticationEntryPoint,
 			RestAccessDeniedHandler accessDeniedHandler,
-			@Value("${springdoc.api-docs.enabled:true}") boolean apiDocsEnabled) throws Exception {
+			@Value("${springdoc.api-docs.enabled:true}") boolean apiDocsEnabled,
+			@Value("${dev.test-token.enabled:false}") boolean devTestTokenEnabled) throws Exception {
 		JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(tokenProvider);
 		http
 			.cors(Customizer.withDefaults())
@@ -102,6 +107,9 @@ public class SecurityConfig {
 				auth.requestMatchers(PUBLIC_ENDPOINTS).permitAll();
 				if (apiDocsEnabled) {
 					auth.requestMatchers(API_DOCS_ENDPOINTS).permitAll();
+				}
+				if (devTestTokenEnabled) {
+					auth.requestMatchers(DEV_ENDPOINTS).permitAll();
 				}
 				auth.requestMatchers(HttpMethod.GET, BROWSE_ENDPOINTS).access(AuthorizationManagers.anyOf(
 					AuthorityAuthorizationManager.hasAuthority(TokenRealm.GUEST.authority()),
