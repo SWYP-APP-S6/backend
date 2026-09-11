@@ -13,7 +13,7 @@
 - **Jackson 3**(`tools.jackson.databind`)만 import한다 — 2.x(`com.fasterxml.jackson`)도 전이
   의존성으로 함께 있어 잘못 써도 컴파일은 되고, 그 경우 `JsonNode`가 트리가 아니라
   **POJO로 직렬화**돼(`{"array":false,…}`) 응답이 조용히 망가진다.
-- **API 문서 = 앱의 코드젠 입력**: springdoc-openapi(`/swagger-ui`). **Boot 4 → springdoc 3.x.**
+- **API 문서 = 앱의 코드젠 입력**: springdoc-openapi(`/swagger-ui.html`). **Boot 4 → springdoc 3.x.**
   스펙은 그룹으로 갈라져 있다 — **`/v3/api-docs/app`(앱)**, `/v3/api-docs/admin`(백오피스). 앱이 이
   스펙으로 Retrofit 클라이언트를 생성하므로 명세가 곧 계약이고, 규약은 `common/openapi`가 강제한다:
   응답 record 컴포넌트는 `required`로 올라가고(실제 null 가능 필드에만 `@Nullable`), 모든 오퍼레이션에
