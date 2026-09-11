@@ -22,6 +22,10 @@
 - **Package-by-feature + 레이어 서브패키지**: `com.swyp.backend.<feature>`(예: `.admin`, `.ping`) 아래
   `controller` / `service` / `function` / `repository` / `entity` / `dto`. `com.swyp.backend.common`에는
   **여러 feature가 공유하는 타입만** 둔다(`BaseTimeEntity`, `JpaAuditingConfig` 등).
+- **화면 조합 feature**: 여러 feature를 한 화면으로 모으는 응답은 **자기 feature를 갖는다**
+  (`com.swyp.backend.home` = 점주 홈 `GET /owner/home`). entity·repository 없이 controller/service/dto만
+  두고 데이터는 각 feature의 `function`에서 받는다 — 상품 API가 상점·찜·알림까지 내주기 시작하면
+  그 엔드포인트의 이름이 거짓말이 된다(규칙 14).
 - **`function` = 그 feature가 남에게 내주는 재사용 단위.** repository 호출과 "찾거나 예외"를 여기서
   끝내고(`get{Entity}ById` → 없으면 `BusinessException`), service는 트랜잭션·유스케이스 조합·DTO
   매핑만 맡는다. 파사드를 위에 얹는 대신 공용 계층을 **아래**에 둔 것 — 파사드는 service끼리의
