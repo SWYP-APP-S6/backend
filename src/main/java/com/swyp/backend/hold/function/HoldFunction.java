@@ -2,7 +2,9 @@ package com.swyp.backend.hold.function;
 
 import com.swyp.backend.common.exception.BusinessException;
 import com.swyp.backend.hold.dto.ActiveHoldQty;
+import com.swyp.backend.hold.dto.HoldTarget;
 import com.swyp.backend.hold.dto.OverdueHold;
+import com.swyp.backend.hold.dto.OwnerHoldStatus;
 import com.swyp.backend.hold.entity.Hold;
 import com.swyp.backend.hold.entity.HoldStatus;
 import com.swyp.backend.hold.exception.HoldErrorCode;
@@ -15,6 +17,10 @@ import java.util.Optional;
 import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -64,6 +70,24 @@ public class HoldFunction {
 		return holdRepository.findStoreHoldsByStatus(storeId, HoldStatus.HOLDING);
 	}
 
+	public Page<Hold> findStoreHolds(Long storeId, OwnerHoldStatus filter, Pageable pageable) {
+		return holdRepository.findStoreHolds(
+				storeId,
+				filter == null ? null : filter.status(),
+				filter == null ? null : filter.canceledBy(),
+				PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sortFor(filter)));
+	}
+
+	public Hold getDetailById(Long holdId) {
+		return holdRepository.findDetailById(holdId)
+				.orElseThrow(() -> new BusinessException(HoldErrorCode.HOLD_NOT_FOUND));
+	}
+
+	public HoldTarget getTargetById(Long holdId) {
+		return holdRepository.findTargetById(holdId)
+				.orElseThrow(() -> new BusinessException(HoldErrorCode.HOLD_NOT_FOUND));
+	}
+
 	public long countCompletedTodayOfStore(Long storeId) {
 		return holdRepository.countCompletedSince(storeId, startOfToday());
 	}
@@ -78,5 +102,12 @@ public class HoldFunction {
 
 	private Instant startOfToday() {
 		return LocalDate.now(clock).atStartOfDay(clock.getZone()).toInstant();
+	}
+
+	private static Sort sortFor(OwnerHoldStatus filter) {
+		Sort.Direction direction = filter == OwnerHoldStatus.HOLDING
+				? Sort.Direction.ASC
+				: Sort.Direction.DESC;
+		return Sort.by(direction, "expiresAt").and(Sort.by(direction, "id"));
 	}
 }

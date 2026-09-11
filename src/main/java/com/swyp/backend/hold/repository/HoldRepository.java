@@ -1,8 +1,10 @@
 package com.swyp.backend.hold.repository;
 
 import com.swyp.backend.hold.dto.ActiveHoldQty;
+import com.swyp.backend.hold.dto.HoldTarget;
 import com.swyp.backend.hold.dto.OverdueHold;
 import com.swyp.backend.hold.entity.Hold;
+import com.swyp.backend.hold.entity.HoldCanceledBy;
 import com.swyp.backend.hold.entity.HoldStatus;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
@@ -71,6 +73,42 @@ public interface HoldRepository extends JpaRepository<Hold, Long> {
 			""")
 	List<Hold> findStoreHoldsByStatus(
 			@Param("storeId") Long storeId, @Param("status") HoldStatus status);
+
+	@Query(value = """
+			select h from Hold h
+			join fetch h.user
+			join fetch h.product p
+			where p.store.id = :storeId
+				and (:status is null or h.status = :status)
+				and (:canceledBy is null or h.canceledBy = :canceledBy)
+			""",
+			countQuery = """
+			select count(h) from Hold h
+			where h.product.store.id = :storeId
+				and (:status is null or h.status = :status)
+				and (:canceledBy is null or h.canceledBy = :canceledBy)
+			""")
+	Page<Hold> findStoreHolds(
+			@Param("storeId") Long storeId,
+			@Param("status") HoldStatus status,
+			@Param("canceledBy") HoldCanceledBy canceledBy,
+			Pageable pageable);
+
+	@Query("""
+			select h from Hold h
+			join fetch h.user
+			join fetch h.product p
+			join fetch p.store
+			where h.id = :id
+			""")
+	Optional<Hold> findDetailById(@Param("id") Long id);
+
+	@Query("""
+			select new com.swyp.backend.hold.dto.HoldTarget(h.product.id, h.product.store.id)
+			from Hold h
+			where h.id = :id
+			""")
+	Optional<HoldTarget> findTargetById(@Param("id") Long id);
 
 	@Query("""
 			select new com.swyp.backend.hold.dto.ActiveHoldQty(h.product.id, sum(h.qty))
