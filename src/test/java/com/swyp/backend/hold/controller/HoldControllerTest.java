@@ -329,4 +329,94 @@ class HoldControllerTest {
 		assertThat(held.getAvailableQty()).isEqualTo(2);
 		assertThat(held.getHeldQty()).isEqualTo(1);
 	}
+
+	@Test
+	void cancelingMyHoldGivesTheQuantityBackAndRecordsWhoCanceled() throws Exception {
+		Hold hold = holding(consumer, 2, Instant.now().plusSeconds(600));
+
+		mockMvc.perform(post("/holds/{holdId}/cancel", hold.getId())
+				.header("Authorization", bearer(consumer)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.id").value(hold.getId()))
+			.andExpect(jsonPath("$.data.status").value("CANCELED"))
+			.andExpect(jsonPath("$.data.canceledBy").value("USER"))
+			.andExpect(jsonPath("$.data.canceledAt").exists())
+			.andExpect(jsonPath("$.data.qty").value(2));
+
+		Product released = productRepository.findById(product.getId()).orElseThrow();
+		assertThat(released.getAvailableQty()).isEqualTo(3);
+		assertThat(released.getHeldQty()).isZero();
+	}
+
+	@Test
+	void cancelingTheSameHoldTwiceGivesTheQuantityBackOnce() throws Exception {
+		Hold hold = holding(consumer, 2, Instant.now().plusSeconds(600));
+		mockMvc.perform(post("/holds/{holdId}/cancel", hold.getId())
+				.header("Authorization", bearer(consumer)))
+			.andExpect(status().isOk());
+
+		mockMvc.perform(post("/holds/{holdId}/cancel", hold.getId())
+				.header("Authorization", bearer(consumer)))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("HOLD_ALREADY_RESOLVED"));
+
+		Product released = productRepository.findById(product.getId()).orElseThrow();
+		assertThat(released.getAvailableQty()).isEqualTo(3);
+		assertThat(released.getHeldQty()).isZero();
+	}
+
+	@Test
+	void someoneElsesHoldIsNotFoundRatherThanForbidden() throws Exception {
+		User other = userRepository.saveAndFlush(
+				new User(UserRole.CONSUMER, "다른소비자", null, false, Instant.now()));
+		Hold hold = holding(other, 2, Instant.now().plusSeconds(600));
+
+		mockMvc.perform(post("/holds/{holdId}/cancel", hold.getId())
+				.header("Authorization", bearer(consumer)))
+			.andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.code").value("HOLD_NOT_FOUND"));
+
+		assertThat(holdRepository.findById(hold.getId()).orElseThrow().getStatus())
+			.isEqualTo(HoldStatus.HOLDING);
+		Product untouched = productRepository.findById(product.getId()).orElseThrow();
+		assertThat(untouched.getAvailableQty()).isEqualTo(1);
+		assertThat(untouched.getHeldQty()).isEqualTo(2);
+	}
+
+	@Test
+	void aHoldThatIsAlreadyPastItsExpiryCannotBeCanceled() throws Exception {
+		Hold overdue = holding(consumer, 2, Instant.now().minusSeconds(1));
+
+		mockMvc.perform(post("/holds/{holdId}/cancel", overdue.getId())
+				.header("Authorization", bearer(consumer)))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("HOLD_ALREADY_RESOLVED"));
+
+		assertThat(holdRepository.findById(overdue.getId()).orElseThrow().getStatus())
+			.as("the expiry batch owns the transition, so a late cancel must not record CANCELED")
+			.isEqualTo(HoldStatus.HOLDING);
+		Product untouched = productRepository.findById(product.getId()).orElseThrow();
+		assertThat(untouched.getAvailableQty()).isEqualTo(1);
+		assertThat(untouched.getHeldQty()).isEqualTo(2);
+	}
+
+	@Test
+	void cancelingIsClosedToGuests() throws Exception {
+		Hold hold = holding(consumer, 1, Instant.now().plusSeconds(600));
+
+		mockMvc.perform(post("/holds/{holdId}/cancel", hold.getId())
+				.header("Authorization", "Bearer " + tokenProvider.createAccessToken(
+					TokenRealm.GUEST, 1L, "GUEST")))
+			.andExpect(status().isForbidden())
+			.andExpect(jsonPath("$.code").value("LOGIN_REQUIRED"));
+
+		assertThat(holdRepository.findById(hold.getId()).orElseThrow().getStatus())
+			.isEqualTo(HoldStatus.HOLDING);
+	}
+
+	private Hold holding(User user, int qty, Instant expiresAt) {
+		product.hold(qty);
+		productRepository.saveAndFlush(product);
+		return holdRepository.saveAndFlush(new Hold(user, product, qty, expiresAt));
+	}
 }
