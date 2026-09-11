@@ -32,6 +32,11 @@ public class ProductFunction {
 				.orElseThrow(() -> new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND));
 	}
 
+	public Product getByIdForUpdate(Long productId) {
+		return productRepository.findByIdForUpdate(productId)
+				.orElseThrow(() -> new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND));
+	}
+
 	public Product save(Product product) {
 		return productRepository.save(product);
 	}
