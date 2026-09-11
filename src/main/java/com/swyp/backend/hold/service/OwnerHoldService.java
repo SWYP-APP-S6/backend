@@ -2,6 +2,7 @@ package com.swyp.backend.hold.service;
 
 import com.swyp.backend.common.exception.BusinessException;
 import com.swyp.backend.common.response.PageResponse;
+import com.swyp.backend.hold.dto.HoldTarget;
 import com.swyp.backend.hold.dto.OwnerHoldDetailResponse;
 import com.swyp.backend.hold.dto.OwnerHoldStatus;
 import com.swyp.backend.hold.dto.OwnerHoldSummaryResponse;
@@ -55,25 +56,27 @@ public class OwnerHoldService {
 	@Transactional
 	public OwnerHoldDetailResponse completePickup(Long ownerId, Long holdId) {
 		Store store = storeFunction.getByOwnerId(ownerId);
-		Hold hold = holdFunction.getDetailById(holdId);
-		requireOwnedBy(hold, store);
+		HoldTarget target = holdFunction.getTargetById(holdId);
+		if (!target.storeId().equals(store.getId())) {
+			throw new BusinessException(HoldErrorCode.HOLD_NOT_FOUND);
+		}
 
-		Product product = productFunction.getByIdForUpdate(hold.getProduct().getId());
-		Hold locked = holdFunction.getByIdForUpdate(holdId);
-		if (locked.getStatus() != HoldStatus.HOLDING) {
+		Product product = productFunction.getByIdForUpdate(target.productId());
+		Hold hold = holdFunction.getByIdForUpdate(holdId);
+		if (hold.getStatus() != HoldStatus.HOLDING) {
 			throw new BusinessException(HoldErrorCode.HOLD_ALREADY_RESOLVED);
 		}
 
 		Instant now = Instant.now(clock);
-		locked.complete(now);
-		product.completeHold(locked.getQty());
+		hold.complete(now);
+		product.completeHold(hold.getQty());
 		notificationFunction.notify(
-				locked.getUser(),
+				hold.getUser(),
 				NotificationType.PICKUP_COMPLETED,
 				"수령이 완료됐어요",
 				product.getName() + " 수령이 완료됐어요.",
 				null);
-		return OwnerHoldDetailResponse.from(locked, now);
+		return OwnerHoldDetailResponse.from(hold, now);
 	}
 
 	private static void requireOwnedBy(Hold hold, Store store) {

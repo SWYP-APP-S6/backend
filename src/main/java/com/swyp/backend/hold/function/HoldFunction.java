@@ -2,6 +2,7 @@ package com.swyp.backend.hold.function;
 
 import com.swyp.backend.common.exception.BusinessException;
 import com.swyp.backend.hold.dto.ActiveHoldQty;
+import com.swyp.backend.hold.dto.HoldTarget;
 import com.swyp.backend.hold.dto.OverdueHold;
 import com.swyp.backend.hold.dto.OwnerHoldStatus;
 import com.swyp.backend.hold.entity.Hold;
@@ -79,6 +80,11 @@ public class HoldFunction {
 
 	public Hold getDetailById(Long holdId) {
 		return holdRepository.findDetailById(holdId)
+				.orElseThrow(() -> new BusinessException(HoldErrorCode.HOLD_NOT_FOUND));
+	}
+
+	public HoldTarget getTargetById(Long holdId) {
+		return holdRepository.findTargetById(holdId)
 				.orElseThrow(() -> new BusinessException(HoldErrorCode.HOLD_NOT_FOUND));
 	}
 

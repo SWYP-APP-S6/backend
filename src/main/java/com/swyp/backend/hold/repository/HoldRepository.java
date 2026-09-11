@@ -1,6 +1,7 @@
 package com.swyp.backend.hold.repository;
 
 import com.swyp.backend.hold.dto.ActiveHoldQty;
+import com.swyp.backend.hold.dto.HoldTarget;
 import com.swyp.backend.hold.dto.OverdueHold;
 import com.swyp.backend.hold.entity.Hold;
 import com.swyp.backend.hold.entity.HoldCanceledBy;
@@ -101,6 +102,13 @@ public interface HoldRepository extends JpaRepository<Hold, Long> {
 			where h.id = :id
 			""")
 	Optional<Hold> findDetailById(@Param("id") Long id);
+
+	@Query("""
+			select new com.swyp.backend.hold.dto.HoldTarget(h.product.id, h.product.store.id)
+			from Hold h
+			where h.id = :id
+			""")
+	Optional<HoldTarget> findTargetById(@Param("id") Long id);
 
 	@Query("""
 			select new com.swyp.backend.hold.dto.ActiveHoldQty(h.product.id, sum(h.qty))
