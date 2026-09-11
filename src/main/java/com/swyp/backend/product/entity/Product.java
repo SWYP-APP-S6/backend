@@ -150,6 +150,16 @@ public class Product extends BaseTimeEntity {
 		syncStatusWithAvailableQty();
 	}
 
+	public void completeHold(int qty) {
+		if (qty <= 0) {
+			throw new IllegalArgumentException("complete qty must be positive");
+		}
+		if (qty > heldQty) {
+			throw new IllegalStateException("complete qty exceeds held qty");
+		}
+		this.heldQty -= qty;
+	}
+
 	public void adjustAvailableQty(int availableQty) {
 		if (availableQty < 0) {
 			throw new IllegalArgumentException("available qty must not be negative");
