@@ -1,0 +1,4 @@
+package com.swyp.backend.home.dto;
+
+public record OwnerHomeIssues(long expiredTodayCount) {
+}

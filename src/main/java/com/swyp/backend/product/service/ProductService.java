@@ -6,11 +6,9 @@ import com.swyp.backend.hold.function.HoldFunction;
 import com.swyp.backend.notification.entity.NotificationType;
 import com.swyp.backend.notification.function.NotificationFunction;
 import com.swyp.backend.product.dto.HoldDisposition;
-import com.swyp.backend.product.dto.OwnerHomeResponse;
 import com.swyp.backend.product.dto.ProductAvailableQtyUpdateRequest;
 import com.swyp.backend.product.dto.ProductDetailResponse;
 import com.swyp.backend.product.dto.ProductRegisterRequest;
-import com.swyp.backend.product.dto.ProductSummaryResponse;
 import com.swyp.backend.product.entity.Product;
 import com.swyp.backend.product.entity.ProductCategory;
 import com.swyp.backend.product.entity.ProductStatus;
@@ -23,7 +21,6 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -76,29 +73,6 @@ public class ProductService {
 		}
 		productFunction.save(product);
 		return ProductDetailResponse.from(product, 0L);
-	}
-
-	public OwnerHomeResponse getHome(Long ownerId) {
-		Store store = storeFunction.getByOwnerId(ownerId);
-		List<Product> products = productFunction.findByStoreIdNewestFirst(store.getId());
-		Map<Long, Long> activeHoldQtyByProduct = holdFunction.activeQtyByProductOfStore(store.getId());
-
-		List<ProductSummaryResponse> productResponses = products.stream()
-				.map(product -> ProductSummaryResponse.from(product, activeHoldQtyByProduct.getOrDefault(product.getId(), 0L)))
-				.toList();
-
-		int heldQty = products.stream().mapToInt(Product::getHeldQty).sum();
-		int reconfirmPendingCount = (int) products.stream()
-				.filter(product -> product.getReconfirmSentAt() != null && product.getReconfirmAnsweredAt() == null)
-				.count();
-		long completedQty = holdFunction.completedQtyOfStore(store.getId());
-		long activeHoldCount = holdFunction.activeHoldCountOfStore(store.getId());
-
-		return new OwnerHomeResponse(
-				new OwnerHomeResponse.Summary(products.size(), heldQty, completedQty),
-				reconfirmPendingCount,
-				activeHoldCount,
-				productResponses);
 	}
 
 	public ProductDetailResponse getMyProduct(Long ownerId, Long productId) {

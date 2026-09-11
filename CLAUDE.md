@@ -13,7 +13,7 @@
 - **Jackson 3**(`tools.jackson.databind`)만 import한다 — 2.x(`com.fasterxml.jackson`)도 전이
   의존성으로 함께 있어 잘못 써도 컴파일은 되고, 그 경우 `JsonNode`가 트리가 아니라
   **POJO로 직렬화**돼(`{"array":false,…}`) 응답이 조용히 망가진다.
-- **API 문서 = 앱의 코드젠 입력**: springdoc-openapi(`/swagger-ui`). **Boot 4 → springdoc 3.x.**
+- **API 문서 = 앱의 코드젠 입력**: springdoc-openapi(`/swagger-ui.html`). **Boot 4 → springdoc 3.x.**
   스펙은 그룹으로 갈라져 있다 — **`/v3/api-docs/app`(앱)**, `/v3/api-docs/admin`(백오피스). 앱이 이
   스펙으로 Retrofit 클라이언트를 생성하므로 명세가 곧 계약이고, 규약은 `common/openapi`가 강제한다:
   응답 record 컴포넌트는 `required`로 올라가고(실제 null 가능 필드에만 `@Nullable`), 모든 오퍼레이션에
@@ -22,6 +22,10 @@
 - **Package-by-feature + 레이어 서브패키지**: `com.swyp.backend.<feature>`(예: `.admin`, `.ping`) 아래
   `controller` / `service` / `function` / `repository` / `entity` / `dto`. `com.swyp.backend.common`에는
   **여러 feature가 공유하는 타입만** 둔다(`BaseTimeEntity`, `JpaAuditingConfig` 등).
+- **화면 조합 feature**: 여러 feature를 한 화면으로 모으는 응답은 **자기 feature를 갖는다**
+  (`com.swyp.backend.home` = 점주 홈 `GET /owner/home`). entity·repository 없이 controller/service/dto만
+  두고 데이터는 각 feature의 `function`에서 받는다 — 상품 API가 상점·찜·알림까지 내주기 시작하면
+  그 엔드포인트의 이름이 거짓말이 된다(규칙 14).
 - **`function` = 그 feature가 남에게 내주는 재사용 단위.** repository 호출과 "찾거나 예외"를 여기서
   끝내고(`get{Entity}ById` → 없으면 `BusinessException`), service는 트랜잭션·유스케이스 조합·DTO
   매핑만 맡는다. 파사드를 위에 얹는 대신 공용 계층을 **아래**에 둔 것 — 파사드는 service끼리의

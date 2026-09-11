@@ -228,50 +228,6 @@ class OwnerProductControllerTest {
 	}
 
 	@Test
-	void getHome_summarizesHeldAndCompletedQtyAcrossAllProducts() throws Exception {
-		Product product = createProduct("당근", 10);
-		User consumer = createConsumer();
-		product.hold(4);
-		productRepository.saveAndFlush(product);
-		Hold completedHold = new Hold(consumer, product, 4, Instant.now().plus(Duration.ofMinutes(15)));
-		completedHold.complete(Instant.now());
-		holdRepository.saveAndFlush(completedHold);
-
-		mockMvc.perform(get("/owner/products").header("Authorization", "Bearer " + token))
-			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.summary.heldQty").value(4))
-			.andExpect(jsonPath("$.data.summary.completedQty").value(4))
-			.andExpect(jsonPath("$.data.activeHoldCount").value(0));
-	}
-
-	@Test
-	void getHome_listsOnlyMyStoresProducts_andCountsThemAsRegistered() throws Exception {
-		createProduct("당근", 10);
-		createProduct("감자", 5);
-
-		mockMvc.perform(get("/owner/products").header("Authorization", "Bearer " + token))
-			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.products.length()").value(2))
-			.andExpect(jsonPath("$.data.summary.registeredCount").value(2))
-			.andExpect(jsonPath("$.data.summary.heldQty").value(0));
-	}
-
-	@Test
-	void getHome_flagsOversoldProducts_withTheActiveHoldQty() throws Exception {
-		Product product = createProduct("당근", 10);
-		User consumer = createConsumer();
-		holdRepository.saveAndFlush(new Hold(consumer, product, 3, Instant.now().plus(Duration.ofMinutes(15))));
-		product.adjustAvailableQty(1);
-		productRepository.saveAndFlush(product);
-
-		mockMvc.perform(get("/owner/products").header("Authorization", "Bearer " + token))
-			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.products[0].oversold").value(true))
-			.andExpect(jsonPath("$.data.products[0].activeHoldQty").value(3))
-			.andExpect(jsonPath("$.data.activeHoldCount").value(1));
-	}
-
-	@Test
 	void getMyProduct_includesCompletedQty() throws Exception {
 		Product product = createProduct("당근", 10);
 		User consumer = createConsumer();
