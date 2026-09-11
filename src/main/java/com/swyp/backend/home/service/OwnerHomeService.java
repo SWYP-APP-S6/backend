@@ -1,11 +1,11 @@
 package com.swyp.backend.home.service;
 
+import com.swyp.backend.home.dto.OwnerHomeIssues;
+import com.swyp.backend.home.dto.OwnerHomeProductCard;
 import com.swyp.backend.home.dto.OwnerHomeResponse;
-import com.swyp.backend.home.dto.OwnerHomeResponse.Issues;
-import com.swyp.backend.home.dto.OwnerHomeResponse.ProductCard;
-import com.swyp.backend.home.dto.OwnerHomeResponse.StoreSummary;
-import com.swyp.backend.home.dto.OwnerHomeResponse.Summary;
-import com.swyp.backend.home.dto.OwnerHomeResponse.UpcomingVisit;
+import com.swyp.backend.home.dto.OwnerHomeStore;
+import com.swyp.backend.home.dto.OwnerHomeSummary;
+import com.swyp.backend.home.dto.OwnerHomeVisit;
 import com.swyp.backend.hold.function.HoldFunction;
 import com.swyp.backend.notification.function.NotificationFunction;
 import com.swyp.backend.product.entity.Product;
@@ -34,22 +34,22 @@ public class OwnerHomeService {
 
 		List<Product> products = productFunction.findSellingNowOfStore(storeId);
 		Map<Long, Long> activeHoldQtyByProduct = holdFunction.activeQtyByProductOfStore(storeId);
-		List<ProductCard> productCards = products.stream()
-				.map(product -> ProductCard.from(
+		List<OwnerHomeProductCard> productCards = products.stream()
+				.map(product -> OwnerHomeProductCard.from(
 						product, activeHoldQtyByProduct.getOrDefault(product.getId(), 0L)))
 				.toList();
 
-		List<UpcomingVisit> upcomingVisits = holdFunction.findHoldingOfStore(storeId).stream()
-				.map(UpcomingVisit::from)
+		List<OwnerHomeVisit> upcomingVisits = holdFunction.findHoldingOfStore(storeId).stream()
+				.map(OwnerHomeVisit::from)
 				.toList();
 
 		return new OwnerHomeResponse(
-				StoreSummary.from(store),
-				new Summary(
+				OwnerHomeStore.from(store),
+				new OwnerHomeSummary(
 						upcomingVisits.size(),
 						holdFunction.countCompletedTodayOfStore(storeId),
 						sumAvailableQty(productCards)),
-				new Issues(
+				new OwnerHomeIssues(
 						sumOversoldQty(productCards),
 						holdFunction.countExpiredTodayOfStore(storeId)),
 				notificationFunction.countUnread(ownerId),
@@ -59,15 +59,15 @@ public class OwnerHomeService {
 				productCards);
 	}
 
-	private static int sumAvailableQty(List<ProductCard> productCards) {
-		return productCards.stream().mapToInt(ProductCard::availableQty).sum();
+	private static int sumAvailableQty(List<OwnerHomeProductCard> productCards) {
+		return productCards.stream().mapToInt(OwnerHomeProductCard::availableQty).sum();
 	}
 
-	private static long sumOversoldQty(List<ProductCard> productCards) {
-		return productCards.stream().mapToLong(ProductCard::oversoldQty).sum();
+	private static long sumOversoldQty(List<OwnerHomeProductCard> productCards) {
+		return productCards.stream().mapToLong(OwnerHomeProductCard::oversoldQty).sum();
 	}
 
-	private static int countReconfirmPending(List<ProductCard> productCards) {
-		return (int) productCards.stream().filter(ProductCard::reconfirmPending).count();
+	private static int countReconfirmPending(List<OwnerHomeProductCard> productCards) {
+		return (int) productCards.stream().filter(OwnerHomeProductCard::reconfirmPending).count();
 	}
 }
