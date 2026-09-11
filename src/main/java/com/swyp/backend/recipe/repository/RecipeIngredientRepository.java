@@ -1,6 +1,7 @@
 package com.swyp.backend.recipe.repository;
 
 import com.swyp.backend.recipe.entity.RecipeIngredient;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -11,4 +12,9 @@ public interface RecipeIngredientRepository extends JpaRepository<RecipeIngredie
 	@Query("select ri from RecipeIngredient ri left join fetch ri.ingredient "
 			+ "where ri.recipe.id = :recipeId order by ri.seq")
 	List<RecipeIngredient> findByRecipeIdWithIngredient(@Param("recipeId") Long recipeId);
+
+	@Query("select ri from RecipeIngredient ri left join fetch ri.ingredient "
+			+ "where ri.recipe.id in :recipeIds order by ri.recipe.id, ri.seq")
+	List<RecipeIngredient> findByRecipeIdInWithIngredient(
+			@Param("recipeIds") Collection<Long> recipeIds);
 }

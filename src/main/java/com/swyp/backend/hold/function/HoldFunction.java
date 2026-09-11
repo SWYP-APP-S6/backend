@@ -31,6 +31,11 @@ public class HoldFunction {
 				userId, productId, HoldStatus.HOLDING);
 	}
 
+	public Optional<Long> findHoldingIdOf(Long userId, Long productId) {
+		return holdRepository.findByUserIdAndProductIdAndStatus(userId, productId, HoldStatus.HOLDING)
+				.map(Hold::getId);
+	}
+
 	public List<OverdueHold> findOverdue(Instant now) {
 		return holdRepository.findOverdueByStatus(HoldStatus.HOLDING, now);
 	}

@@ -8,6 +8,7 @@ import com.swyp.backend.product.entity.Product;
 import com.swyp.backend.product.entity.ProductCategory;
 import com.swyp.backend.product.exception.ProductErrorCode;
 import com.swyp.backend.product.repository.ProductRepository;
+import com.swyp.backend.store.entity.StoreStatus;
 import com.swyp.backend.store.entity.Store;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -30,6 +31,15 @@ public class ProductFunction {
 	public Product getByIdAndStoreId(Long productId, Long storeId) {
 		return productRepository.findByIdAndStoreId(productId, storeId)
 				.orElseThrow(() -> new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND));
+	}
+
+	public Product getBrowsableById(Long productId) {
+		Product product = productRepository.findWithStoreById(productId)
+				.orElseThrow(() -> new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND));
+		if (product.getStore().getStatus() != StoreStatus.APPROVED) {
+			throw new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND);
+		}
+		return product;
 	}
 
 	public Product getByIdForUpdate(Long productId) {

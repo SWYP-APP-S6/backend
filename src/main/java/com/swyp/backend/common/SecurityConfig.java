@@ -62,6 +62,7 @@ public class SecurityConfig {
 		"/recipes",
 		"/recipes/**",
 		"/products/nearby",
+		"/products/*",
 		"/stores/nearby",
 		"/stores/*/products",
 	};
