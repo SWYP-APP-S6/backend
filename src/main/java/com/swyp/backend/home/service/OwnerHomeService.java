@@ -43,16 +43,23 @@ public class OwnerHomeService {
 				.map(OwnerHomeVisit::from)
 				.toList();
 
+		OwnerHomeSummary summary = new OwnerHomeSummary(
+				upcomingVisits.size(),
+				holdFunction.countCompletedTodayOfStore(storeId),
+				sumAvailableQty(productCards));
+		OwnerHomeIssues issues =
+				new OwnerHomeIssues(holdFunction.countExpiredTodayOfStore(storeId));
+		long unreadNotificationCount = notificationFunction.countUnread(ownerId);
+		int reconfirmPendingCount = countReconfirmPending(productCards);
+		boolean hasRegisteredProduct = productFunction.hasAnyProduct(storeId);
+
 		return new OwnerHomeResponse(
 				OwnerHomeStore.from(store),
-				new OwnerHomeSummary(
-						upcomingVisits.size(),
-						holdFunction.countCompletedTodayOfStore(storeId),
-						sumAvailableQty(productCards)),
-				new OwnerHomeIssues(holdFunction.countExpiredTodayOfStore(storeId)),
-				notificationFunction.countUnread(ownerId),
-				countReconfirmPending(productCards),
-				productFunction.hasAnyProduct(storeId),
+				summary,
+				issues,
+				unreadNotificationCount,
+				reconfirmPendingCount,
+				hasRegisteredProduct,
 				upcomingVisits,
 				productCards);
 	}
