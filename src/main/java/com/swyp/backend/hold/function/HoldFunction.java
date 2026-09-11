@@ -2,6 +2,7 @@ package com.swyp.backend.hold.function;
 
 import com.swyp.backend.common.exception.BusinessException;
 import com.swyp.backend.hold.dto.ActiveHoldQty;
+import com.swyp.backend.hold.dto.OverdueHold;
 import com.swyp.backend.hold.entity.Hold;
 import com.swyp.backend.hold.entity.HoldStatus;
 import com.swyp.backend.hold.exception.HoldErrorCode;
@@ -28,6 +29,10 @@ public class HoldFunction {
 	public Optional<Hold> findHoldingOf(Long userId, Long productId) {
 		return holdRepository.findByUserIdAndProductIdAndStatus(
 				userId, productId, HoldStatus.HOLDING);
+	}
+
+	public List<OverdueHold> findOverdue(Instant now) {
+		return holdRepository.findOverdueByStatus(HoldStatus.HOLDING, now);
 	}
 
 	public void flush() {
