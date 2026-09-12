@@ -29,13 +29,15 @@ public enum OwnerHoldStatus {
 	}
 
 	public static OwnerHoldStatus of(Hold hold) {
-		return switch (hold.getStatus()) {
+		return of(hold.getStatus(), hold.getCanceledBy());
+	}
+
+	public static OwnerHoldStatus of(HoldStatus status, @Nullable HoldCanceledBy canceledBy) {
+		return switch (status) {
 			case HOLDING -> HOLDING;
 			case COMPLETED -> COMPLETED;
 			case EXPIRED -> EXPIRED;
-			case CANCELED -> hold.getCanceledBy() == HoldCanceledBy.OWNER
-					? CANCELED_BY_OWNER
-					: CANCELED_BY_USER;
+			case CANCELED -> canceledBy == HoldCanceledBy.OWNER ? CANCELED_BY_OWNER : CANCELED_BY_USER;
 		};
 	}
 }

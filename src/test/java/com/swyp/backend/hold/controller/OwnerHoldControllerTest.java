@@ -29,6 +29,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -91,12 +92,12 @@ class OwnerHoldControllerTest {
 
 		mockMvc.perform(get("/owner/holds?status=HOLDING").header("Authorization", "Bearer " + token))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.totalElements").value(2))
-			.andExpect(jsonPath("$.data.content[0].totalQty").value(2))
-			.andExpect(jsonPath("$.data.content[0].status").value("HOLDING"))
-			.andExpect(jsonPath("$.data.content[0].nickname").value("윤지현"))
-			.andExpect(jsonPath("$.data.content[0].items[0].productName").value("시금치 한 단"))
-			.andExpect(jsonPath("$.data.content[1].totalQty").value(1));
+			.andExpect(jsonPath("$.data.holds.totalElements").value(2))
+			.andExpect(jsonPath("$.data.holds.content[0].totalQty").value(2))
+			.andExpect(jsonPath("$.data.holds.content[0].status").value("HOLDING"))
+			.andExpect(jsonPath("$.data.holds.content[0].nickname").value("윤지현"))
+			.andExpect(jsonPath("$.data.holds.content[0].items[0].productName").value("시금치 한 단"))
+			.andExpect(jsonPath("$.data.holds.content[1].totalQty").value(1));
 	}
 
 	@Test
@@ -110,14 +111,14 @@ class OwnerHoldControllerTest {
 
 		mockMvc.perform(get("/owner/holds?status=CANCELED_BY_OWNER").header("Authorization", "Bearer " + token))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.totalElements").value(1))
-			.andExpect(jsonPath("$.data.content[0].totalQty").value(1))
-			.andExpect(jsonPath("$.data.content[0].status").value("CANCELED_BY_OWNER"));
+			.andExpect(jsonPath("$.data.holds.totalElements").value(1))
+			.andExpect(jsonPath("$.data.holds.content[0].totalQty").value(1))
+			.andExpect(jsonPath("$.data.holds.content[0].status").value("CANCELED_BY_OWNER"));
 
 		mockMvc.perform(get("/owner/holds?status=CANCELED_BY_USER").header("Authorization", "Bearer " + token))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.totalElements").value(1))
-			.andExpect(jsonPath("$.data.content[0].totalQty").value(2));
+			.andExpect(jsonPath("$.data.holds.totalElements").value(1))
+			.andExpect(jsonPath("$.data.holds.content[0].totalQty").value(2));
 	}
 
 	@Test
@@ -131,7 +132,7 @@ class OwnerHoldControllerTest {
 
 		mockMvc.perform(get("/owner/holds").header("Authorization", "Bearer " + token))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.totalElements").value(2));
+			.andExpect(jsonPath("$.data.holds.totalElements").value(2));
 	}
 
 	@Test
@@ -143,10 +144,10 @@ class OwnerHoldControllerTest {
 
 		mockMvc.perform(get("/owner/holds?size=2").header("Authorization", "Bearer " + token))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.content.length()").value(2))
-			.andExpect(jsonPath("$.data.totalElements").value(3))
-			.andExpect(jsonPath("$.data.totalPages").value(2))
-			.andExpect(jsonPath("$.data.last").value(false));
+			.andExpect(jsonPath("$.data.holds.content.length()").value(2))
+			.andExpect(jsonPath("$.data.holds.totalElements").value(3))
+			.andExpect(jsonPath("$.data.holds.totalPages").value(2))
+			.andExpect(jsonPath("$.data.holds.last").value(false));
 	}
 
 	@Test
