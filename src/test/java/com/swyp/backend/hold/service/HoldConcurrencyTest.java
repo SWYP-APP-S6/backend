@@ -3,10 +3,12 @@ package com.swyp.backend.hold.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
+import com.swyp.backend.AppDataCleaner;
 import com.swyp.backend.RedisTestcontainersConfiguration;
 import com.swyp.backend.TestcontainersConfiguration;
 import com.swyp.backend.common.security.JwtTokenProvider;
 import com.swyp.backend.common.security.TokenRealm;
+import com.swyp.backend.hold.HoldFixture;
 import com.swyp.backend.hold.entity.Hold;
 import com.swyp.backend.hold.entity.HoldStatus;
 import com.swyp.backend.hold.repository.HoldRepository;
@@ -51,6 +53,9 @@ import org.springframework.test.web.servlet.MockMvc;
 @Import({TestcontainersConfiguration.class, RedisTestcontainersConfiguration.class})
 @TestPropertySource(properties = "hold.expiry-scan-interval=1h")
 class HoldConcurrencyTest {
+
+	@Autowired
+	AppDataCleaner appDataCleaner;
 
 	@Autowired
 	MockMvc mockMvc;
@@ -132,11 +137,7 @@ class HoldConcurrencyTest {
 	}
 
 	private void clearCommittedRows() {
-		holdRepository.deleteAll();
-		notificationRepository.deleteAll();
-		productRepository.deleteAll();
-		storeRepository.deleteAll();
-		userRepository.deleteAll();
+		appDataCleaner.clear();
 	}
 
 	private Product reloaded() {
@@ -173,7 +174,7 @@ class HoldConcurrencyTest {
 		held.hold(1);
 		productRepository.saveAndFlush(held);
 		Hold overdue = holdRepository.saveAndFlush(
-				new Hold(user, held, 1, Instant.now().minusSeconds(60)));
+				HoldFixture.hold(user, held, 1, Instant.now().minusSeconds(60)));
 
 		List<Integer> expired = runTogether(List.<Callable<Integer>>of(
 				holdExpiryService::expireOverdueHolds,
@@ -197,7 +198,7 @@ class HoldConcurrencyTest {
 		Product held = reloaded();
 		held.hold(1);
 		productRepository.saveAndFlush(held);
-		holdRepository.saveAndFlush(new Hold(user, held, 1, Instant.now().minusSeconds(60)));
+		holdRepository.saveAndFlush(HoldFixture.hold(user, held, 1, Instant.now().minusSeconds(60)));
 
 		String buyer = tokenFor("새소비자");
 		String body = "{\"productId\":%d,\"qty\":1}".formatted(product.getId());

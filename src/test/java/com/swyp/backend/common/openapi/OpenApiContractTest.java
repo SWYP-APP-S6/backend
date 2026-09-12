@@ -24,6 +24,8 @@ class OpenApiContractTest {
 
 	private static final List<String> SPRING_OWNED_SCHEMAS = List.of("Pageable", "PageableObject");
 
+	private static final List<String> WRAPPERS_OF_ONE_OPTIONAL_VALUE = List.of("ActiveHoldResponse");
+
 	private static final List<String> ERROR_STATUSES = List.of("400", "401", "403", "429", "500");
 
 	@Autowired
@@ -108,7 +110,8 @@ class OpenApiContractTest {
 		List<String> withoutRequired = new ArrayList<>();
 		schemas.propertyNames().forEach(name -> {
 			JsonNode schema = schemas.get(name);
-			if (SPRING_OWNED_SCHEMAS.contains(name)) {
+			if (SPRING_OWNED_SCHEMAS.contains(name)
+					|| WRAPPERS_OF_ONE_OPTIONAL_VALUE.contains(name)) {
 				return;
 			}
 			if (schema.has("properties") && !schema.has("required")) {

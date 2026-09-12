@@ -2,7 +2,7 @@ package com.swyp.backend.hold.function;
 
 import com.swyp.backend.common.exception.BusinessException;
 import com.swyp.backend.hold.dto.ActiveHoldQty;
-import com.swyp.backend.hold.dto.HoldTarget;
+import com.swyp.backend.hold.dto.HoldRef;
 import com.swyp.backend.hold.dto.OverdueHold;
 import com.swyp.backend.hold.dto.OwnerHoldStatus;
 import com.swyp.backend.hold.entity.Hold;
@@ -13,8 +13,8 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Optional;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -35,32 +35,50 @@ public class HoldFunction {
 				.orElseThrow(() -> new BusinessException(HoldErrorCode.HOLD_NOT_FOUND));
 	}
 
-	public Long getProductIdOfUserHold(Long userId, Long holdId) {
-		return holdRepository.findProductIdByUserIdAndHoldId(userId, holdId)
-				.orElseThrow(() -> new BusinessException(HoldErrorCode.HOLD_NOT_FOUND));
-	}
-
 	public Hold getDetailOfUserHold(Long userId, Long holdId) {
 		return holdRepository.findDetailByUserIdAndHoldId(userId, holdId)
 				.orElseThrow(() -> new BusinessException(HoldErrorCode.HOLD_NOT_FOUND));
 	}
 
-	public List<Hold> findActiveOf(Long userId, Instant now) {
-		return holdRepository.findActiveDetailsByUserId(userId, now);
+	public Optional<Hold> findActiveOf(Long userId, Instant now) {
+		return holdRepository.findActiveDetailByUserId(userId, now);
 	}
 
-	public Optional<Hold> findHoldingOf(Long userId, Long productId) {
-		return holdRepository.findByUserIdAndProductIdAndStatus(
-				userId, productId, HoldStatus.HOLDING);
+	public Optional<HoldRef> findHoldingRefOf(Long userId) {
+		return holdRepository.findHoldingRefByUserId(userId);
+	}
+
+	public List<Long> getProductIdsOfUserHold(Long userId, Long holdId) {
+		List<Long> productIds = holdRepository.findProductIdsOfUserHold(userId, holdId);
+		if (productIds.isEmpty()) {
+			throw new BusinessException(HoldErrorCode.HOLD_NOT_FOUND);
+		}
+		return productIds;
+	}
+
+	public List<Long> getProductIdsOfHold(Long holdId) {
+		List<Long> productIds = holdRepository.findProductIdsOfHold(holdId);
+		if (productIds.isEmpty()) {
+			throw new BusinessException(HoldErrorCode.HOLD_NOT_FOUND);
+		}
+		return productIds;
+	}
+
+	public Long getStoreIdOfHold(Long holdId) {
+		return holdRepository.findStoreIdById(holdId)
+				.orElseThrow(() -> new BusinessException(HoldErrorCode.HOLD_NOT_FOUND));
 	}
 
 	public Optional<Long> findHoldingIdOf(Long userId, Long productId) {
-		return holdRepository.findByUserIdAndProductIdAndStatus(userId, productId, HoldStatus.HOLDING)
-				.map(Hold::getId);
+		return holdRepository.findHoldingIdOfProduct(userId, productId);
 	}
 
 	public List<OverdueHold> findOverdue(Instant now) {
 		return holdRepository.findOverdueByStatus(HoldStatus.HOLDING, now);
+	}
+
+	public List<Hold> findUnchargedNoShows(Long userId, Instant decidedBefore) {
+		return holdRepository.findUnchargedNoShows(userId, decidedBefore);
 	}
 
 	public void flush() {
@@ -76,8 +94,12 @@ public class HoldFunction {
 				.collect(Collectors.toMap(ActiveHoldQty::productId, ActiveHoldQty::qty));
 	}
 
+	public List<Long> findProductIdsSharingActiveHoldsWith(Long productId) {
+		return holdRepository.findProductIdsOfActiveHoldsContaining(productId);
+	}
+
 	public List<Hold> findActiveHoldsOfProduct(Long productId) {
-		return holdRepository.findByProductIdAndStatus(productId, HoldStatus.HOLDING);
+		return holdRepository.findByItemProductIdAndStatus(productId, HoldStatus.HOLDING);
 	}
 
 	public List<Hold> findHoldingOfStore(Long storeId) {
@@ -97,11 +119,6 @@ public class HoldFunction {
 				.orElseThrow(() -> new BusinessException(HoldErrorCode.HOLD_NOT_FOUND));
 	}
 
-	public HoldTarget getTargetById(Long holdId) {
-		return holdRepository.findTargetById(holdId)
-				.orElseThrow(() -> new BusinessException(HoldErrorCode.HOLD_NOT_FOUND));
-	}
-
 	public long countCompletedTodayOfStore(Long storeId) {
 		return holdRepository.countCompletedSince(storeId, startOfToday());
 	}
@@ -111,7 +128,7 @@ public class HoldFunction {
 	}
 
 	public long completedQtyOfProduct(Long productId) {
-		return holdRepository.sumQtyByProductIdAndStatus(productId, HoldStatus.COMPLETED);
+		return holdRepository.sumItemQtyByProductIdAndStatus(productId, HoldStatus.COMPLETED);
 	}
 
 	private Instant startOfToday() {

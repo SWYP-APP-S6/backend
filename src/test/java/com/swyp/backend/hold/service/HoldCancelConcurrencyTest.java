@@ -2,9 +2,13 @@ package com.swyp.backend.hold.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.swyp.backend.AppDataCleaner;
 import com.swyp.backend.RedisTestcontainersConfiguration;
 import com.swyp.backend.TestcontainersConfiguration;
 import com.swyp.backend.common.exception.BusinessException;
+import com.swyp.backend.hold.HoldFixture;
+import com.swyp.backend.hold.HoldFixture;
+import com.swyp.backend.hold.dto.HoldCreateRequest;
 import com.swyp.backend.hold.entity.Hold;
 import com.swyp.backend.hold.entity.HoldStatus;
 import com.swyp.backend.hold.exception.HoldErrorCode;
@@ -45,6 +49,9 @@ import org.springframework.test.context.TestPropertySource;
 class HoldCancelConcurrencyTest {
 
 	@Autowired
+	AppDataCleaner appDataCleaner;
+
+	@Autowired
 	HoldService holdService;
 
 	@Autowired
@@ -77,15 +84,38 @@ class HoldCancelConcurrencyTest {
 			new User(UserRole.OWNER, "청과마을사장", null, false, Instant.now()));
 		consumer = userRepository.saveAndFlush(
 			new User(UserRole.CONSUMER, "손님", null, false, Instant.now()));
-		store = storeRepository.saveAndFlush(new Store(
+		Store unapproved = new Store(
 			owner, "청과마을", "04524", "서울특별시 강남구 역삼로 1", null, "0212345678",
 			new BigDecimal("37.500000"), new BigDecimal("127.030000"),
-			LocalTime.of(9, 0), LocalTime.of(21, 0)));
+			LocalTime.of(9, 0), LocalTime.of(21, 0));
+		unapproved.approve();
+		store = storeRepository.saveAndFlush(unapproved);
 	}
 
 	@AfterEach
 	void tearDown() {
 		clearCommittedRows();
+	}
+
+	@Test
+	void twoTapsOnAddAtOnceLandInOneGroupRatherThanColliding() throws Exception {
+		Product carrot = createProduct("당근", 10);
+		Product onion = createProduct("양파", 10);
+
+		List<Throwable> failures = runTogether(
+			() -> holdService.create(consumer.getId(), new HoldCreateRequest(carrot.getId(), 1)),
+			() -> holdService.create(consumer.getId(), new HoldCreateRequest(onion.getId(), 2)));
+
+		assertThat(failures).isEmpty();
+		assertThat(holdRepository.count())
+			.as("a user has one hold in progress, so the second tap has to join the first")
+			.isEqualTo(1);
+		Hold hold = holdRepository
+			.findDetailById(holdRepository.findAll().getFirst().getId())
+			.orElseThrow();
+		assertThat(hold.getItems()).hasSize(2);
+		assertThat(reload(carrot).getAvailableQty()).isEqualTo(9);
+		assertThat(reload(onion).getAvailableQty()).isEqualTo(8);
 	}
 
 	@Test
@@ -206,14 +236,10 @@ class HoldCancelConcurrencyTest {
 		product.hold(qty);
 		productRepository.saveAndFlush(product);
 		return holdRepository.saveAndFlush(
-			new Hold(user, product, qty, Instant.now().plus(Duration.ofMinutes(15))));
+			HoldFixture.hold(user, product, qty, Instant.now().plus(Duration.ofMinutes(15))));
 	}
 
 	private void clearCommittedRows() {
-		holdRepository.deleteAll();
-		notificationRepository.deleteAll();
-		productRepository.deleteAll();
-		storeRepository.deleteAll();
-		userRepository.deleteAll();
+		appDataCleaner.clear();
 	}
 }

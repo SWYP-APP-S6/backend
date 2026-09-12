@@ -2,6 +2,7 @@ package com.swyp.backend.hold.dto;
 
 import com.swyp.backend.hold.entity.Hold;
 import com.swyp.backend.hold.entity.HoldCanceledBy;
+import com.swyp.backend.hold.entity.HoldItem;
 import com.swyp.backend.hold.entity.HoldStatus;
 import com.swyp.backend.product.entity.Product;
 import com.swyp.backend.product.entity.ProductStatus;
@@ -9,13 +10,14 @@ import com.swyp.backend.store.entity.Store;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalTime;
+import java.util.Comparator;
+import java.util.List;
 import org.jspecify.annotations.Nullable;
 
 public record HoldDetailResponse(
 		Long id,
 		HoldStatus status,
-		int qty,
-		int unitPrice,
+		int totalQty,
 		int totalPrice,
 		Instant heldAt,
 		Instant expiresAt,
@@ -24,27 +26,32 @@ public record HoldDetailResponse(
 		@Nullable Instant canceledAt,
 		@Nullable HoldCanceledBy canceledBy,
 		@Nullable String cancelReason,
-		HoldProduct product,
-		HoldStore store) {
+		HoldStore store,
+		List<HoldItemResponse> items) {
 
-	public record HoldProduct(
-			Long id,
+	public record HoldItemResponse(
+			Long productId,
 			String name,
 			String photoUrl,
 			int originalPrice,
 			int salePrice,
 			short discountRate,
-			ProductStatus status) {
+			ProductStatus status,
+			int qty,
+			int lineTotal) {
 
-		static HoldProduct from(Product product) {
-			return new HoldProduct(
+		static HoldItemResponse from(HoldItem item) {
+			Product product = item.getProduct();
+			return new HoldItemResponse(
 					product.getId(),
 					product.getName(),
 					product.getPhotoUrl(),
 					product.getOriginalPrice(),
 					product.getSalePrice(),
 					product.getDiscountRate(),
-					product.getStatus());
+					product.getStatus(),
+					item.getQty(),
+					product.getSalePrice() * item.getQty());
 		}
 	}
 
@@ -74,20 +81,19 @@ public record HoldDetailResponse(
 	}
 
 	private static HoldStatus statusAt(Hold hold, Instant serverTime) {
-		if (hold.getStatus() == HoldStatus.HOLDING && !hold.getExpiresAt().isAfter(serverTime)) {
-			return HoldStatus.EXPIRED;
-		}
-		return hold.getStatus();
+		return hold.isOverdueAt(serverTime) ? HoldStatus.EXPIRED : hold.getStatus();
 	}
 
 	public static HoldDetailResponse from(Hold hold, Instant serverTime) {
-		Product product = hold.getProduct();
+		List<HoldItemResponse> items = hold.getItems().stream()
+				.sorted(Comparator.comparing(item -> item.getProduct().getId()))
+				.map(HoldItemResponse::from)
+				.toList();
 		return new HoldDetailResponse(
 				hold.getId(),
 				statusAt(hold, serverTime),
-				hold.getQty(),
-				product.getSalePrice(),
-				product.getSalePrice() * hold.getQty(),
+				items.stream().mapToInt(HoldItemResponse::qty).sum(),
+				items.stream().mapToInt(HoldItemResponse::lineTotal).sum(),
 				hold.getCreatedAt(),
 				hold.getExpiresAt(),
 				serverTime,
@@ -95,7 +101,7 @@ public record HoldDetailResponse(
 				hold.getCanceledAt(),
 				hold.getCanceledBy(),
 				hold.getCancelReason(),
-				HoldProduct.from(product),
-				HoldStore.from(product.getStore()));
+				HoldStore.from(hold.getStore()),
+				items);
 	}
 }

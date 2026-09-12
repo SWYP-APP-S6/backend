@@ -24,6 +24,11 @@ public class UserFunction {
 				.orElseThrow(() -> new BusinessException(UserAuthErrorCode.USER_NOT_FOUND));
 	}
 
+	public User getByIdForUpdate(Long id) {
+		return userRepository.findByIdForUpdate(id)
+				.orElseThrow(() -> new BusinessException(UserAuthErrorCode.USER_NOT_FOUND));
+	}
+
 	public Optional<User> findByOauthIdentity(String provider, String providerId, UserRole role) {
 		return userRepository.findByOauthProviderAndOauthProviderIdAndRole(provider, providerId, role);
 	}

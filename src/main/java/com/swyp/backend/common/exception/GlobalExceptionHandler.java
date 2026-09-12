@@ -24,7 +24,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 	public ResponseEntity<ErrorResponse> handleBusiness(BusinessException e) {
 		ApiCode code = e.getCode();
 		log.warn("Business exception: {} - {}", code.name(), code.getMessage());
-		return ResponseEntity.status(code.getStatus()).body(ErrorResponse.of(code));
+		return ResponseEntity.status(code.getStatus()).body(ErrorResponse.of(code, e.getRetryAt()));
 	}
 
 	@ExceptionHandler(Exception.class)
@@ -55,6 +55,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 		HttpStatus resolved = HttpStatus.resolve(statusCode.value());
 		String code = (resolved != null) ? resolved.name() : "ERROR";
 		String message = (resolved != null) ? resolved.getReasonPhrase() : "요청을 처리할 수 없습니다.";
-		return new ErrorResponse(statusCode.value(), code, message, null);
+		return new ErrorResponse(statusCode.value(), code, message, null, null);
 	}
 }

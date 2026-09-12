@@ -8,6 +8,7 @@ import com.swyp.backend.RedisTestcontainersConfiguration;
 import com.swyp.backend.TestcontainersConfiguration;
 import com.swyp.backend.common.security.JwtTokenProvider;
 import com.swyp.backend.common.security.TokenRealm;
+import com.swyp.backend.hold.HoldFixture;
 import com.swyp.backend.hold.entity.Hold;
 import com.swyp.backend.hold.repository.HoldRepository;
 import com.swyp.backend.notification.entity.Notification;
@@ -102,7 +103,7 @@ class OwnerHomeControllerTest {
 		User consumer = createConsumer();
 		carrot.hold(2);
 		productRepository.saveAndFlush(carrot);
-		holdRepository.saveAndFlush(new Hold(consumer, carrot, 2, Instant.now().plus(Duration.ofMinutes(15))));
+		holdRepository.saveAndFlush(HoldFixture.hold(consumer, carrot, 2, Instant.now().plus(Duration.ofMinutes(15))));
 		completedHold(consumer, potato, 1, Instant.now());
 
 		mockMvc.perform(get("/owner/home").header("Authorization", "Bearer " + token))
@@ -129,7 +130,7 @@ class OwnerHomeControllerTest {
 		User consumer = createConsumer();
 		carrot.hold(3);
 		productRepository.saveAndFlush(carrot);
-		holdRepository.saveAndFlush(new Hold(consumer, carrot, 3, Instant.now().plus(Duration.ofMinutes(15))));
+		holdRepository.saveAndFlush(HoldFixture.hold(consumer, carrot, 3, Instant.now().plus(Duration.ofMinutes(15))));
 		expiredHold(createConsumer(), carrot, 1, Instant.now());
 		expiredHold(createConsumer(), carrot, 1, Instant.now().minus(2, ChronoUnit.DAYS));
 
@@ -146,7 +147,7 @@ class OwnerHomeControllerTest {
 		User consumer = createConsumer();
 		carrot.hold(2);
 		productRepository.saveAndFlush(carrot);
-		holdRepository.saveAndFlush(new Hold(consumer, carrot, 2, Instant.now().plus(Duration.ofMinutes(15))));
+		holdRepository.saveAndFlush(HoldFixture.hold(consumer, carrot, 2, Instant.now().plus(Duration.ofMinutes(15))));
 
 		mockMvc.perform(get("/owner/home").header("Authorization", "Bearer " + token))
 			.andExpect(status().isOk())
@@ -162,15 +163,15 @@ class OwnerHomeControllerTest {
 		Product carrot = createProduct("당근", 10);
 		User late = userRepository.saveAndFlush(new User(UserRole.CONSUMER, "늦게오는손님", null, false, Instant.now()));
 		User soon = userRepository.saveAndFlush(new User(UserRole.CONSUMER, "곧오는손님", null, false, Instant.now()));
-		holdRepository.saveAndFlush(new Hold(late, carrot, 1, Instant.now().plus(Duration.ofMinutes(14))));
-		holdRepository.saveAndFlush(new Hold(soon, carrot, 2, Instant.now().plus(Duration.ofMinutes(3))));
+		holdRepository.saveAndFlush(HoldFixture.hold(late, carrot, 1, Instant.now().plus(Duration.ofMinutes(14))));
+		holdRepository.saveAndFlush(HoldFixture.hold(soon, carrot, 2, Instant.now().plus(Duration.ofMinutes(3))));
 
 		mockMvc.perform(get("/owner/home").header("Authorization", "Bearer " + token))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.upcomingVisits.length()").value(2))
 			.andExpect(jsonPath("$.data.upcomingVisits[0].nickname").value("곧오는손님"))
-			.andExpect(jsonPath("$.data.upcomingVisits[0].productName").value("당근"))
-			.andExpect(jsonPath("$.data.upcomingVisits[0].qty").value(2))
+			.andExpect(jsonPath("$.data.upcomingVisits[0].summary").value("당근"))
+			.andExpect(jsonPath("$.data.upcomingVisits[0].totalQty").value(2))
 			.andExpect(jsonPath("$.data.upcomingVisits[1].nickname").value("늦게오는손님"));
 	}
 
@@ -233,7 +234,7 @@ class OwnerHomeControllerTest {
 			otherStore, "남의상품", ProductCategory.FRUIT, 5, 1000, 800,
 			LocalDateTime.now(), LocalDateTime.now().plusHours(1), "https://example.com/b.jpg"));
 		holdRepository.saveAndFlush(
-			new Hold(createConsumer(), othersProduct, 2, Instant.now().plus(Duration.ofMinutes(15))));
+			HoldFixture.hold(createConsumer(), othersProduct, 2, Instant.now().plus(Duration.ofMinutes(15))));
 
 		mockMvc.perform(get("/owner/home").header("Authorization", "Bearer " + token))
 			.andExpect(status().isOk())
@@ -280,13 +281,13 @@ class OwnerHomeControllerTest {
 	}
 
 	private void completedHold(User user, Product product, int qty, Instant completedAt) {
-		Hold hold = new Hold(user, product, qty, completedAt.plus(Duration.ofMinutes(15)));
+		Hold hold = HoldFixture.hold(user, product, qty, completedAt.plus(Duration.ofMinutes(15)));
 		hold.complete(completedAt);
 		holdRepository.saveAndFlush(hold);
 	}
 
 	private void expiredHold(User user, Product product, int qty, Instant expiresAt) {
-		Hold hold = new Hold(user, product, qty, expiresAt);
+		Hold hold = HoldFixture.hold(user, product, qty, expiresAt);
 		hold.expire();
 		holdRepository.saveAndFlush(hold);
 	}

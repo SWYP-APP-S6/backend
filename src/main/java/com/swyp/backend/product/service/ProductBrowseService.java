@@ -2,6 +2,7 @@ package com.swyp.backend.product.service;
 
 import com.swyp.backend.common.BrowseProperties;
 import com.swyp.backend.common.Distance;
+import com.swyp.backend.hold.dto.HoldRef;
 import com.swyp.backend.hold.function.HoldFunction;
 import com.swyp.backend.product.dto.NearbyProductSort;
 import com.swyp.backend.product.dto.NearbyProductsRequest;
@@ -17,12 +18,14 @@ import com.swyp.backend.recipe.entity.Recipe;
 import com.swyp.backend.recipe.function.RecipeFunction;
 import com.swyp.backend.store.entity.Store;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -67,10 +70,17 @@ public class ProductBrowseService {
 					store.getLatitude().doubleValue(), store.getLongitude().doubleValue()));
 		}
 
+		Optional<HoldRef> activeHold = holdFunction.findHoldingRefOf(viewerId)
+				.filter(ref -> ref.expiresAt().isAfter(Instant.now(clock)));
+		boolean holdsThisStore = activeHold
+				.filter(ref -> ref.storeId().equals(store.getId()))
+				.isPresent();
+
 		return ProductBrowseDetailResponse.of(
 				product,
 				recipeFunction.ingredientNamesOf(product.getIngredientIds()),
-				holdFunction.findHoldingIdOf(viewerId, productId).orElse(null),
+				holdsThisStore ? holdFunction.findHoldingIdOf(viewerId, productId).orElse(null) : null,
+				activeHold.isPresent() && !holdsThisStore,
 				distanceMeters,
 				isOpenNow(store),
 				product.getPickupEndAt().isAfter(LocalDateTime.now(clock)),
