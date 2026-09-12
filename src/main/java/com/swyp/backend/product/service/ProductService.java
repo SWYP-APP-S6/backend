@@ -2,6 +2,7 @@ package com.swyp.backend.product.service;
 
 import com.swyp.backend.common.exception.BusinessException;
 import com.swyp.backend.hold.entity.Hold;
+import com.swyp.backend.hold.entity.HoldItem;
 import com.swyp.backend.hold.function.HoldFunction;
 import com.swyp.backend.notification.entity.NotificationType;
 import com.swyp.backend.notification.function.NotificationFunction;
@@ -20,7 +21,10 @@ import com.swyp.backend.store.function.StoreFunction;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -85,7 +89,8 @@ public class ProductService {
 	public ProductDetailResponse updateAvailableQty(
 			Long ownerId, Long productId, ProductAvailableQtyUpdateRequest request) {
 		Store store = storeFunction.getByOwnerId(ownerId);
-		Product product = productFunction.getByIdForUpdate(productId);
+		Map<Long, Product> locked = lockProducts(productId, request.availableQty() == 0);
+		Product product = locked.get(productId);
 		if (!product.getStore().getId().equals(store.getId())) {
 			throw new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND);
 		}
@@ -94,13 +99,25 @@ public class ProductService {
 		}
 
 		if (request.availableQty() == 0) {
-			applyZeroQtyDisposition(product, request.disposition());
+			applyZeroQtyDisposition(product, request.disposition(), locked);
 		}
 		product.adjustAvailableQty(request.availableQty());
 		return ProductDetailResponse.from(product, completedQtyOf(productId));
 	}
 
-	private void applyZeroQtyDisposition(Product product, HoldDisposition disposition) {
+	private Map<Long, Product> lockProducts(Long productId, boolean withHoldSiblings) {
+		List<Long> ids = new ArrayList<>(List.of(productId));
+		if (withHoldSiblings) {
+			ids.addAll(holdFunction.findProductIdsSharingActiveHoldsWith(productId));
+		}
+		Map<Long, Product> locked = new LinkedHashMap<>();
+		ids.stream().distinct().sorted()
+				.forEach(id -> locked.put(id, productFunction.getByIdForUpdate(id)));
+		return locked;
+	}
+
+	private void applyZeroQtyDisposition(
+			Product product, HoldDisposition disposition, Map<Long, Product> locked) {
 		List<Hold> activeHolds = holdFunction.findActiveHoldsOfProduct(product.getId());
 		if (activeHolds.isEmpty()) {
 			return;
@@ -112,6 +129,9 @@ public class ProductService {
 			Instant now = Instant.now(clock);
 			for (Hold hold : activeHolds) {
 				hold.cancelByOwner(now, OWNER_CANCEL_REASON);
+				for (HoldItem item : hold.getItems()) {
+					locked.get(item.getProduct().getId()).releaseHold(item.getQty());
+				}
 				notificationFunction.notify(
 						hold.getUser(),
 						NotificationType.HOLD_CANCELED_BY_OWNER,

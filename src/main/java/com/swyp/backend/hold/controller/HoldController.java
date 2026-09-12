@@ -2,6 +2,7 @@ package com.swyp.backend.hold.controller;
 
 import com.swyp.backend.common.response.ApiResponse;
 import com.swyp.backend.common.response.SuccessCode;
+import com.swyp.backend.hold.dto.ActiveHoldResponse;
 import com.swyp.backend.hold.dto.HoldCreateRequest;
 import com.swyp.backend.hold.dto.HoldDetailResponse;
 import com.swyp.backend.hold.service.HoldService;
@@ -11,7 +12,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -36,8 +36,8 @@ public class HoldController {
 	}
 
 	@GetMapping("/active")
-	public ApiResponse<List<HoldDetailResponse>> getActiveHolds(@AuthenticationPrincipal Long userId) {
-		return ApiResponse.of(SuccessCode.OK, holdService.getActiveHolds(userId));
+	public ApiResponse<ActiveHoldResponse> getActiveHold(@AuthenticationPrincipal Long userId) {
+		return ApiResponse.of(SuccessCode.OK, holdService.getActiveHold(userId));
 	}
 
 	@GetMapping("/{holdId}")
