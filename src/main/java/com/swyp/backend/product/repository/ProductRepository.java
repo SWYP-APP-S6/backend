@@ -6,6 +6,7 @@ import com.swyp.backend.product.entity.ProductCategory;
 import com.swyp.backend.product.entity.ProductStatus;
 import jakarta.persistence.LockModeType;
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
@@ -32,6 +33,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 			join fetch p.store s
 			""" + WHERE_SELLABLE_AS_OF_NOW + """
 			and s.status = com.swyp.backend.store.entity.StoreStatus.APPROVED
+			and :today member of s.businessDays
 			and s.latitude between :minLatitude and :maxLatitude
 			and s.longitude between :minLongitude and :maxLongitude
 			and (:category is null or p.category = :category)
@@ -39,6 +41,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 			""")
 	List<Product> findSellableWithinBounds(
 			@Param("now") LocalDateTime now,
+			@Param("today") DayOfWeek today,
 			@Param("category") ProductCategory category,
 			@Param("minLatitude") BigDecimal minLatitude,
 			@Param("maxLatitude") BigDecimal maxLatitude,
@@ -64,11 +67,14 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 			select new com.swyp.backend.product.dto.StoreProductSummary(p.store.id, count(p))
 			from Product p
 			""" + WHERE_SELLABLE_AS_OF_NOW + """
+			and :today member of p.store.businessDays
 			and p.store.id in :storeIds
 			group by p.store.id
 			""")
 	List<StoreProductSummary> summarizeSellableByStoreIds(
-			@Param("now") LocalDateTime now, @Param("storeIds") Collection<Long> storeIds);
+			@Param("now") LocalDateTime now,
+			@Param("today") DayOfWeek today,
+			@Param("storeIds") Collection<Long> storeIds);
 
 	@Query("""
 			select p from Product p

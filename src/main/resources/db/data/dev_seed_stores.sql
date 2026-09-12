@@ -32,3 +32,13 @@ from (values
 ) as v(nickname, name, address, address_detail, phone, latitude, longitude,
        open_time, close_time, status, brn, note, age)
 join users u on u.nickname = v.nickname;
+
+-- 영업 요일. 비워 두면 "오늘 영업하는 가게" 필터(V0016 의 주석 참고)가 이 가게들을 목록·지도에서
+-- 통째로 지운다 -- 마이그레이션의 백필은 그때 이미 있던 행만 채우므로 이 스크립트가 스스로 넣어야 한다.
+insert into store_business_days (store_id, day_of_week)
+select s.id, d.day_of_week
+from stores s
+join users u on u.id = s.owner_user_id and u.nickname like 'dev\_%'
+cross join (values ('MONDAY'), ('TUESDAY'), ('WEDNESDAY'), ('THURSDAY'),
+                   ('FRIDAY'), ('SATURDAY'), ('SUNDAY')) as d(day_of_week)
+on conflict do nothing;

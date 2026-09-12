@@ -67,8 +67,9 @@ public class ProductFunction {
 		if (storeIds.isEmpty()) {
 			return Map.of();
 		}
+		LocalDateTime now = LocalDateTime.now(clock);
 		return productRepository
-				.summarizeSellableByStoreIds(LocalDateTime.now(clock), storeIds).stream()
+				.summarizeSellableByStoreIds(now, now.getDayOfWeek(), storeIds).stream()
 				.collect(Collectors.toMap(
 						StoreProductSummary::storeId, StoreProductSummary::productCount));
 	}
@@ -78,8 +79,10 @@ public class ProductFunction {
 		BigDecimal latitudeDelta = Distance.latitudeDelta(radiusMeters);
 		BigDecimal longitudeDelta = Distance.longitudeDelta(radiusMeters, latitude.doubleValue());
 
+		LocalDateTime now = LocalDateTime.now(clock);
 		return productRepository.findSellableWithinBounds(
-						LocalDateTime.now(clock),
+						now,
+						now.getDayOfWeek(),
 						category,
 						latitude.subtract(latitudeDelta),
 						latitude.add(latitudeDelta),
