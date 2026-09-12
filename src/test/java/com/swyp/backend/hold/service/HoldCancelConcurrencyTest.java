@@ -24,6 +24,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -41,7 +42,10 @@ import org.springframework.test.context.TestPropertySource;
 @SpringBootTest
 @Import({TestcontainersConfiguration.class, RedisTestcontainersConfiguration.class})
 @TestPropertySource(properties = "hold.expiry-scan-interval=1h")
-class OwnerHoldPickupConcurrencyTest {
+class HoldCancelConcurrencyTest {
+
+	@Autowired
+	HoldService holdService;
 
 	@Autowired
 	OwnerHoldService ownerHoldService;
@@ -62,14 +66,17 @@ class OwnerHoldPickupConcurrencyTest {
 	NotificationRepository notificationRepository;
 
 	private User owner;
+	private User consumer;
 	private Store store;
 
 	@BeforeEach
 	void setUp() {
-		clearAll();
+		clearCommittedRows();
 
 		owner = userRepository.saveAndFlush(
 			new User(UserRole.OWNER, "청과마을사장", null, false, Instant.now()));
+		consumer = userRepository.saveAndFlush(
+			new User(UserRole.CONSUMER, "손님", null, false, Instant.now()));
 		store = storeRepository.saveAndFlush(new Store(
 			owner, "청과마을", "04524", "서울특별시 강남구 역삼로 1", null, "0212345678",
 			new BigDecimal("37.500000"), new BigDecimal("127.030000"),
@@ -78,59 +85,88 @@ class OwnerHoldPickupConcurrencyTest {
 
 	@AfterEach
 	void tearDown() {
-		clearAll();
+		clearCommittedRows();
 	}
 
 	@Test
-	void twoHoldsOnOneProduct_completedAtOnce_bothLeaveHeldQty() throws Exception {
+	void theSameHoldCanceledTwiceAtOnceGivesTheQuantityBackOnce() throws Exception {
 		Product product = createProduct("당근", 10);
-		product.hold(1);
-		product.hold(1);
-		productRepository.saveAndFlush(product);
-		Hold first = holding(product, 1);
-		Hold second = holding(product, 1);
-
-		List<Throwable> failures = completeAtOnce(first.getId(), second.getId());
-
-		assertThat(failures).isEmpty();
-		assertThat(heldQtyOf(product)).isZero();
-	}
-
-	@Test
-	void oneHold_completedTwiceAtOnce_completesOnce() throws Exception {
-		Product product = createProduct("당근", 10);
-		product.hold(2);
-		productRepository.saveAndFlush(product);
 		Hold hold = holding(product, 2);
 
-		List<Throwable> failures = completeAtOnce(hold.getId(), hold.getId());
+		List<Throwable> failures = runTogether(
+			() -> holdService.cancel(consumer.getId(), hold.getId()),
+			() -> holdService.cancel(consumer.getId(), hold.getId()));
 
 		assertThat(failures).singleElement()
 			.isInstanceOf(BusinessException.class)
 			.extracting(failure -> ((BusinessException) failure).getCode())
 			.isEqualTo(HoldErrorCode.HOLD_ALREADY_RESOLVED);
-		assertThat(heldQtyOf(product)).isZero();
-		assertThat(holdRepository.findById(hold.getId()).orElseThrow().getStatus())
-			.isEqualTo(HoldStatus.COMPLETED);
-		assertThat(notificationRepository.count()).isEqualTo(1);
+		assertThat(statusOf(hold)).isEqualTo(HoldStatus.CANCELED);
+		Product settled = reload(product);
+		assertThat(settled.getAvailableQty()).isEqualTo(10);
+		assertThat(settled.getHeldQty()).isZero();
 	}
 
-	private List<Throwable> completeAtOnce(Long... holdIds) throws Exception {
-		ExecutorService pool = Executors.newFixedThreadPool(holdIds.length);
-		CountDownLatch ready = new CountDownLatch(holdIds.length);
+	@Test
+	void cancelingWhileTheOwnerCompletesThePickupLeavesExactlyOneOutcome() throws Exception {
+		Product product = createProduct("당근", 10);
+		Hold hold = holding(product, 2);
+
+		List<Throwable> failures = runTogether(
+			() -> holdService.cancel(consumer.getId(), hold.getId()),
+			() -> ownerHoldService.completePickup(owner.getId(), hold.getId()));
+
+		assertThat(failures).singleElement()
+			.isInstanceOf(BusinessException.class)
+			.extracting(failure -> ((BusinessException) failure).getCode())
+			.isEqualTo(HoldErrorCode.HOLD_ALREADY_RESOLVED);
+
+		Product settled = reload(product);
+		assertThat(settled.getHeldQty()).isZero();
+		if (statusOf(hold) == HoldStatus.CANCELED) {
+			assertThat(settled.getAvailableQty()).isEqualTo(10);
+			assertThat(notificationRepository.count()).isZero();
+		} else {
+			assertThat(statusOf(hold)).isEqualTo(HoldStatus.COMPLETED);
+			assertThat(settled.getAvailableQty()).isEqualTo(8);
+			assertThat(notificationRepository.count()).isEqualTo(1);
+		}
+	}
+
+	@Test
+	void cancelingTwoHoldsOnOneProductAtOnceGivesBothQuantitiesBack() throws Exception {
+		Product product = createProduct("당근", 10);
+		User second = userRepository.saveAndFlush(
+			new User(UserRole.CONSUMER, "다른손님", null, false, Instant.now()));
+		Hold mine = holding(product, 2);
+		Hold theirs = holding(second, product, 3);
+
+		List<Throwable> failures = runTogether(
+			() -> holdService.cancel(consumer.getId(), mine.getId()),
+			() -> holdService.cancel(second.getId(), theirs.getId()));
+
+		assertThat(failures).isEmpty();
+		Product settled = reload(product);
+		assertThat(settled.getAvailableQty()).isEqualTo(10);
+		assertThat(settled.getHeldQty()).isZero();
+	}
+
+	private List<Throwable> runTogether(Runnable... actions) throws Exception {
+		ExecutorService pool = Executors.newFixedThreadPool(actions.length);
+		CountDownLatch ready = new CountDownLatch(actions.length);
 		CountDownLatch start = new CountDownLatch(1);
-		CountDownLatch done = new CountDownLatch(holdIds.length);
-		List<Throwable> failures = java.util.Collections.synchronizedList(new ArrayList<>());
-		AtomicInteger completed = new AtomicInteger();
+		CountDownLatch done = new CountDownLatch(actions.length);
+		List<Throwable> failures = Collections.synchronizedList(new ArrayList<>());
+		AtomicInteger succeeded = new AtomicInteger();
 
 		try {
-			for (Long holdId : holdIds) {
+			for (Runnable action : actions) {
 				pool.submit(() -> {
 					try {
 						ready.countDown();
 						start.await();
-						ownerHoldService.completePickup(owner.getId(), holdId);
-						completed.incrementAndGet();
+						action.run();
+						succeeded.incrementAndGet();
 					} catch (Throwable failure) {
 						failures.add(failure);
 					} finally {
@@ -144,12 +180,16 @@ class OwnerHoldPickupConcurrencyTest {
 		} finally {
 			pool.shutdownNow();
 		}
-		assertThat(completed.get() + failures.size()).isEqualTo(holdIds.length);
+		assertThat(succeeded.get() + failures.size()).isEqualTo(actions.length);
 		return failures;
 	}
 
-	private int heldQtyOf(Product product) {
-		return productRepository.findById(product.getId()).orElseThrow().getHeldQty();
+	private HoldStatus statusOf(Hold hold) {
+		return holdRepository.findById(hold.getId()).orElseThrow().getStatus();
+	}
+
+	private Product reload(Product product) {
+		return productRepository.findById(product.getId()).orElseThrow();
 	}
 
 	private Product createProduct(String name, int initialQty) {
@@ -159,13 +199,17 @@ class OwnerHoldPickupConcurrencyTest {
 	}
 
 	private Hold holding(Product product, int qty) {
-		User consumer = userRepository.saveAndFlush(
-			new User(UserRole.CONSUMER, "손님", null, false, Instant.now()));
-		return holdRepository.saveAndFlush(
-			new Hold(consumer, product, qty, Instant.now().plus(Duration.ofMinutes(15))));
+		return holding(consumer, product, qty);
 	}
 
-	private void clearAll() {
+	private Hold holding(User user, Product product, int qty) {
+		product.hold(qty);
+		productRepository.saveAndFlush(product);
+		return holdRepository.saveAndFlush(
+			new Hold(user, product, qty, Instant.now().plus(Duration.ofMinutes(15))));
+	}
+
+	private void clearCommittedRows() {
 		holdRepository.deleteAll();
 		notificationRepository.deleteAll();
 		productRepository.deleteAll();

@@ -11,6 +11,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import java.util.List;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -30,5 +33,22 @@ public class HoldController {
 		HoldDetailResponse response = holdService.create(userId, request);
 		return ResponseEntity.status(HttpStatus.CREATED)
 				.body(ApiResponse.of(SuccessCode.CREATED, response));
+	}
+
+	@GetMapping("/active")
+	public ApiResponse<List<HoldDetailResponse>> getActiveHolds(@AuthenticationPrincipal Long userId) {
+		return ApiResponse.of(SuccessCode.OK, holdService.getActiveHolds(userId));
+	}
+
+	@GetMapping("/{holdId}")
+	public ApiResponse<HoldDetailResponse> getHold(
+			@AuthenticationPrincipal Long userId, @PathVariable Long holdId) {
+		return ApiResponse.of(SuccessCode.OK, holdService.getHold(userId, holdId));
+	}
+
+	@PostMapping("/{holdId}/cancel")
+	public ApiResponse<HoldDetailResponse> cancelHold(
+			@AuthenticationPrincipal Long userId, @PathVariable Long holdId) {
+		return ApiResponse.of(SuccessCode.OK, holdService.cancel(userId, holdId));
 	}
 }

@@ -1,6 +1,7 @@
 package com.swyp.backend.hold.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -328,5 +329,182 @@ class HoldControllerTest {
 		Product held = productRepository.findById(product.getId()).orElseThrow();
 		assertThat(held.getAvailableQty()).isEqualTo(2);
 		assertThat(held.getHeldQty()).isEqualTo(1);
+	}
+
+	@Test
+	void cancelingMyHoldGivesTheQuantityBackAndRecordsWhoCanceled() throws Exception {
+		Hold hold = holding(consumer, 2, Instant.now().plusSeconds(600));
+
+		mockMvc.perform(post("/holds/{holdId}/cancel", hold.getId())
+				.header("Authorization", bearer(consumer)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.id").value(hold.getId()))
+			.andExpect(jsonPath("$.data.status").value("CANCELED"))
+			.andExpect(jsonPath("$.data.canceledBy").value("USER"))
+			.andExpect(jsonPath("$.data.canceledAt").exists())
+			.andExpect(jsonPath("$.data.qty").value(2));
+
+		Product released = productRepository.findById(product.getId()).orElseThrow();
+		assertThat(released.getAvailableQty()).isEqualTo(3);
+		assertThat(released.getHeldQty()).isZero();
+	}
+
+	@Test
+	void cancelingTheSameHoldTwiceGivesTheQuantityBackOnce() throws Exception {
+		Hold hold = holding(consumer, 2, Instant.now().plusSeconds(600));
+		mockMvc.perform(post("/holds/{holdId}/cancel", hold.getId())
+				.header("Authorization", bearer(consumer)))
+			.andExpect(status().isOk());
+
+		mockMvc.perform(post("/holds/{holdId}/cancel", hold.getId())
+				.header("Authorization", bearer(consumer)))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("HOLD_ALREADY_RESOLVED"));
+
+		Product released = productRepository.findById(product.getId()).orElseThrow();
+		assertThat(released.getAvailableQty()).isEqualTo(3);
+		assertThat(released.getHeldQty()).isZero();
+	}
+
+	@Test
+	void someoneElsesHoldIsNotFoundRatherThanForbidden() throws Exception {
+		User other = userRepository.saveAndFlush(
+				new User(UserRole.CONSUMER, "다른소비자", null, false, Instant.now()));
+		Hold hold = holding(other, 2, Instant.now().plusSeconds(600));
+
+		mockMvc.perform(post("/holds/{holdId}/cancel", hold.getId())
+				.header("Authorization", bearer(consumer)))
+			.andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.code").value("HOLD_NOT_FOUND"));
+
+		assertThat(holdRepository.findById(hold.getId()).orElseThrow().getStatus())
+			.isEqualTo(HoldStatus.HOLDING);
+		Product untouched = productRepository.findById(product.getId()).orElseThrow();
+		assertThat(untouched.getAvailableQty()).isEqualTo(1);
+		assertThat(untouched.getHeldQty()).isEqualTo(2);
+	}
+
+	@Test
+	void aHoldThatIsAlreadyPastItsExpiryCannotBeCanceled() throws Exception {
+		Hold overdue = holding(consumer, 2, Instant.now().minusSeconds(1));
+
+		mockMvc.perform(post("/holds/{holdId}/cancel", overdue.getId())
+				.header("Authorization", bearer(consumer)))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("HOLD_ALREADY_EXPIRED"));
+
+		assertThat(holdRepository.findById(overdue.getId()).orElseThrow().getStatus())
+			.as("the expiry batch owns the transition, so a late cancel must not record CANCELED")
+			.isEqualTo(HoldStatus.HOLDING);
+		Product untouched = productRepository.findById(product.getId()).orElseThrow();
+		assertThat(untouched.getAvailableQty()).isEqualTo(1);
+		assertThat(untouched.getHeldQty()).isEqualTo(2);
+	}
+
+	@Test
+	void cancelingIsClosedToGuests() throws Exception {
+		Hold hold = holding(consumer, 1, Instant.now().plusSeconds(600));
+
+		mockMvc.perform(post("/holds/{holdId}/cancel", hold.getId())
+				.header("Authorization", "Bearer " + tokenProvider.createAccessToken(
+					TokenRealm.GUEST, 1L, "GUEST")))
+			.andExpect(status().isForbidden())
+			.andExpect(jsonPath("$.code").value("LOGIN_REQUIRED"));
+
+		assertThat(holdRepository.findById(hold.getId()).orElseThrow().getStatus())
+			.isEqualTo(HoldStatus.HOLDING);
+	}
+
+	@Test
+	void readingMyHoldAnswersWithTheCountdownFieldsAndTheStore() throws Exception {
+		Hold hold = holding(consumer, 2, Instant.now().plusSeconds(600));
+
+		mockMvc.perform(get("/holds/{holdId}", hold.getId())
+				.header("Authorization", bearer(consumer)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.id").value(hold.getId()))
+			.andExpect(jsonPath("$.data.status").value("HOLDING"))
+			.andExpect(jsonPath("$.data.qty").value(2))
+			.andExpect(jsonPath("$.data.totalPrice").value(8000))
+			.andExpect(jsonPath("$.data.heldAt").exists())
+			.andExpect(jsonPath("$.data.expiresAt").exists())
+			.andExpect(jsonPath("$.data.serverTime").exists())
+			.andExpect(jsonPath("$.data.product.name").value("복숭아 4입"))
+			.andExpect(jsonPath("$.data.store.name").value("청과마을"));
+	}
+
+	@Test
+	void aHoldPastItsExpiryReadsAsExpiredWithoutBeingWrittenTo() throws Exception {
+		Hold overdue = holding(consumer, 2, Instant.now().minusSeconds(1));
+
+		mockMvc.perform(get("/holds/{holdId}", overdue.getId())
+				.header("Authorization", bearer(consumer)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.status").value("EXPIRED"));
+
+		assertThat(holdRepository.findById(overdue.getId()).orElseThrow().getStatus())
+			.as("a read must not transition the row -- the batch restores the stock with it")
+			.isEqualTo(HoldStatus.HOLDING);
+		Product untouched = productRepository.findById(product.getId()).orElseThrow();
+		assertThat(untouched.getAvailableQty()).isEqualTo(1);
+		assertThat(untouched.getHeldQty()).isEqualTo(2);
+	}
+
+	@Test
+	void readingSomeoneElsesHoldIsNotFound() throws Exception {
+		User other = userRepository.saveAndFlush(
+				new User(UserRole.CONSUMER, "다른소비자", null, false, Instant.now()));
+		Hold hold = holding(other, 1, Instant.now().plusSeconds(600));
+
+		mockMvc.perform(get("/holds/{holdId}", hold.getId())
+				.header("Authorization", bearer(consumer)))
+			.andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.code").value("HOLD_NOT_FOUND"));
+	}
+
+	@Test
+	void activeHoldsComeBackSoonestFirstAndLeaveOutTheOnesThatAreDone() throws Exception {
+		Product other = sellableProduct(5, LocalDateTime.now().plusHours(6));
+		Hold later = holding(consumer, product, 1, Instant.now().plusSeconds(900));
+		Hold sooner = holding(consumer, other, 1, Instant.now().plusSeconds(300));
+		holding(consumer, sellableProduct(5, LocalDateTime.now().plusHours(7)), 1,
+				Instant.now().minusSeconds(1));
+		Hold canceled = holding(consumer, sellableProduct(5, LocalDateTime.now().plusHours(8)), 1,
+				Instant.now().plusSeconds(600));
+		canceled.cancelByUser(Instant.now());
+		holdRepository.saveAndFlush(canceled);
+
+		mockMvc.perform(get("/holds/active").header("Authorization", bearer(consumer)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.length()").value(2))
+			.andExpect(jsonPath("$.data[0].id").value(sooner.getId()))
+			.andExpect(jsonPath("$.data[1].id").value(later.getId()));
+	}
+
+	@Test
+	void activeHoldsOfSomeoneElseAreNotListed() throws Exception {
+		User other = userRepository.saveAndFlush(
+				new User(UserRole.CONSUMER, "다른소비자", null, false, Instant.now()));
+		holding(other, 1, Instant.now().plusSeconds(600));
+
+		mockMvc.perform(get("/holds/active").header("Authorization", bearer(consumer)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.length()").value(0));
+
+		mockMvc.perform(get("/holds/active")
+				.header("Authorization", "Bearer " + tokenProvider.createAccessToken(
+					TokenRealm.GUEST, 1L, "GUEST")))
+			.andExpect(status().isForbidden())
+			.andExpect(jsonPath("$.code").value("LOGIN_REQUIRED"));
+	}
+
+	private Hold holding(User user, int qty, Instant expiresAt) {
+		return holding(user, product, qty, expiresAt);
+	}
+
+	private Hold holding(User user, Product target, int qty, Instant expiresAt) {
+		target.hold(qty);
+		productRepository.saveAndFlush(target);
+		return holdRepository.saveAndFlush(new Hold(user, target, qty, expiresAt));
 	}
 }
