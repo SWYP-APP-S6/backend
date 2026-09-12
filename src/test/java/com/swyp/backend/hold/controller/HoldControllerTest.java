@@ -30,6 +30,7 @@ import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.EnumSet;
@@ -74,6 +75,9 @@ class HoldControllerTest {
 	@Autowired
 	JwtTokenProvider tokenProvider;
 
+	@Autowired
+	java.time.Clock clock;
+
 	private User consumer;
 	private Product product;
 
@@ -91,19 +95,76 @@ class HoldControllerTest {
 	}
 
 	private Product sellableProduct(int qty, LocalDateTime pickupEndAt) {
+		return sellableProduct(qty, pickupEndAt, LocalTime.MIN, LocalTime.MAX,
+				EnumSet.allOf(DayOfWeek.class));
+	}
+
+	private Product sellableProduct(int qty, LocalDateTime pickupEndAt, LocalTime openTime,
+			LocalTime closeTime, Set<DayOfWeek> businessDays) {
 		User owner = userRepository.saveAndFlush(
 				new User(UserRole.OWNER, "점주" + qty + pickupEndAt.getNano(), null, false, Instant.now()));
 		Store store = new Store(
 				owner, "청과마을", "04524", "서울 마포구 망원로 12", "1층", "02-1234-5678",
 				new BigDecimal("37.556000"), new BigDecimal("126.901000"),
-				LocalTime.of(9, 0), LocalTime.of(21, 0));
+				openTime, closeTime);
 		store.replaceCategories(Set.of(StoreCategory.FRUIT));
-		store.replaceBusinessDays(EnumSet.allOf(DayOfWeek.class));
+		store.replaceBusinessDays(businessDays);
 		store.approve();
 		storeRepository.saveAndFlush(store);
 		return productRepository.saveAndFlush(new Product(
 				store, "복숭아 4입", ProductCategory.FRUIT, qty, 10_000, 4_000,
 				pickupEndAt.minusHours(1), pickupEndAt, "https://cdn.example.com/peach.jpg"));
+	}
+
+	@Test
+	void theHoldDetailSaysWhetherTheStoreIsOpenRightNow() throws Exception {
+		String holdId = holdAndReturnId(product, 1);
+
+		mockMvc.perform(get("/holds/" + holdId).header("Authorization", bearer(consumer)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.store.openNow").value(true))
+			.andExpect(jsonPath("$.data.store.businessOpenTime").isNotEmpty());
+	}
+
+	@Test
+	void aStoreThatStartedRestingTodayReadsAsClosedOnTheHoldItAlreadyTook() throws Exception {
+		String holdId = holdAndReturnId(product, 1);
+		Store store = product.getStore();
+		store.replaceBusinessDays(
+				EnumSet.complementOf(EnumSet.of(LocalDate.now(clock).getDayOfWeek())));
+		storeRepository.saveAndFlush(store);
+
+		mockMvc.perform(get("/holds/" + holdId).header("Authorization", bearer(consumer)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.store.openNow").value(false));
+	}
+
+	@Test
+	void aStoreRestingTodayRefusesTheHoldEvenInsideItsOpeningHours() throws Exception {
+		Product restingStore = sellableProduct(3, LocalDateTime.now().plusHours(5),
+				LocalTime.MIN, LocalTime.MAX,
+				EnumSet.complementOf(EnumSet.of(LocalDate.now(clock).getDayOfWeek())));
+
+		mockMvc.perform(post("/holds")
+				.header("Authorization", bearer(consumer))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(body(restingStore.getId(), 1)))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("STORE_CLOSED_TODAY"));
+
+		assertThat(productRepository.findById(restingStore.getId()).orElseThrow().getAvailableQty())
+			.isEqualTo(3);
+	}
+
+	private String holdAndReturnId(Product target, int qty) throws Exception {
+		String created = mockMvc.perform(post("/holds")
+				.header("Authorization", bearer(consumer))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(body(target.getId(), qty)))
+			.andExpect(status().isCreated())
+			.andReturn().getResponse().getContentAsString();
+		int id = com.jayway.jsonpath.JsonPath.read(created, "$.data.id");
+		return String.valueOf(id);
 	}
 
 	private String bearer(User user) {

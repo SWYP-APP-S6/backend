@@ -8,6 +8,7 @@ import com.swyp.backend.recipe.dto.RecipeSuggestionResponse;
 import com.swyp.backend.store.entity.Store;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
@@ -70,7 +71,7 @@ public record ProductBrowseDetailResponse(
 			@Nullable Long myHoldId,
 			boolean holdingAtAnotherStore,
 			@Nullable Integer distanceMeters,
-			boolean openNow,
+			ZonedDateTime serverTime,
 			boolean pickupWindowOpen,
 			List<RecipeSuggestionResponse> recipes) {
 		return new ProductBrowseDetailResponse(
@@ -86,18 +87,20 @@ public record ProductBrowseDetailResponse(
 				product.getPickupStartAt(),
 				product.getPickupEndAt(),
 				product.getStatus(),
-				buttonStateOf(product, myHoldId, holdingAtAnotherStore, pickupWindowOpen),
+				buttonStateOf(product, myHoldId, holdingAtAnotherStore, pickupWindowOpen,
+						product.getStore().opensOn(serverTime.getDayOfWeek())),
 				myHoldId,
-				ProductStore.of(product.getStore(), distanceMeters, openNow),
+				ProductStore.of(
+						product.getStore(), distanceMeters, product.getStore().isOpenAt(serverTime)),
 				recipes);
 	}
 
 	private static HoldButtonState buttonStateOf(Product product, @Nullable Long myHoldId,
-			boolean holdingAtAnotherStore, boolean pickupWindowOpen) {
+			boolean holdingAtAnotherStore, boolean pickupWindowOpen, boolean storeOpensToday) {
 		if (myHoldId != null) {
 			return HoldButtonState.ALREADY_HOLDING;
 		}
-		if (product.getStatus() == ProductStatus.CLOSED || !pickupWindowOpen) {
+		if (product.getStatus() == ProductStatus.CLOSED || !pickupWindowOpen || !storeOpensToday) {
 			return HoldButtonState.CLOSED;
 		}
 		if (product.getStatus() == ProductStatus.SOLD_OUT || product.getAvailableQty() == 0) {

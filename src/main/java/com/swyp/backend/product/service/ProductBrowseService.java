@@ -20,7 +20,6 @@ import com.swyp.backend.store.entity.Store;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.util.Comparator;
 import java.util.List;
@@ -47,7 +46,7 @@ public class ProductBrowseService {
 		List<SellableStoreGroup> nearby = productFunction.findSellableGroupedByStore(
 				request.lat(),
 				request.lng(),
-				browseProperties.nearbyRadiusMeters(),
+				radiusOf(request),
 				request.category());
 
 		List<NearbyStoreGroupResponse> groups = nearby.stream()
@@ -56,6 +55,12 @@ public class ProductBrowseService {
 				.toList();
 
 		return NearbyProductsResponse.of(groups, request.page(), request.size());
+	}
+
+	private int radiusOf(NearbyProductsRequest request) {
+		return request.radiusMeters() == null
+				? browseProperties.nearbyRadiusMeters()
+				: request.radiusMeters();
 	}
 
 	public ProductBrowseDetailResponse getProductDetail(
@@ -82,7 +87,7 @@ public class ProductBrowseService {
 				holdsThisStore ? holdFunction.findHoldingIdOf(viewerId, productId).orElse(null) : null,
 				activeHold.isPresent() && !holdsThisStore,
 				distanceMeters,
-				isOpenNow(store),
+				ZonedDateTime.now(clock),
 				product.getPickupEndAt().isAfter(LocalDateTime.now(clock)),
 				suggestedRecipes(product));
 	}
@@ -96,16 +101,6 @@ public class ProductBrowseService {
 				.map(recipe -> RecipeSuggestionResponse.of(
 						recipe, namesByRecipe.getOrDefault(recipe.getId(), List.of())))
 				.toList();
-	}
-
-	private boolean isOpenNow(Store store) {
-		ZonedDateTime now = ZonedDateTime.now(clock);
-		if (!store.getBusinessDays().contains(now.getDayOfWeek())) {
-			return false;
-		}
-		LocalTime time = now.toLocalTime();
-		return !time.isBefore(store.getBusinessOpenTime())
-				&& time.isBefore(store.getBusinessCloseTime());
 	}
 
 	private static Comparator<SellableStoreGroup> comparatorFor(NearbyProductSort sort) {

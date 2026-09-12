@@ -19,9 +19,13 @@ import com.swyp.backend.user.entity.User;
 import com.swyp.backend.user.entity.UserRole;
 import com.swyp.backend.user.repository.UserRepository;
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.EnumSet;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,6 +65,9 @@ class ProductControllerTest {
 	@Autowired
 	JwtTokenProvider tokenProvider;
 
+	@Autowired
+	Clock clock;
+
 	private LocalDateTime now;
 
 	@BeforeEach
@@ -95,9 +102,17 @@ class ProductControllerTest {
 				new BigDecimal(longitude),
 				LocalTime.of(9, 0),
 				LocalTime.of(21, 0));
+		store.replaceBusinessDays(EnumSet.allOf(DayOfWeek.class));
 		if (approved) {
 			store.approve();
 		}
+		return storeRepository.saveAndFlush(store);
+	}
+
+	private Store storeClosedToday(String name, String latitude, String longitude) {
+		Store store = approvedStore(name, latitude, longitude);
+		store.replaceBusinessDays(
+				EnumSet.complementOf(EnumSet.of(LocalDate.now(clock).getDayOfWeek())));
 		return storeRepository.saveAndFlush(store);
 	}
 
@@ -121,6 +136,46 @@ class ProductControllerTest {
 		return mockMvc.perform(get("/products/nearby?lat=" + ORIGIN_LATITUDE
 						+ "&lng=" + ORIGIN_LONGITUDE + query)
 				.header("Authorization", bearer(TokenRealm.GUEST, "GUEST")));
+	}
+
+	@Test
+	void aStoreBeyondTheDefaultRadiusShowsUpOnlyWhenTheCallerWidensIt() throws Exception {
+		Store farAway = approvedStore("먼가게", "37.583000", "126.901000");
+		product(farAway, "고구마 1kg", ProductCategory.VEGETABLE, now.plusHours(3));
+
+		browse("")
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.totalProductCount").value(0));
+
+		browse("&radiusMeters=5000")
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.totalProductCount").value(1))
+			.andExpect(jsonPath("$.data.stores.content[0].storeName").value("먼가게"));
+	}
+
+	@Test
+	void aRadiusOutsideTheAllowedRangeIsRejected() throws Exception {
+		browse("&radiusMeters=99999")
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+
+		browse("&radiusMeters=10")
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+	}
+
+	@Test
+	void aStoreThatIsClosedTodayKeepsItsProductsOutOfTheList() throws Exception {
+		seedTwoNearbyStores();
+		Store restingToday = storeClosedToday("오늘휴무", "37.556500", "126.901500");
+		product(restingToday, "감자 1kg", ProductCategory.VEGETABLE, now.plusHours(3));
+
+		browse("")
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.totalProductCount").value(4))
+			.andExpect(jsonPath("$.data.stores.content.length()").value(2))
+			.andExpect(jsonPath("$.data.stores.content[*].storeName")
+				.value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem("오늘휴무"))));
 	}
 
 	@Test

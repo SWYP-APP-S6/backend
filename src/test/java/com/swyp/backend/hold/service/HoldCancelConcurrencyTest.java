@@ -26,7 +26,9 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.DayOfWeek;
 import java.time.LocalTime;
+import java.util.EnumSet;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -88,6 +90,7 @@ class HoldCancelConcurrencyTest {
 			owner, "청과마을", "04524", "서울특별시 강남구 역삼로 1", null, "0212345678",
 			new BigDecimal("37.500000"), new BigDecimal("127.030000"),
 			LocalTime.of(9, 0), LocalTime.of(21, 0));
+		unapproved.replaceBusinessDays(EnumSet.allOf(DayOfWeek.class));
 		unapproved.approve();
 		store = storeRepository.saveAndFlush(unapproved);
 	}

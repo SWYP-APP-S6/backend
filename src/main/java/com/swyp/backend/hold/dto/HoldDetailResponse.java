@@ -10,6 +10,8 @@ import com.swyp.backend.store.entity.Store;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.Comparator;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
@@ -64,9 +66,10 @@ public record HoldDetailResponse(
 			BigDecimal latitude,
 			BigDecimal longitude,
 			LocalTime businessOpenTime,
-			LocalTime businessCloseTime) {
+			LocalTime businessCloseTime,
+			boolean openNow) {
 
-		static HoldStore from(Store store) {
+		static HoldStore from(Store store, ZonedDateTime serverTime) {
 			return new HoldStore(
 					store.getId(),
 					store.getName(),
@@ -76,11 +79,12 @@ public record HoldDetailResponse(
 					store.getLatitude(),
 					store.getLongitude(),
 					store.getBusinessOpenTime(),
-					store.getBusinessCloseTime());
+					store.getBusinessCloseTime(),
+					store.isOpenAt(serverTime));
 		}
 	}
 
-	public static HoldDetailResponse from(Hold hold, Instant serverTime) {
+	public static HoldDetailResponse from(Hold hold, Instant serverTime, ZoneId zone) {
 		List<HoldItemResponse> items = hold.getItems().stream()
 				.sorted(Comparator.comparing(item -> item.getProduct().getId()))
 				.map(HoldItemResponse::from)
@@ -97,7 +101,7 @@ public record HoldDetailResponse(
 				hold.getCanceledAt(),
 				hold.getCanceledBy(),
 				hold.getCancelReason(),
-				HoldStore.from(hold.getStore()),
+				HoldStore.from(hold.getStore(), serverTime.atZone(zone)),
 				items);
 	}
 }

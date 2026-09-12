@@ -19,6 +19,7 @@ import jakarta.persistence.UniqueConstraint;
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalTime;
+import java.time.ZonedDateTime;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -137,7 +138,22 @@ public class Store extends BaseTimeEntity {
 		this.categories.addAll(categories);
 	}
 
+	public boolean opensOn(DayOfWeek day) {
+		return businessDays.contains(day);
+	}
+
+	public boolean isOpenAt(ZonedDateTime at) {
+		if (!opensOn(at.getDayOfWeek())) {
+			return false;
+		}
+		LocalTime time = at.toLocalTime();
+		return !time.isBefore(businessOpenTime) && time.isBefore(businessCloseTime);
+	}
+
 	public void replaceBusinessDays(Collection<DayOfWeek> businessDays) {
+		if (businessDays.isEmpty()) {
+			throw new IllegalArgumentException("store must open on at least one day");
+		}
 		this.businessDays.clear();
 		this.businessDays.addAll(businessDays);
 	}

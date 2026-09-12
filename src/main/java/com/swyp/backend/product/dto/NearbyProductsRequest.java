@@ -16,10 +16,15 @@ public record NearbyProductsRequest(
 		BigDecimal lng,
 		ProductCategory category,
 		NearbyProductSort sort,
+		@Min(MIN_RADIUS_METERS) @Max(MAX_RADIUS_METERS) Integer radiusMeters,
 		@Min(0) Integer page,
 		@Min(1) @Max(100) Integer size) {
 
 	private static final int DEFAULT_SIZE = 20;
+
+	private static final int MIN_RADIUS_METERS = 100;
+
+	private static final int MAX_RADIUS_METERS = 5_000;
 
 	public NearbyProductsRequest {
 		sort = sort == null ? NearbyProductSort.DISTANCE : sort;
