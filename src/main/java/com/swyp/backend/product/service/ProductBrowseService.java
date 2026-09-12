@@ -87,7 +87,7 @@ public class ProductBrowseService {
 				holdsThisStore ? holdFunction.findHoldingIdOf(viewerId, productId).orElse(null) : null,
 				activeHold.isPresent() && !holdsThisStore,
 				distanceMeters,
-				store.isOpenAt(ZonedDateTime.now(clock)),
+				ZonedDateTime.now(clock),
 				product.getPickupEndAt().isAfter(LocalDateTime.now(clock)),
 				suggestedRecipes(product));
 	}

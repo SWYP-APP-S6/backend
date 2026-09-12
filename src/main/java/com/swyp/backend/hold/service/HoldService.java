@@ -66,11 +66,11 @@ public class HoldService {
 
 		Hold hold = resolveHold(user, current, product, now, locked);
 		requireWithinQtyLimit(hold, product, request.qty());
-		requireSellable(product, request.qty());
+		requireSellable(product, request.qty(), now);
 		product.hold(request.qty());
 		hold.addItem(product, request.qty());
 		hold.restrictExpiryTo(pickupBound(product));
-		return HoldDetailResponse.from(hold, now);
+		return HoldDetailResponse.from(hold, now, clock.getZone());
 	}
 
 	@Transactional
@@ -86,7 +86,7 @@ public class HoldService {
 		releaseAll(hold, locked);
 		hold.cancelByUser(now);
 		chargeUnlessMisTap(hold, user, now);
-		return HoldDetailResponse.from(hold, now);
+		return HoldDetailResponse.from(hold, now, clock.getZone());
 	}
 
 	private void chargeUnlessMisTap(Hold hold, User user, Instant now) {
@@ -98,7 +98,8 @@ public class HoldService {
 
 	public HoldDetailResponse getHold(Long userId, Long holdId) {
 		Instant now = Instant.now(clock);
-		return HoldDetailResponse.from(holdFunction.getDetailOfUserHold(userId, holdId), now);
+		return HoldDetailResponse.from(
+				holdFunction.getDetailOfUserHold(userId, holdId), now, clock.getZone());
 	}
 
 	public HoldHistoryResponse getHolds(Long userId, Pageable pageable) {
@@ -115,7 +116,7 @@ public class HoldService {
 		HoldCancelCredit credit = creditsAsOf(userId, now);
 		return new ActiveHoldResponse(
 				holdFunction.findActiveOf(userId, now)
-						.map(hold -> HoldDetailResponse.from(hold, now))
+						.map(hold -> HoldDetailResponse.from(hold, now, clock.getZone()))
 						.orElse(null),
 				credit.getCredits(),
 				credit.nextRefillAt(
@@ -208,9 +209,12 @@ public class HoldService {
 		}
 	}
 
-	private void requireSellable(Product product, int qty) {
+	private void requireSellable(Product product, int qty, Instant now) {
 		if (product.getStore().getStatus() != StoreStatus.APPROVED) {
 			throw new BusinessException(HoldErrorCode.PRODUCT_NOT_SELLABLE);
+		}
+		if (!product.getStore().opensOn(now.atZone(clock.getZone()).getDayOfWeek())) {
+			throw new BusinessException(HoldErrorCode.STORE_CLOSED_TODAY);
 		}
 		if (product.getStatus() != ProductStatus.ON_SALE) {
 			throw new BusinessException(HoldErrorCode.PRODUCT_NOT_SELLABLE);
