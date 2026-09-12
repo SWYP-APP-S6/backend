@@ -20,7 +20,6 @@ import com.swyp.backend.store.entity.Store;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.util.Comparator;
 import java.util.List;
@@ -82,7 +81,7 @@ public class ProductBrowseService {
 				holdsThisStore ? holdFunction.findHoldingIdOf(viewerId, productId).orElse(null) : null,
 				activeHold.isPresent() && !holdsThisStore,
 				distanceMeters,
-				isOpenNow(store),
+				store.isOpenAt(ZonedDateTime.now(clock)),
 				product.getPickupEndAt().isAfter(LocalDateTime.now(clock)),
 				suggestedRecipes(product));
 	}
@@ -96,16 +95,6 @@ public class ProductBrowseService {
 				.map(recipe -> RecipeSuggestionResponse.of(
 						recipe, namesByRecipe.getOrDefault(recipe.getId(), List.of())))
 				.toList();
-	}
-
-	private boolean isOpenNow(Store store) {
-		ZonedDateTime now = ZonedDateTime.now(clock);
-		if (!store.getBusinessDays().contains(now.getDayOfWeek())) {
-			return false;
-		}
-		LocalTime time = now.toLocalTime();
-		return !time.isBefore(store.getBusinessOpenTime())
-				&& time.isBefore(store.getBusinessCloseTime());
 	}
 
 	private static Comparator<SellableStoreGroup> comparatorFor(NearbyProductSort sort) {
