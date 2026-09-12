@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "찜")
+@Tag(name = "Hold", description = "찜")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/holds")

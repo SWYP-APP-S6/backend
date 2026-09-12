@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "가게 탐색")
+@Tag(name = "StoreBrowse", description = "가게 탐색")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/stores")

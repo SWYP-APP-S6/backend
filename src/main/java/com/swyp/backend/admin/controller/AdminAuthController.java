@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "관리자 인증")
+@Tag(name = "AdminAuth", description = "관리자 인증")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/admin/auth")

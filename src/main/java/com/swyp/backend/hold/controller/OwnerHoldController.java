@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "점주 찜 현황")
+@Tag(name = "OwnerHold", description = "점주 찜 현황")
 @RestController
 @RequestMapping("/owner/holds")
 @RequiredArgsConstructor

@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "알림")
+@Tag(name = "Notification", description = "알림")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/notifications")
