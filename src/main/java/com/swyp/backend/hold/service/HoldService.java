@@ -16,6 +16,8 @@ import com.swyp.backend.hold.exception.HoldErrorCode;
 import com.swyp.backend.hold.entity.HoldCancelCredit;
 import com.swyp.backend.hold.function.HoldCancelCreditFunction;
 import com.swyp.backend.hold.function.HoldFunction;
+import com.swyp.backend.notification.entity.NotificationType;
+import com.swyp.backend.notification.function.NotificationFunction;
 import com.swyp.backend.product.entity.Product;
 import com.swyp.backend.product.entity.ProductStatus;
 import com.swyp.backend.product.function.ProductFunction;
@@ -45,6 +47,7 @@ public class HoldService {
 	private final HoldCancelCreditFunction holdCancelCreditFunction;
 	private final ProductFunction productFunction;
 	private final UserFunction userFunction;
+	private final NotificationFunction notificationFunction;
 	private final HoldProperties holdProperties;
 	private final Clock clock;
 
@@ -65,11 +68,20 @@ public class HoldService {
 		Product product = locked.get(request.productId());
 
 		Hold hold = resolveHold(user, current, product, now, locked);
+		boolean opensAPickup = hold.getItems().isEmpty();
 		requireWithinQtyLimit(hold, product, request.qty());
 		requireSellable(product, request.qty(), now);
 		product.hold(request.qty());
 		hold.addItem(product, request.qty());
 		hold.restrictExpiryTo(pickupBound(product));
+		if (opensAPickup) {
+			notificationFunction.notify(
+					hold.getStore().getOwner(),
+					NotificationType.NEW_HOLD_RECEIVED,
+					"새 찜이 들어왔어요",
+					user.getNickname() + "님이 " + product.getName() + " 상품을 찜했어요.",
+					null);
+		}
 		return HoldDetailResponse.from(hold, now, clock.getZone());
 	}
 

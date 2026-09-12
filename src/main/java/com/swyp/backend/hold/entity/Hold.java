@@ -74,6 +74,9 @@ public class Hold extends BaseTimeEntity {
 	@Column(name = "no_show_charged_at")
 	private Instant noShowChargedAt;
 
+	@Column(name = "expiry_reminded_at")
+	private Instant expiryRemindedAt;
+
 	public Hold(User user, Store store, Instant expiresAt) {
 		this.user = user;
 		this.store = store;
@@ -123,6 +126,10 @@ public class Hold extends BaseTimeEntity {
 		}
 		this.status = HoldStatus.COMPLETED;
 		this.completedAt = completedAt;
+	}
+
+	public void markExpiryReminded(Instant remindedAt) {
+		this.expiryRemindedAt = remindedAt;
 	}
 
 	public void markNoShowCharged(Instant chargedAt) {
