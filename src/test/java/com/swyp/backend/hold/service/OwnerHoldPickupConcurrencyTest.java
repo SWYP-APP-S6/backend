@@ -2,9 +2,11 @@ package com.swyp.backend.hold.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.swyp.backend.AppDataCleaner;
 import com.swyp.backend.RedisTestcontainersConfiguration;
 import com.swyp.backend.TestcontainersConfiguration;
 import com.swyp.backend.common.exception.BusinessException;
+import com.swyp.backend.hold.HoldFixture;
 import com.swyp.backend.hold.entity.Hold;
 import com.swyp.backend.hold.entity.HoldStatus;
 import com.swyp.backend.hold.exception.HoldErrorCode;
@@ -42,6 +44,9 @@ import org.springframework.test.context.TestPropertySource;
 @Import({TestcontainersConfiguration.class, RedisTestcontainersConfiguration.class})
 @TestPropertySource(properties = "hold.expiry-scan-interval=1h")
 class OwnerHoldPickupConcurrencyTest {
+
+	@Autowired
+	AppDataCleaner appDataCleaner;
 
 	@Autowired
 	OwnerHoldService ownerHoldService;
@@ -162,14 +167,10 @@ class OwnerHoldPickupConcurrencyTest {
 		User consumer = userRepository.saveAndFlush(
 			new User(UserRole.CONSUMER, "손님", null, false, Instant.now()));
 		return holdRepository.saveAndFlush(
-			new Hold(consumer, product, qty, Instant.now().plus(Duration.ofMinutes(15))));
+			HoldFixture.hold(consumer, product, qty, Instant.now().plus(Duration.ofMinutes(15))));
 	}
 
 	private void clearAll() {
-		holdRepository.deleteAll();
-		notificationRepository.deleteAll();
-		productRepository.deleteAll();
-		storeRepository.deleteAll();
-		userRepository.deleteAll();
+		appDataCleaner.clear();
 	}
 }

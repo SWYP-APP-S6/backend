@@ -10,8 +10,11 @@ import com.swyp.backend.RedisTestcontainersConfiguration;
 import com.swyp.backend.TestcontainersConfiguration;
 import com.swyp.backend.common.security.JwtTokenProvider;
 import com.swyp.backend.common.security.TokenRealm;
+import com.swyp.backend.hold.HoldFixture;
 import com.swyp.backend.hold.entity.Hold;
+import com.swyp.backend.hold.entity.HoldCancelCredit;
 import com.swyp.backend.hold.entity.HoldStatus;
+import com.swyp.backend.hold.repository.HoldCancelCreditRepository;
 import com.swyp.backend.hold.repository.HoldRepository;
 import com.swyp.backend.notification.repository.NotificationRepository;
 import com.swyp.backend.product.entity.Product;
@@ -25,6 +28,7 @@ import com.swyp.backend.user.entity.UserRole;
 import com.swyp.backend.user.repository.UserRepository;
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -60,6 +64,9 @@ class HoldControllerTest {
 
 	@Autowired
 	HoldRepository holdRepository;
+
+	@Autowired
+	HoldCancelCreditRepository holdCancelCreditRepository;
 
 	@Autowired
 	NotificationRepository notificationRepository;
@@ -116,12 +123,13 @@ class HoldControllerTest {
 				.content(body(product.getId(), 2)))
 			.andExpect(status().isCreated())
 			.andExpect(jsonPath("$.data.status").value("HOLDING"))
-			.andExpect(jsonPath("$.data.qty").value(2))
-			.andExpect(jsonPath("$.data.unitPrice").value(4000))
+			.andExpect(jsonPath("$.data.totalQty").value(2))
+			.andExpect(jsonPath("$.data.items[0].qty").value(2))
+			.andExpect(jsonPath("$.data.items[0].salePrice").value(4000))
 			.andExpect(jsonPath("$.data.totalPrice").value(8000))
 			.andExpect(jsonPath("$.data.expiresAt").exists())
 			.andExpect(jsonPath("$.data.serverTime").exists())
-			.andExpect(jsonPath("$.data.product.name").value("복숭아 4입"))
+			.andExpect(jsonPath("$.data.items[0].name").value("복숭아 4입"))
 			.andExpect(jsonPath("$.data.store.name").value("청과마을"));
 
 		Product held = productRepository.findById(product.getId()).orElseThrow();
@@ -152,7 +160,7 @@ class HoldControllerTest {
 			.andExpect(status().isCreated());
 
 		Hold hold = holdRepository.findAll().stream()
-			.filter(h -> h.getProduct().getId().equals(closingSoon.getId()))
+			.filter(h -> h.itemOf(closingSoon.getId()).isPresent())
 			.findFirst().orElseThrow();
 		assertThat(hold.getExpiresAt())
 			.as("a hold that outlives the pickup window walks the user to a closed shop, and one "
@@ -260,7 +268,7 @@ class HoldControllerTest {
 	}
 
 	@Test
-	void aSecondHoldOnTheSameProductIsRejected() throws Exception {
+	void aSecondHoldOnTheSameProductAddsToTheSameGroup() throws Exception {
 		mockMvc.perform(post("/holds")
 				.header("Authorization", bearer(consumer))
 				.contentType(MediaType.APPLICATION_JSON)
@@ -271,8 +279,15 @@ class HoldControllerTest {
 				.header("Authorization", bearer(consumer))
 				.contentType(MediaType.APPLICATION_JSON)
 				.content(body(product.getId(), 1)))
-			.andExpect(status().isConflict())
-			.andExpect(jsonPath("$.code").value("ALREADY_HOLDING"));
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.data.items.length()").value(1))
+			.andExpect(jsonPath("$.data.items[0].qty").value(2))
+			.andExpect(jsonPath("$.data.totalQty").value(2));
+
+		assertThat(holdRepository.count()).as("더 담기는 새 찜을 만들지 않는다").isEqualTo(1);
+		Product held = productRepository.findById(product.getId()).orElseThrow();
+		assertThat(held.getAvailableQty()).isEqualTo(1);
+		assertThat(held.getHeldQty()).isEqualTo(2);
 	}
 
 	@Test
@@ -313,7 +328,7 @@ class HoldControllerTest {
 	@Test
 	void anExpiredHoldIsClearedSoTheSameProductCanBeHeldAgain() throws Exception {
 		Hold overdue = holdRepository.saveAndFlush(
-				new Hold(consumer, product, 1, Instant.now().minusSeconds(60)));
+				HoldFixture.hold(consumer, product, 1, Instant.now().minusSeconds(60)));
 		product.hold(1);
 		productRepository.saveAndFlush(product);
 
@@ -342,7 +357,7 @@ class HoldControllerTest {
 			.andExpect(jsonPath("$.data.status").value("CANCELED"))
 			.andExpect(jsonPath("$.data.canceledBy").value("USER"))
 			.andExpect(jsonPath("$.data.canceledAt").exists())
-			.andExpect(jsonPath("$.data.qty").value(2));
+			.andExpect(jsonPath("$.data.totalQty").value(2));
 
 		Product released = productRepository.findById(product.getId()).orElseThrow();
 		assertThat(released.getAvailableQty()).isEqualTo(3);
@@ -424,12 +439,12 @@ class HoldControllerTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.id").value(hold.getId()))
 			.andExpect(jsonPath("$.data.status").value("HOLDING"))
-			.andExpect(jsonPath("$.data.qty").value(2))
+			.andExpect(jsonPath("$.data.totalQty").value(2))
 			.andExpect(jsonPath("$.data.totalPrice").value(8000))
 			.andExpect(jsonPath("$.data.heldAt").exists())
 			.andExpect(jsonPath("$.data.expiresAt").exists())
 			.andExpect(jsonPath("$.data.serverTime").exists())
-			.andExpect(jsonPath("$.data.product.name").value("복숭아 4입"))
+			.andExpect(jsonPath("$.data.items[0].name").value("복숭아 4입"))
 			.andExpect(jsonPath("$.data.store.name").value("청과마을"));
 	}
 
@@ -463,33 +478,41 @@ class HoldControllerTest {
 	}
 
 	@Test
-	void activeHoldsComeBackSoonestFirstAndLeaveOutTheOnesThatAreDone() throws Exception {
+	void theActiveHoldIsTheGroupInProgressWithEveryItemInIt() throws Exception {
 		Product other = sellableProduct(5, LocalDateTime.now().plusHours(6));
-		Hold later = holding(consumer, product, 1, Instant.now().plusSeconds(900));
-		Hold sooner = holding(consumer, other, 1, Instant.now().plusSeconds(300));
-		holding(consumer, sellableProduct(5, LocalDateTime.now().plusHours(7)), 1,
-				Instant.now().minusSeconds(1));
-		Hold canceled = holding(consumer, sellableProduct(5, LocalDateTime.now().plusHours(8)), 1,
-				Instant.now().plusSeconds(600));
-		canceled.cancelByUser(Instant.now());
-		holdRepository.saveAndFlush(canceled);
+		Hold hold = holding(consumer, product, 1, Instant.now().plusSeconds(900));
+		hold.addItem(other, 2);
+		holdRepository.saveAndFlush(hold);
 
 		mockMvc.perform(get("/holds/active").header("Authorization", bearer(consumer)))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.length()").value(2))
-			.andExpect(jsonPath("$.data[0].id").value(sooner.getId()))
-			.andExpect(jsonPath("$.data[1].id").value(later.getId()));
+			.andExpect(jsonPath("$.data.hold.id").value(hold.getId()))
+			.andExpect(jsonPath("$.data.hold.totalQty").value(3))
+			.andExpect(jsonPath("$.data.hold.items.length()").value(2));
 	}
 
 	@Test
-	void activeHoldsOfSomeoneElseAreNotListed() throws Exception {
+	void aHoldThatIsFinishedOrOverdueIsNotTheActiveOne() throws Exception {
+		Hold canceled = holding(consumer, 1, Instant.now().plusSeconds(600));
+		canceled.cancelByUser(Instant.now());
+		holdRepository.saveAndFlush(canceled);
+		Hold overdue = holding(consumer, 1, Instant.now().minusSeconds(1));
+		holdRepository.saveAndFlush(overdue);
+
+		mockMvc.perform(get("/holds/active").header("Authorization", bearer(consumer)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.hold").doesNotExist());
+	}
+
+	@Test
+	void theActiveHoldOfSomeoneElseIsNotMine() throws Exception {
 		User other = userRepository.saveAndFlush(
 				new User(UserRole.CONSUMER, "다른소비자", null, false, Instant.now()));
 		holding(other, 1, Instant.now().plusSeconds(600));
 
 		mockMvc.perform(get("/holds/active").header("Authorization", bearer(consumer)))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.length()").value(0));
+			.andExpect(jsonPath("$.data.hold").doesNotExist());
 
 		mockMvc.perform(get("/holds/active")
 				.header("Authorization", "Bearer " + tokenProvider.createAccessToken(
@@ -498,6 +521,182 @@ class HoldControllerTest {
 			.andExpect(jsonPath("$.code").value("LOGIN_REQUIRED"));
 	}
 
+	@Test
+	void anotherProductFromTheSameStoreJoinsTheGroupInsteadOfStartingOne() throws Exception {
+		Product sibling = siblingProduct(product, "당근 1kg", 5);
+
+		mockMvc.perform(post("/holds")
+				.header("Authorization", bearer(consumer))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(body(product.getId(), 1)))
+			.andExpect(status().isCreated());
+		mockMvc.perform(post("/holds")
+				.header("Authorization", bearer(consumer))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(body(sibling.getId(), 2)))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.data.items.length()").value(2))
+			.andExpect(jsonPath("$.data.totalQty").value(3))
+			.andExpect(jsonPath("$.data.totalPrice").value(4_000 + 2 * 2_500));
+
+		assertThat(holdRepository.count()).isEqualTo(1);
+	}
+
+	@Test
+	void aProductFromAnotherStoreCannotJoinAndCannotStartASecondGroup() throws Exception {
+		Product elsewhere = sellableProduct(5, LocalDateTime.now().plusHours(6));
+
+		mockMvc.perform(post("/holds")
+				.header("Authorization", bearer(consumer))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(body(product.getId(), 1)))
+			.andExpect(status().isCreated());
+		mockMvc.perform(post("/holds")
+				.header("Authorization", bearer(consumer))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(body(elsewhere.getId(), 1)))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("OTHER_STORE_HOLD_ACTIVE"));
+
+		assertThat(holdRepository.count()).isEqualTo(1);
+		assertThat(productRepository.findById(elsewhere.getId()).orElseThrow().getAvailableQty())
+			.as("the refused store must not lose stock")
+			.isEqualTo(5);
+	}
+
+	@Test
+	void cancelingGivesBackEveryItemInTheGroup() throws Exception {
+		Product sibling = siblingProduct(product, "당근 1kg", 5);
+		Hold hold = holding(consumer, product, 1, Instant.now().plusSeconds(600));
+		hold.addItem(sibling, 2);
+		sibling.hold(2);
+		productRepository.saveAndFlush(sibling);
+		holdRepository.saveAndFlush(hold);
+
+		mockMvc.perform(post("/holds/{holdId}/cancel", hold.getId())
+				.header("Authorization", bearer(consumer)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.status").value("CANCELED"));
+
+		assertThat(productRepository.findById(product.getId()).orElseThrow().getAvailableQty())
+			.isEqualTo(3);
+		assertThat(productRepository.findById(sibling.getId()).orElseThrow().getAvailableQty())
+			.isEqualTo(5);
+		assertThat(productRepository.findById(sibling.getId()).orElseThrow().getHeldQty()).isZero();
+	}
+
+	@Test
+	void withNoCancelCreditsLeftTheNextHoldIsRefusedWithWhenItComesBack() throws Exception {
+		holdCancelCreditRepository.saveAndFlush(
+				new HoldCancelCredit(consumer, 0, Instant.now().minusSeconds(3600)));
+
+		mockMvc.perform(post("/holds")
+				.header("Authorization", bearer(consumer))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(body(product.getId(), 1)))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("CANCEL_LIMIT_EXCEEDED"))
+			.andExpect(jsonPath("$.retryAt").exists());
+	}
+
+	@Test
+	void aCancelRightAfterHoldingCostsNothing() throws Exception {
+		String created = mockMvc.perform(post("/holds")
+				.header("Authorization", bearer(consumer))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(body(product.getId(), 1)))
+			.andExpect(status().isCreated())
+			.andReturn().getResponse().getContentAsString();
+		int holdId = com.jayway.jsonpath.JsonPath.read(created, "$.data.id");
+
+		mockMvc.perform(post("/holds/{holdId}/cancel", holdId)
+				.header("Authorization", bearer(consumer)))
+			.andExpect(status().isOk());
+
+		mockMvc.perform(get("/holds/active").header("Authorization", bearer(consumer)))
+			.andExpect(jsonPath("$.data.cancelsLeft").value(3))
+			.andExpect(jsonPath("$.data.nextCancelCreditAt").doesNotExist());
+	}
+
+	@Test
+	void aNoShowPastTheGraceTakesACreditAndTheCountSaysSo() throws Exception {
+		settledHold(HoldStatus.EXPIRED, Instant.now().minus(Duration.ofMinutes(45)));
+
+		mockMvc.perform(get("/holds/active").header("Authorization", bearer(consumer)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.cancelsLeft").value(2));
+	}
+
+	@Test
+	void anExpiryWithinTheGraceIsNotYetANoShow() throws Exception {
+		settledHold(HoldStatus.EXPIRED, Instant.now().minusSeconds(60));
+		settledHold(HoldStatus.EXPIRED, Instant.now().minusSeconds(60));
+		settledHold(HoldStatus.EXPIRED, Instant.now().minusSeconds(60));
+
+		mockMvc.perform(post("/holds")
+				.header("Authorization", bearer(consumer))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(body(product.getId(), 1)))
+			.andExpect(status().isCreated());
+	}
+
+	@Test
+	void anExpiryPastTheGraceCountsAgainstTheUser() throws Exception {
+		settledHold(HoldStatus.EXPIRED, Instant.now().minus(Duration.ofMinutes(45)));
+		settledHold(HoldStatus.EXPIRED, Instant.now().minus(Duration.ofMinutes(45)));
+		settledHold(HoldStatus.EXPIRED, Instant.now().minus(Duration.ofMinutes(45)));
+
+		mockMvc.perform(post("/holds")
+				.header("Authorization", bearer(consumer))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(body(product.getId(), 1)))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("CANCEL_LIMIT_EXCEEDED"));
+	}
+
+	@Test
+	void addingAnItemThatClosesEarlierPullsTheWholeGroupsExpiryForward() throws Exception {
+		Product closingSooner = productRepository.saveAndFlush(new Product(
+				product.getStore(), "떨이 상추", ProductCategory.VEGETABLE, 5, 4_000, 2_000,
+				LocalDateTime.now().minusHours(1), LocalDateTime.now().plusMinutes(3),
+				"https://cdn.example.com/lettuce.jpg"));
+
+		mockMvc.perform(post("/holds")
+				.header("Authorization", bearer(consumer))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(body(product.getId(), 1)))
+			.andExpect(status().isCreated());
+		mockMvc.perform(post("/holds")
+				.header("Authorization", bearer(consumer))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(body(closingSooner.getId(), 1)))
+			.andExpect(status().isCreated());
+
+		Hold hold = holdRepository.findAll().getFirst();
+		assertThat(hold.getExpiresAt())
+			.as("a group cannot outlive the earliest pickup deadline it holds")
+			.isBeforeOrEqualTo(Instant.now().plus(Duration.ofMinutes(4)));
+	}
+
+	private Product siblingProduct(Product sibling, String name, int qty) {
+		return productRepository.saveAndFlush(new Product(
+				sibling.getStore(), name, ProductCategory.VEGETABLE, qty, 5_000, 2_500,
+				sibling.getPickupStartAt(), sibling.getPickupEndAt(),
+				"https://cdn.example.com/" + name + ".jpg"));
+	}
+
+	private Hold settledHold(HoldStatus status, Instant expiresAt) {
+		Hold finished = holdRepository.saveAndFlush(
+				HoldFixture.hold(consumer, product, 1, expiresAt));
+		if (status == HoldStatus.CANCELED) {
+			finished.cancelByUser(finished.getCreatedAt().plusSeconds(90));
+		} else {
+			finished.expire();
+		}
+		return holdRepository.saveAndFlush(finished);
+	}
+
+
 	private Hold holding(User user, int qty, Instant expiresAt) {
 		return holding(user, product, qty, expiresAt);
 	}
@@ -505,6 +704,6 @@ class HoldControllerTest {
 	private Hold holding(User user, Product target, int qty, Instant expiresAt) {
 		target.hold(qty);
 		productRepository.saveAndFlush(target);
-		return holdRepository.saveAndFlush(new Hold(user, target, qty, expiresAt));
+		return holdRepository.saveAndFlush(HoldFixture.hold(user, target, qty, expiresAt));
 	}
 }

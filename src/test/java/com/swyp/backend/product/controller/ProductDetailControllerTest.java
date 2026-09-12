@@ -8,6 +8,7 @@ import com.swyp.backend.RedisTestcontainersConfiguration;
 import com.swyp.backend.TestcontainersConfiguration;
 import com.swyp.backend.common.security.JwtTokenProvider;
 import com.swyp.backend.common.security.TokenRealm;
+import com.swyp.backend.hold.HoldFixture;
 import com.swyp.backend.hold.entity.Hold;
 import com.swyp.backend.hold.repository.HoldRepository;
 import com.swyp.backend.notification.repository.NotificationRepository;
@@ -195,7 +196,7 @@ class ProductDetailControllerTest {
 		product.hold(1);
 		productRepository.saveAndFlush(product);
 		Hold mine = holdRepository.saveAndFlush(
-				new Hold(consumer, product, 1, Instant.now().plusSeconds(600)));
+				HoldFixture.hold(consumer, product, 1, Instant.now().plusSeconds(600)));
 
 		mockMvc.perform(get("/products/" + product.getId())
 				.header("Authorization", "Bearer " + tokenProvider.createAccessToken(
@@ -203,6 +204,77 @@ class ProductDetailControllerTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.holdButton").value("ALREADY_HOLDING"))
 			.andExpect(jsonPath("$.data.myHoldId").value(mine.getId()));
+	}
+
+	@Test
+	void holdingAtAnotherStoreIsSaidOnTheButtonRatherThanLearnedFromAFailedTap() throws Exception {
+		User consumer = userRepository.saveAndFlush(
+				new User(UserRole.CONSUMER, "소비자", null, false, Instant.now()));
+		Product elsewhere = productOfAnotherStore();
+		elsewhere.hold(1);
+		productRepository.saveAndFlush(elsewhere);
+		holdRepository.saveAndFlush(
+				HoldFixture.hold(consumer, elsewhere, 1, Instant.now().plusSeconds(600)));
+
+		mockMvc.perform(get("/products/" + product.getId())
+				.header("Authorization", "Bearer " + tokenProvider.createAccessToken(
+					TokenRealm.USER, consumer.getId(), "CONSUMER")))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.holdButton").value("OTHER_STORE"))
+			.andExpect(jsonPath("$.data.myHoldId").doesNotExist());
+	}
+
+	@Test
+	void anotherProductOfTheStoreIAmHoldingAtStaysAvailableToAdd() throws Exception {
+		User consumer = userRepository.saveAndFlush(
+				new User(UserRole.CONSUMER, "소비자", null, false, Instant.now()));
+		Product sibling = productRepository.saveAndFlush(new Product(
+				product.getStore(), "곁들임 상품", ProductCategory.FRUIT, 3, 6_000, 3_000,
+				product.getPickupStartAt(), product.getPickupEndAt(),
+				"https://cdn.example.com/side.jpg"));
+		sibling.hold(1);
+		productRepository.saveAndFlush(sibling);
+		holdRepository.saveAndFlush(
+				HoldFixture.hold(consumer, sibling, 1, Instant.now().plusSeconds(600)));
+
+		mockMvc.perform(get("/products/" + product.getId())
+				.header("Authorization", "Bearer " + tokenProvider.createAccessToken(
+					TokenRealm.USER, consumer.getId(), "CONSUMER")))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.holdButton").value("AVAILABLE"));
+	}
+
+	@Test
+	void anOverdueHoldElsewhereDoesNotBlockTheButton() throws Exception {
+		User consumer = userRepository.saveAndFlush(
+				new User(UserRole.CONSUMER, "소비자", null, false, Instant.now()));
+		Product elsewhere = productOfAnotherStore();
+		elsewhere.hold(1);
+		productRepository.saveAndFlush(elsewhere);
+		holdRepository.saveAndFlush(
+				HoldFixture.hold(consumer, elsewhere, 1, Instant.now().minusSeconds(1)));
+
+		mockMvc.perform(get("/products/" + product.getId())
+				.header("Authorization", "Bearer " + tokenProvider.createAccessToken(
+					TokenRealm.USER, consumer.getId(), "CONSUMER")))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.holdButton").value("AVAILABLE"));
+	}
+
+	private Product productOfAnotherStore() {
+		Store other = new Store(
+				userRepository.saveAndFlush(
+						new User(UserRole.OWNER, "다른점주", null, false, Instant.now())),
+				"다른가게", "04524", "서울 강남구 역삼로 2", null, "0299998888",
+				new BigDecimal("37.500100"), new BigDecimal("127.030100"),
+				LocalTime.of(9, 0), LocalTime.of(21, 0));
+		other.replaceBusinessDays(EnumSet.allOf(DayOfWeek.class));
+		other.approve();
+		storeRepository.saveAndFlush(other);
+		return productRepository.saveAndFlush(new Product(
+				other, "다른가게 상품", ProductCategory.FRUIT, 5, 10_000, 5_000,
+				product.getPickupStartAt(), product.getPickupEndAt(),
+				"https://cdn.example.com/other.jpg"));
 	}
 
 	@Test
@@ -221,7 +293,7 @@ class ProductDetailControllerTest {
 				new User(UserRole.CONSUMER, "소비자", null, false, Instant.now()));
 		product.hold(3);
 		productRepository.saveAndFlush(product);
-		holdRepository.saveAndFlush(new Hold(consumer, product, 3, Instant.now().plusSeconds(600)));
+		holdRepository.saveAndFlush(HoldFixture.hold(consumer, product, 3, Instant.now().plusSeconds(600)));
 
 		mockMvc.perform(get("/products/" + product.getId())
 				.header("Authorization", "Bearer " + tokenProvider.createAccessToken(

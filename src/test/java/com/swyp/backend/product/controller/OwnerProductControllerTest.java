@@ -13,6 +13,7 @@ import com.swyp.backend.TestcontainersConfiguration;
 import com.swyp.backend.common.ClockConfig;
 import com.swyp.backend.common.security.JwtTokenProvider;
 import com.swyp.backend.common.security.TokenRealm;
+import com.swyp.backend.hold.HoldFixture;
 import com.swyp.backend.hold.entity.Hold;
 import com.swyp.backend.hold.entity.HoldStatus;
 import com.swyp.backend.hold.repository.HoldRepository;
@@ -231,7 +232,7 @@ class OwnerProductControllerTest {
 	void getMyProduct_includesCompletedQty() throws Exception {
 		Product product = createProduct("당근", 10);
 		User consumer = createConsumer();
-		Hold completedHold = new Hold(consumer, product, 3, Instant.now().plus(Duration.ofMinutes(15)));
+		Hold completedHold = HoldFixture.hold(consumer, product, 3, Instant.now().plus(Duration.ofMinutes(15)));
 		completedHold.complete(Instant.now());
 		holdRepository.saveAndFlush(completedHold);
 
@@ -273,7 +274,7 @@ class OwnerProductControllerTest {
 	void updateAvailableQty_toZeroWithActiveHolds_requiresDisposition() throws Exception {
 		Product product = createProduct("당근", 10);
 		User consumer = createConsumer();
-		holdRepository.saveAndFlush(new Hold(consumer, product, 3, Instant.now().plus(Duration.ofMinutes(15))));
+		holdRepository.saveAndFlush(HoldFixture.hold(consumer, product, 3, Instant.now().plus(Duration.ofMinutes(15))));
 
 		mockMvc.perform(patch("/owner/products/" + product.getId() + "/available-qty")
 				.header("Authorization", "Bearer " + token)
@@ -288,7 +289,7 @@ class OwnerProductControllerTest {
 	void updateAvailableQty_toZeroKeepingHolds_leavesActiveHoldsUntouched() throws Exception {
 		Product product = createProduct("당근", 10);
 		User consumer = createConsumer();
-		Hold hold = holdRepository.saveAndFlush(new Hold(consumer, product, 3, Instant.now().plus(Duration.ofMinutes(15))));
+		Hold hold = holdRepository.saveAndFlush(HoldFixture.hold(consumer, product, 3, Instant.now().plus(Duration.ofMinutes(15))));
 
 		mockMvc.perform(patch("/owner/products/" + product.getId() + "/available-qty")
 				.header("Authorization", "Bearer " + token)
@@ -305,7 +306,9 @@ class OwnerProductControllerTest {
 	void updateAvailableQty_toZeroCancelingAllHolds_cancelsThemAndNotifies() throws Exception {
 		Product product = createProduct("당근", 10);
 		User consumer = createConsumer();
-		Hold hold = holdRepository.saveAndFlush(new Hold(consumer, product, 3, Instant.now().plus(Duration.ofMinutes(15))));
+		product.hold(3);
+		productRepository.saveAndFlush(product);
+		Hold hold = holdRepository.saveAndFlush(HoldFixture.hold(consumer, product, 3, Instant.now().plus(Duration.ofMinutes(15))));
 		long notificationsBefore = notificationRepository.count();
 
 		String body = mockMvc.perform(patch("/owner/products/" + product.getId() + "/available-qty")
@@ -320,6 +323,9 @@ class OwnerProductControllerTest {
 		Hold reloaded = holdRepository.findById(hold.getId()).orElseThrow();
 		assertThat(reloaded.getStatus()).isEqualTo(HoldStatus.CANCELED);
 		assertThat(notificationRepository.count()).isEqualTo(notificationsBefore + 1);
+		assertThat(productRepository.findById(product.getId()).orElseThrow().getHeldQty())
+			.as("canceling the hold has to let go of what it was holding")
+			.isZero();
 	}
 
 	@Test
@@ -343,7 +349,7 @@ class OwnerProductControllerTest {
 	void updateAvailableQty_aboveZero_doesNotTouchExistingHolds() throws Exception {
 		Product product = createProduct("당근", 10);
 		User consumer = createConsumer();
-		Hold hold = holdRepository.saveAndFlush(new Hold(consumer, product, 3, Instant.now().plus(Duration.ofMinutes(15))));
+		Hold hold = holdRepository.saveAndFlush(HoldFixture.hold(consumer, product, 3, Instant.now().plus(Duration.ofMinutes(15))));
 
 		mockMvc.perform(patch("/owner/products/" + product.getId() + "/available-qty")
 				.header("Authorization", "Bearer " + token)

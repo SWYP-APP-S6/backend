@@ -2,8 +2,10 @@ package com.swyp.backend.hold.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.swyp.backend.AppDataCleaner;
 import com.swyp.backend.RedisTestcontainersConfiguration;
 import com.swyp.backend.TestcontainersConfiguration;
+import com.swyp.backend.hold.HoldFixture;
 import com.swyp.backend.hold.entity.Hold;
 import com.swyp.backend.hold.entity.HoldStatus;
 import com.swyp.backend.hold.repository.HoldRepository;
@@ -37,6 +39,9 @@ import org.springframework.test.context.TestPropertySource;
 @Import({TestcontainersConfiguration.class, RedisTestcontainersConfiguration.class})
 @TestPropertySource(properties = "hold.expiry-scan-interval=1h")
 class HoldExpiryServiceTest {
+
+	@Autowired
+	AppDataCleaner appDataCleaner;
 
 	@Autowired
 	HoldExpiryService holdExpiryService;
@@ -84,7 +89,7 @@ class HoldExpiryServiceTest {
 				new User(UserRole.CONSUMER, nickname, null, false, Instant.now()));
 		product.hold(qty);
 		productRepository.saveAndFlush(product);
-		return holdRepository.saveAndFlush(new Hold(user, product, qty, expiresAt));
+		return holdRepository.saveAndFlush(HoldFixture.hold(user, product, qty, expiresAt));
 	}
 
 	@AfterEach
@@ -93,15 +98,34 @@ class HoldExpiryServiceTest {
 	}
 
 	private void clearCommittedRows() {
-		holdRepository.deleteAll();
-		notificationRepository.deleteAll();
-		productRepository.deleteAll();
-		storeRepository.deleteAll();
-		userRepository.deleteAll();
+		appDataCleaner.clear();
 	}
 
 	private Product reloaded() {
 		return productRepository.findById(product.getId()).orElseThrow();
+	}
+
+	@Test
+	void everyItemInAnOverdueGroupComesBackAndTheOwnerIsTold() {
+		Product onion = productRepository.saveAndFlush(new Product(
+				product.getStore(), "양파 1.5kg", ProductCategory.VEGETABLE, 5, 6_000, 3_000,
+				product.getPickupStartAt(), product.getPickupEndAt(),
+				"https://cdn.example.com/onion.jpg"));
+		Hold hold = hold("두가지담은소비자", 2, Instant.now().minusSeconds(60));
+		onion.hold(3);
+		productRepository.saveAndFlush(onion);
+		hold.addItem(onion, 3);
+		holdRepository.saveAndFlush(hold);
+		long notificationsBefore = notificationRepository.count();
+
+		assertThat(holdExpiryService.expireOverdueHolds()).isEqualTo(1);
+
+		assertThat(reloaded().getAvailableQty()).isEqualTo(5);
+		assertThat(productRepository.findById(onion.getId()).orElseThrow().getAvailableQty())
+			.isEqualTo(5);
+		assertThat(notificationRepository.count())
+			.as("the owner may have handed the goods over already and simply not tapped yet")
+			.isEqualTo(notificationsBefore + 1);
 	}
 
 	@Test
@@ -187,7 +211,7 @@ class HoldExpiryServiceTest {
 				new User(UserRole.CONSUMER, "소비자2", null, false, Instant.now()));
 		second.hold(3);
 		productRepository.saveAndFlush(second);
-		holdRepository.saveAndFlush(new Hold(other, second, 3, Instant.now().minusSeconds(30)));
+		holdRepository.saveAndFlush(HoldFixture.hold(other, second, 3, Instant.now().minusSeconds(30)));
 
 		assertThat(holdExpiryService.expireOverdueHolds())
 			.as("the scan groups by product and loops -- stopping after the first group would "
@@ -201,16 +225,23 @@ class HoldExpiryServiceTest {
 	}
 
 	@Test
-	void theScheduledEntryPointIsTheTransactionalOne() throws Exception {
-		java.lang.reflect.Method scheduled =
-				HoldExpiryService.class.getMethod("expireOverdueHolds");
-
+	void theScheduledPassOpensNoTransactionOfItsOwnAndExpiresOneHoldPerTransaction()
+			throws Exception {
+		java.lang.reflect.Method scheduled = HoldExpiryService.class.getMethod("expireOverdueHolds");
 		assertThat(scheduled.isAnnotationPresent(org.springframework.scheduling.annotation.Scheduled.class))
 			.isTrue();
-		assertThat(scheduled.isAnnotationPresent(
-				org.springframework.transaction.annotation.Transactional.class))
-			.as("a @Scheduled wrapper calling the @Transactional method through this bypasses the "
-					+ "proxy, so the batch runs with no transaction and silently changes nothing")
+
+		assertThat(java.util.Arrays.stream(HoldExpiryService.class.getDeclaredMethods())
+				.noneMatch(method -> method.isAnnotationPresent(
+						org.springframework.transaction.annotation.Transactional.class)))
+			.as("a @Transactional method on this bean would be reachable by self-invocation, which "
+					+ "bypasses the proxy and runs the batch with no transaction at all")
+			.isTrue();
+		assertThat(HoldExpirer.class
+				.getMethod("expire", Long.class, java.util.List.class)
+				.isAnnotationPresent(org.springframework.transaction.annotation.Transactional.class))
+			.as("one transaction per hold keeps the locks a pass holds to a single hold's products, "
+					+ "so two passes cannot take them in opposite orders")
 			.isTrue();
 	}
 

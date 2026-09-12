@@ -6,10 +6,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.swyp.backend.AppDataCleaner;
 import com.swyp.backend.RedisTestcontainersConfiguration;
 import com.swyp.backend.TestcontainersConfiguration;
 import com.swyp.backend.common.security.JwtTokenProvider;
 import com.swyp.backend.common.security.TokenRealm;
+import com.swyp.backend.hold.HoldFixture;
 import com.swyp.backend.hold.entity.Hold;
 import com.swyp.backend.hold.entity.HoldStatus;
 import com.swyp.backend.hold.repository.HoldRepository;
@@ -40,6 +42,9 @@ import org.springframework.test.web.servlet.MockMvc;
 @AutoConfigureMockMvc
 @Import({TestcontainersConfiguration.class, RedisTestcontainersConfiguration.class})
 class OwnerHoldControllerTest {
+
+	@Autowired
+	AppDataCleaner appDataCleaner;
 
 	@Autowired
 	MockMvc mockMvc;
@@ -87,11 +92,11 @@ class OwnerHoldControllerTest {
 		mockMvc.perform(get("/owner/holds?status=HOLDING").header("Authorization", "Bearer " + token))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.totalElements").value(2))
-			.andExpect(jsonPath("$.data.content[0].qty").value(2))
+			.andExpect(jsonPath("$.data.content[0].totalQty").value(2))
 			.andExpect(jsonPath("$.data.content[0].status").value("HOLDING"))
 			.andExpect(jsonPath("$.data.content[0].nickname").value("윤지현"))
-			.andExpect(jsonPath("$.data.content[0].productName").value("시금치 한 단"))
-			.andExpect(jsonPath("$.data.content[1].qty").value(1));
+			.andExpect(jsonPath("$.data.content[0].items[0].productName").value("시금치 한 단"))
+			.andExpect(jsonPath("$.data.content[1].totalQty").value(1));
 	}
 
 	@Test
@@ -106,13 +111,13 @@ class OwnerHoldControllerTest {
 		mockMvc.perform(get("/owner/holds?status=CANCELED_BY_OWNER").header("Authorization", "Bearer " + token))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.totalElements").value(1))
-			.andExpect(jsonPath("$.data.content[0].qty").value(1))
+			.andExpect(jsonPath("$.data.content[0].totalQty").value(1))
 			.andExpect(jsonPath("$.data.content[0].status").value("CANCELED_BY_OWNER"));
 
 		mockMvc.perform(get("/owner/holds?status=CANCELED_BY_USER").header("Authorization", "Bearer " + token))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.totalElements").value(1))
-			.andExpect(jsonPath("$.data.content[0].qty").value(2));
+			.andExpect(jsonPath("$.data.content[0].totalQty").value(2));
 	}
 
 	@Test
@@ -153,8 +158,8 @@ class OwnerHoldControllerTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.nickname").value("윤지현"))
 			.andExpect(jsonPath("$.data.storeName").value("청과마을"))
-			.andExpect(jsonPath("$.data.qty").value(2))
-			.andExpect(jsonPath("$.data.unitPrice").value(800))
+			.andExpect(jsonPath("$.data.totalQty").value(2))
+			.andExpect(jsonPath("$.data.items[0].unitPrice").value(800))
 			.andExpect(jsonPath("$.data.totalPrice").value(1600))
 			.andExpect(jsonPath("$.data.status").value("HOLDING"));
 	}
@@ -209,16 +214,42 @@ class OwnerHoldControllerTest {
 	}
 
 	@Test
-	void completePickup_onAnExpiredHold_isRejected() throws Exception {
+	void completePickup_shortlyAfterTheExpiry_isStillAccepted() throws Exception {
 		Product product = createProduct("콩나물 한 바구니", 10);
-		Hold hold = holding(product, 1, Duration.ofMinutes(1));
-		hold.expire();
-		holdRepository.saveAndFlush(hold);
+		Hold hold = holding(product, 1, Duration.ofMinutes(-1));
+		product.hold(1);
+		productRepository.saveAndFlush(product);
+		expireWithStockBack(hold, product);
+
+		mockMvc.perform(post("/owner/holds/" + hold.getId() + "/complete")
+				.header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.status").value("COMPLETED"));
+
+		assertThat(productRepository.findById(product.getId()).orElseThrow().getAvailableQty())
+			.as("the goods left the shop after the batch had already put them back on the shelf")
+			.isEqualTo(9);
+	}
+
+	@Test
+	void completePickup_longAfterTheExpiry_isRejected() throws Exception {
+		Product product = createProduct("콩나물 한 바구니", 10);
+		Hold hold = holding(product, 1, Duration.ofHours(-2));
+		product.hold(1);
+		productRepository.saveAndFlush(product);
+		expireWithStockBack(hold, product);
 
 		mockMvc.perform(post("/owner/holds/" + hold.getId() + "/complete")
 				.header("Authorization", "Bearer " + token))
 			.andExpect(status().isConflict())
 			.andExpect(jsonPath("$.code").value("HOLD_ALREADY_RESOLVED"));
+	}
+
+	private void expireWithStockBack(Hold hold, Product product) {
+		hold.expire();
+		product.releaseHold(hold.getItems().getFirst().getQty());
+		holdRepository.saveAndFlush(hold);
+		productRepository.saveAndFlush(product);
 	}
 
 	@Test
@@ -240,11 +271,7 @@ class OwnerHoldControllerTest {
 	}
 
 	private void clearAll() {
-		holdRepository.deleteAll();
-		notificationRepository.deleteAll();
-		productRepository.deleteAll();
-		storeRepository.deleteAll();
-		userRepository.deleteAll();
+		appDataCleaner.clear();
 	}
 
 	private Product createProduct(String name, int initialQty) {
@@ -255,7 +282,7 @@ class OwnerHoldControllerTest {
 
 	private Hold holding(Product product, int qty, Duration until) {
 		return holdRepository.saveAndFlush(
-			new Hold(newConsumer(), product, qty, Instant.now().plus(until)));
+			HoldFixture.hold(newConsumer(), product, qty, Instant.now().plus(until)));
 	}
 
 	private User newConsumer() {
@@ -273,6 +300,6 @@ class OwnerHoldControllerTest {
 			otherStore, "남의상품", ProductCategory.FRUIT, 5, 1000, 800,
 			LocalDateTime.now(), LocalDateTime.now().plusHours(1), "https://example.com/b.jpg"));
 		return holdRepository.saveAndFlush(
-			new Hold(newConsumer(), othersProduct, 1, Instant.now().plus(Duration.ofMinutes(7))));
+			HoldFixture.hold(newConsumer(), othersProduct, 1, Instant.now().plus(Duration.ofMinutes(7))));
 	}
 }
