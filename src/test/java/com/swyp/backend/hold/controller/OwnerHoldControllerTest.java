@@ -151,6 +151,40 @@ class OwnerHoldControllerTest {
 	}
 
 	@Test
+	void getOwnerHolds_countsEveryFilterWhicheverOneIsApplied() throws Exception {
+		Product product = createProduct("시금치 한 단", 20);
+		holding(product, 1, Duration.ofMinutes(5));
+		Hold completed = holding(product, 1, Duration.ofMinutes(6));
+		completed.complete(Instant.now());
+		Hold expired = holding(product, 1, Duration.ofMinutes(7));
+		expired.expire();
+		Hold byOwner = holding(product, 1, Duration.ofMinutes(8));
+		byOwner.cancelByOwner(Instant.now(), "재고가 모자라요");
+		holdRepository.saveAllAndFlush(List.of(completed, expired, byOwner));
+
+		mockMvc.perform(get("/owner/holds?status=HOLDING").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.holds.totalElements").value(1))
+			.andExpect(jsonPath("$.data.counts.all").value(4))
+			.andExpect(jsonPath("$.data.counts.holding").value(1))
+			.andExpect(jsonPath("$.data.counts.completed").value(1))
+			.andExpect(jsonPath("$.data.counts.expired").value(1))
+			.andExpect(jsonPath("$.data.counts.canceledByOwner").value(1))
+			.andExpect(jsonPath("$.data.counts.canceledByUser").value(0));
+	}
+
+	@Test
+	void getOwnerHolds_countsOnlyMyStore() throws Exception {
+		holding(createProduct("애호박", 10), 1, Duration.ofMinutes(5));
+		holdOfAnotherStore();
+
+		mockMvc.perform(get("/owner/holds").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.counts.all").value(1))
+			.andExpect(jsonPath("$.data.counts.holding").value(1));
+	}
+
+	@Test
 	void getOwnerHold_showsTheStoreAndTheTotalPrice() throws Exception {
 		Product product = createProduct("복숭아 4입", 10);
 		Hold hold = holding(product, 2, Duration.ofMinutes(8));
