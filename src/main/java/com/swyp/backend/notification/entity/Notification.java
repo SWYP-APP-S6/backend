@@ -48,6 +48,16 @@ public class Notification extends BaseTimeEntity {
 	@Column(name = "read_at")
 	private Instant readAt;
 
+	@Enumerated(EnumType.STRING)
+	@Column(name = "push_state", nullable = false, length = 20)
+	private NotificationPushState pushState = NotificationPushState.PENDING;
+
+	@Column(name = "push_attempts", nullable = false)
+	private int pushAttempts;
+
+	@Column(name = "pushed_at")
+	private Instant pushedAt;
+
 	public Notification(
 			User user, NotificationType type, String title, String body, String deepLink) {
 		this.user = user;
@@ -60,6 +70,26 @@ public class Notification extends BaseTimeEntity {
 	public void markAsRead(Instant readAt) {
 		if (this.readAt == null) {
 			this.readAt = readAt;
+		}
+	}
+
+	public void markPushDelivered(Instant pushedAt) {
+		this.pushState = NotificationPushState.SENT;
+		this.pushedAt = pushedAt;
+	}
+
+	public void skipPush() {
+		this.pushState = NotificationPushState.SKIPPED;
+	}
+
+	public void failPush() {
+		this.pushState = NotificationPushState.FAILED;
+	}
+
+	public void recordPushAttempt(int maxAttempts) {
+		this.pushAttempts++;
+		if (this.pushAttempts >= maxAttempts) {
+			this.pushState = NotificationPushState.FAILED;
 		}
 	}
 }
