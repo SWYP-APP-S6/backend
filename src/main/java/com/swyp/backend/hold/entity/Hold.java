@@ -113,6 +113,10 @@ public class Hold extends BaseTimeEntity {
 		return status == HoldStatus.HOLDING && !expiresAt.isAfter(at);
 	}
 
+	public HoldStatus statusAt(Instant at) {
+		return isOverdueAt(at) ? HoldStatus.EXPIRED : status;
+	}
+
 	public void complete(Instant completedAt) {
 		if (status != HoldStatus.HOLDING && status != HoldStatus.EXPIRED) {
 			throw new IllegalStateException("hold is no longer waiting for a pickup");

@@ -80,10 +80,6 @@ public record HoldDetailResponse(
 		}
 	}
 
-	private static HoldStatus statusAt(Hold hold, Instant serverTime) {
-		return hold.isOverdueAt(serverTime) ? HoldStatus.EXPIRED : hold.getStatus();
-	}
-
 	public static HoldDetailResponse from(Hold hold, Instant serverTime) {
 		List<HoldItemResponse> items = hold.getItems().stream()
 				.sorted(Comparator.comparing(item -> item.getProduct().getId()))
@@ -91,7 +87,7 @@ public record HoldDetailResponse(
 				.toList();
 		return new HoldDetailResponse(
 				hold.getId(),
-				statusAt(hold, serverTime),
+				hold.statusAt(serverTime),
 				items.stream().mapToInt(HoldItemResponse::qty).sum(),
 				items.stream().mapToInt(HoldItemResponse::lineTotal).sum(),
 				hold.getCreatedAt(),
