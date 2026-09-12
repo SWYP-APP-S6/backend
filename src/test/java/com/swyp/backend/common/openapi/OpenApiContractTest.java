@@ -101,6 +101,10 @@ class OpenApiContractTest {
 					.as("an untagged controller becomes xxx-controller, which the generator turns "
 							+ "into a class name the app has to read")
 					.doesNotEndWith("-controller");
+			assertThat(tags.get(0).asString())
+					.as("the generator strips a tag down to a class name, so a non-ASCII tag leaves "
+							+ "nothing and every operation collapses into one DefaultApi")
+					.matches("[A-Za-z][A-Za-z0-9]*");
 		});
 	}
 
