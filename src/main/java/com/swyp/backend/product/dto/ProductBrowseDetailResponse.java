@@ -68,6 +68,7 @@ public record ProductBrowseDetailResponse(
 			Product product,
 			List<String> tags,
 			@Nullable Long myHoldId,
+			boolean holdingAtAnotherStore,
 			@Nullable Integer distanceMeters,
 			boolean openNow,
 			boolean pickupWindowOpen,
@@ -85,14 +86,14 @@ public record ProductBrowseDetailResponse(
 				product.getPickupStartAt(),
 				product.getPickupEndAt(),
 				product.getStatus(),
-				buttonStateOf(product, myHoldId, pickupWindowOpen),
+				buttonStateOf(product, myHoldId, holdingAtAnotherStore, pickupWindowOpen),
 				myHoldId,
 				ProductStore.of(product.getStore(), distanceMeters, openNow),
 				recipes);
 	}
 
-	private static HoldButtonState buttonStateOf(
-			Product product, @Nullable Long myHoldId, boolean pickupWindowOpen) {
+	private static HoldButtonState buttonStateOf(Product product, @Nullable Long myHoldId,
+			boolean holdingAtAnotherStore, boolean pickupWindowOpen) {
 		if (myHoldId != null) {
 			return HoldButtonState.ALREADY_HOLDING;
 		}
@@ -101,6 +102,9 @@ public record ProductBrowseDetailResponse(
 		}
 		if (product.getStatus() == ProductStatus.SOLD_OUT || product.getAvailableQty() == 0) {
 			return HoldButtonState.SOLD_OUT;
+		}
+		if (holdingAtAnotherStore) {
+			return HoldButtonState.OTHER_STORE;
 		}
 		return HoldButtonState.AVAILABLE;
 	}
