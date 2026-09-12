@@ -10,7 +10,7 @@ public class AppDataCleaner {
 
 	private static final String TRUNCATE = """
 			truncate table
-				hold_items, holds, hold_cancel_credits, notifications,
+				hold_items, holds, hold_cancel_credits, notifications, user_device_tokens,
 				products, stores, user_locations, users
 			restart identity cascade
 			""";

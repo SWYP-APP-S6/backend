@@ -51,6 +51,15 @@
   클라이언트 에러 405·400·415도 포함). 비즈니스 예외는 **`BusinessException(ApiCode)` 하나**로 던지고,
   **에러 코드는 각 feature가 자기 enum(`implements ApiCode`)에 소유**한다(제네릭만
   `common.response.ErrorCode` — global→feature 역결합 회피).
+- **알림은 행을 만드는 데서 끝내고, 푸시는 배치가 내보낸다.** 트리거 지점은
+  `NotificationFunction.notify()`로 `notifications` 행 하나를 만들 뿐 **FCM을 직접 부르지 않는다** —
+  그 자리는 `products`에 `FOR UPDATE`를 쥔 트랜잭션 안이라(`HoldExpirer`·`HoldService.create`) 외부
+  HTTP 왕복이 락을 그만큼 붙잡는다. 발송은 `push_state='PENDING'`을 훑는 아웃박스 배치
+  (`NotificationPushService`, `notification.push.scan-interval`)가 **커밋 뒤에** 맡고, 전송 자체는
+  `PushSender`(FCM HTTP v1 — `google-auth-library`로 토큰만 받고 `messages:send`는 `RestClient`)가
+  한다. 키(`fcm.*`)가 없으면 **발송만 꺼지고** 알림함은 그대로다(fail-closed). 수신처는
+  `user_device_tokens`이고 앱이 `POST`/`DELETE /notifications/device-tokens`로 등록·해제한다 —
+  로그아웃 때 지우지 않으면 그 기기를 이어 쓰는 다음 사람이 남의 푸시를 받는다.
 - **제약 메시지는 `src/main/resources/ValidationMessages.properties`가 소유한다** — 없으면 Hibernate
   Validator 기본 번들이 **JVM 로케일에 따라** 골라져 로컬(ko)은 한국어, 운영 컨테이너
   (`eclipse-temurin`의 `LANG=en_US.UTF-8`)는 영어가 나간다. 이 번들은 로케일 접미사가 없어 모든

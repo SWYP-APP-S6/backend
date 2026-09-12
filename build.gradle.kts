@@ -24,6 +24,10 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-security")
 	implementation("org.springframework.boot:spring-boot-starter-webmvc")
 	implementation("org.springframework.boot:spring-boot-starter-restclient")
+	// FCM HTTP v1 의 서비스 계정 JWT 서명 → 액세스 토큰 교환과 그 캐싱·갱신만 맡는다.
+	// 발송 자체는 RestClient 로 직접 친다(firebase-admin 은 v1 에 배치 엔드포인트가 없어져
+	// 재시도·에러코드 매핑 외에 남는 런타임 동작이 없고, guava·gRPC 를 함께 끌고 온다).
+	implementation("com.google.auth:google-auth-library-oauth2-http:1.48.0")
 	implementation("org.springframework.boot:spring-boot-starter-validation")
 	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.0")
 	implementation("io.jsonwebtoken:jjwt-api:0.13.0")
@@ -52,6 +56,9 @@ tasks.withType<Test> {
 	environment("JWT_SECRET", "test-only-secret-that-is-at-least-32-bytes-long")
 	// 벽시계(LocalDateTime) 비교가 CI(UTC)와 로컬(KST)에서 갈리지 않도록 런타임과 같은 존으로 고정한다.
 	systemProperty("user.timezone", "Asia/Seoul")
+	// 푸시 아웃박스 배치는 운영 주기(3초)로 두면 테스트가 알림을 넣는 동안 끼어들어 같은 행의
+	// push_state 를 바꾼다. 스케줄러는 사실상 꺼 두고, 배치를 검증하는 테스트가 직접 호출한다.
+	systemProperty("notification.push.scan-interval", "1h")
 }
 
 // db/data 의 시드 SQL 은 psql 로 직접 넣는 운영 산출물이라 클래스패스에 올릴 이유가 없다.

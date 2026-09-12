@@ -767,4 +767,41 @@ class HoldControllerTest {
 		productRepository.saveAndFlush(target);
 		return holdRepository.saveAndFlush(HoldFixture.hold(user, target, qty, expiresAt));
 	}
+
+	@Test
+	void theOwnerIsToldAsSoonAsAConsumerOpensAHold() throws Exception {
+		holdAndReturnId(product, 1);
+
+		assertThat(notificationRepository.findByUserId(
+				product.getStore().getOwner().getId(), org.springframework.data.domain.Pageable.unpaged()))
+			.singleElement()
+			.satisfies(notification -> {
+				assertThat(notification.getType())
+					.isEqualTo(com.swyp.backend.notification.entity.NotificationType.NEW_HOLD_RECEIVED);
+				assertThat(notification.getBody()).contains("소비자", "복숭아 4입");
+			});
+	}
+
+	@Test
+	void addingASecondProductToTheSamePickupDoesNotRingTheOwnerAgain() throws Exception {
+		Product onion = siblingProduct(product, "양파", 3);
+		holdAndReturnId(product, 1);
+
+		holdAndReturnId(onion, 1);
+
+		assertThat(notificationRepository.findByUserId(
+				product.getStore().getOwner().getId(), org.springframework.data.domain.Pageable.unpaged()))
+			.as("one hold is one pickup -- a second item is not a second visit to announce")
+			.hasSize(1);
+	}
+
+	@Test
+	void theConsumerWhoHeldGetsNoNotificationOfTheirOwnAction() throws Exception {
+		holdAndReturnId(product, 1);
+
+		assertThat(notificationRepository.findByUserId(
+				consumer.getId(), org.springframework.data.domain.Pageable.unpaged()))
+			.as("they are looking at the screen that just confirmed it")
+			.isEmpty();
+	}
 }

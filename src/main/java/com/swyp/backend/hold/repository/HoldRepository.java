@@ -111,6 +111,21 @@ public interface HoldRepository extends JpaRepository<Hold, Long> {
 	@Query("""
 			select h from Hold h
 			join fetch h.user
+			join fetch h.store
+			where h.status = :status
+				and h.expiryRemindedAt is null
+				and h.expiresAt > :now
+				and h.expiresAt <= :remindBy
+			order by h.expiresAt
+			""")
+	List<Hold> findExpiringSoon(
+			@Param("status") HoldStatus status,
+			@Param("now") Instant now,
+			@Param("remindBy") Instant remindBy);
+
+	@Query("""
+			select h from Hold h
+			join fetch h.user
 			join fetch h.items i
 			join fetch i.product
 			where i.product.id = :productId and h.status = :status

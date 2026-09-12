@@ -66,6 +66,9 @@ pull 방향 배포가 성립한다. 서버로 들어오는 인바운드 연결�
 | `KAKAO_CONSUMER_APP_ID` | ✅ | 소비자 앱의 카카오 **숫자 앱 ID**(REST API 키 아님). 없으면 앱은 뜨지만 소비자 카카오 로그인이 전부 거부된다 |
 | `KAKAO_OWNER_APP_ID` | ✅ | 점주 앱의 카카오 앱 ID. 소비자 앱과 **다른 카카오 앱**이다 |
 | `KAKAO_LOCAL_REST_API_KEY` | ✅ | 점주 가게 등록(주소 → 좌표 변환)용 카카오 로컬 API 키. 위 로그인용 앱 ID들과 무관한 별개 값이다 — "카카오맵" 제품을 활성화한 앱의 **REST API 키**. 없으면 가게 등록이 전부 거부된다 |
+| `FCM_PROJECT_ID` | ❌ | FCM 푸시용 Firebase 프로젝트 ID. 비면 앱은 뜨고 **푸시 발송만** 꺼진다(알림은 인앱 알림함까지 간다) |
+| `FCM_CREDENTIALS_BASE64` | ❌ | 위 프로젝트의 서비스 계정 JSON 을 base64 한 줄로(`base64 -i key.json \| tr -d '\\n'`). 파일 마운트를 쓰지 않는 이유는 `compose.yaml` 주석 참고 |
+| `FCM_ANDROID_CHANNEL_ID` | ❌ | 안드로이드 앱이 만드는 알림 채널 id. **앱과 값이 어긋나면 푸시가 도착해도 트레이에 안 뜬다** |
 | `MFDS_API_KEY` | ❌ | 레시피 수집 배치 전용. 비어 있어도 앱은 뜬다 |
 | `KAKAO_CONSUMER_REST_API_KEY` | ❌ | 관리자 웹 `/kakao-test` 의 인가 코드 교환 전용. 네이티브 앱 로그인은 SDK 토큰을 쓰므로 영향 없다 — 비면 그 페이지의 웹 로그인만 거부된다 |
 | `KAKAO_OWNER_REST_API_KEY` | ❌ | 위와 같음(점주 앱 키) |

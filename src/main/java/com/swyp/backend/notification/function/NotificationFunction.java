@@ -1,7 +1,9 @@
 package com.swyp.backend.notification.function;
 
 import com.swyp.backend.common.exception.BusinessException;
+import com.swyp.backend.notification.dto.PendingPush;
 import com.swyp.backend.notification.entity.Notification;
+import com.swyp.backend.notification.entity.NotificationPushState;
 import com.swyp.backend.notification.entity.NotificationType;
 import com.swyp.backend.notification.exception.NotificationErrorCode;
 import com.swyp.backend.notification.repository.NotificationRepository;
@@ -35,6 +37,16 @@ public class NotificationFunction {
 
 	public List<Notification> findUnreadOf(Long userId) {
 		return notificationRepository.findByUserIdAndReadAtIsNull(userId);
+	}
+
+	public List<PendingPush> findPendingPushes(int batchSize) {
+		return notificationRepository.findPendingPushes(
+				NotificationPushState.PENDING, PageRequest.of(0, batchSize));
+	}
+
+	public Notification getById(Long notificationId) {
+		return notificationRepository.findById(notificationId)
+				.orElseThrow(() -> new BusinessException(NotificationErrorCode.NOTIFICATION_NOT_FOUND));
 	}
 
 	public Notification getOwnedBy(Long userId, Long notificationId) {
