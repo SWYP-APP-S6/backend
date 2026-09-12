@@ -60,6 +60,9 @@ public class SecurityConfig {
 
 	private static final String[] APP_USER_ENDPOINTS = {
 		"/users/me",
+		"/notifications",
+		"/notifications/read-all",
+		"/notifications/*/read",
 	};
 
 	private static final String[] BROWSE_ENDPOINTS = {
