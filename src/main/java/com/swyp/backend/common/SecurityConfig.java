@@ -58,6 +58,13 @@ public class SecurityConfig {
 		"/holds/**",
 	};
 
+	private static final String[] APP_USER_ENDPOINTS = {
+		"/users/me",
+		"/notifications",
+		"/notifications/read-all",
+		"/notifications/*/read",
+	};
+
 	private static final String[] BROWSE_ENDPOINTS = {
 		"/recipes",
 		"/recipes/**",
@@ -126,6 +133,7 @@ public class SecurityConfig {
 				auth.requestMatchers(CONSUMER_ENDPOINTS).access(AuthorizationManagers.allOf(
 					AuthorityAuthorizationManager.hasAuthority(TokenRealm.USER.authority()),
 					AuthorityAuthorizationManager.hasRole(CONSUMER_ROLE)));
+				auth.requestMatchers(APP_USER_ENDPOINTS).hasAuthority(TokenRealm.USER.authority());
 				auth.requestMatchers("/admin/**").hasAuthority(TokenRealm.ADMIN.authority());
 				auth.requestMatchers("/owner/**").access(AuthorizationManagers.allOf(
 					AuthorityAuthorizationManager.hasAuthority(TokenRealm.USER.authority()),

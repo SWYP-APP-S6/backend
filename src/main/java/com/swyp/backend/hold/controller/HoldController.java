@@ -5,10 +5,13 @@ import com.swyp.backend.common.response.SuccessCode;
 import com.swyp.backend.hold.dto.ActiveHoldResponse;
 import com.swyp.backend.hold.dto.HoldCreateRequest;
 import com.swyp.backend.hold.dto.HoldDetailResponse;
+import com.swyp.backend.hold.dto.HoldHistoryResponse;
 import com.swyp.backend.hold.service.HoldService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -33,6 +36,12 @@ public class HoldController {
 		HoldDetailResponse response = holdService.create(userId, request);
 		return ResponseEntity.status(HttpStatus.CREATED)
 				.body(ApiResponse.of(SuccessCode.CREATED, response));
+	}
+
+	@GetMapping
+	public ApiResponse<HoldHistoryResponse> getHolds(
+			@AuthenticationPrincipal Long userId, @PageableDefault(size = 20) Pageable pageable) {
+		return ApiResponse.of(SuccessCode.OK, holdService.getHolds(userId, pageable));
 	}
 
 	@GetMapping("/active")

@@ -74,6 +74,19 @@ public interface HoldRepository extends JpaRepository<Hold, Long> {
 	List<Hold> findUnchargedNoShows(
 			@Param("userId") Long userId, @Param("decidedBefore") Instant decidedBefore);
 
+	@Query(value = "select h.id from Hold h where h.user.id = :userId",
+			countQuery = "select count(h) from Hold h where h.user.id = :userId")
+	Page<Long> findUserHoldIds(@Param("userId") Long userId, Pageable pageable);
+
+	@Query("""
+			select distinct h from Hold h
+			join fetch h.store
+			left join fetch h.items i
+			left join fetch i.product
+			where h.id in :ids
+			""")
+	List<Hold> findDetailsByIds(@Param("ids") List<Long> ids);
+
 	@Query("select h.store.id from Hold h where h.id = :holdId")
 	Optional<Long> findStoreIdById(@Param("holdId") Long holdId);
 

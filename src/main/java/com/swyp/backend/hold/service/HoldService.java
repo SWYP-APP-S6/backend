@@ -1,11 +1,14 @@
 package com.swyp.backend.hold.service;
 
 import com.swyp.backend.common.exception.BusinessException;
+import com.swyp.backend.common.response.PageResponse;
 import com.swyp.backend.hold.HoldProperties;
 import com.swyp.backend.hold.dto.ActiveHoldResponse;
 import com.swyp.backend.hold.dto.HoldCreateRequest;
 import com.swyp.backend.hold.dto.HoldDetailResponse;
+import com.swyp.backend.hold.dto.HoldHistoryResponse;
 import com.swyp.backend.hold.dto.HoldRef;
+import com.swyp.backend.hold.dto.HoldSummaryResponse;
 import com.swyp.backend.hold.entity.Hold;
 import com.swyp.backend.hold.entity.HoldItem;
 import com.swyp.backend.hold.entity.HoldStatus;
@@ -28,6 +31,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -94,6 +99,15 @@ public class HoldService {
 	public HoldDetailResponse getHold(Long userId, Long holdId) {
 		Instant now = Instant.now(clock);
 		return HoldDetailResponse.from(holdFunction.getDetailOfUserHold(userId, holdId), now);
+	}
+
+	public HoldHistoryResponse getHolds(Long userId, Pageable pageable) {
+		Instant now = Instant.now(clock);
+		Page<Hold> holds = holdFunction.findUserHolds(userId, pageable);
+		List<HoldSummaryResponse> content = holds.getContent().stream()
+				.map(hold -> HoldSummaryResponse.from(hold, now))
+				.toList();
+		return new HoldHistoryResponse(now, PageResponse.of(content, holds));
 	}
 
 	public ActiveHoldResponse getActiveHold(Long userId) {
