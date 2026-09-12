@@ -4,7 +4,6 @@ import com.swyp.backend.common.exception.BusinessException;
 import com.swyp.backend.user.entity.User;
 import com.swyp.backend.user.entity.UserRole;
 import com.swyp.backend.user.exception.UserAuthErrorCode;
-import com.swyp.backend.user.exception.UserAuthErrorCode;
 import com.swyp.backend.user.repository.UserRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import java.util.Optional;

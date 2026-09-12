@@ -1,6 +1,7 @@
 package com.swyp.backend.user.service;
 
 import com.swyp.backend.common.response.PageResponse;
+import com.swyp.backend.user.dto.MeResponse;
 import com.swyp.backend.user.dto.UserSummaryResponse;
 import com.swyp.backend.user.entity.User;
 import com.swyp.backend.user.entity.UserRole;
@@ -21,6 +22,10 @@ public class UserService {
 
 	private final UserFunction userFunction;
 	private final UserLocationFunction userLocationFunction;
+
+	public MeResponse getMe(Long userId) {
+		return MeResponse.from(userFunction.getById(userId));
+	}
 
 	public PageResponse<UserSummaryResponse> getUsers(UserRole role, Pageable pageable) {
 		Page<User> users = userFunction.findAllByRole(role, pageable);
