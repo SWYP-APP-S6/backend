@@ -67,6 +67,10 @@ src/main/resources/db/data/mfds_*.sql
 ### 관리자 계정 명단 — 팀원의 이메일·전화번호다. 이 저장소는 public 이라 커밋하면 그대로 공개된다.
 src/main/resources/db/data/*.tsv
 
+### 초기 투입 데이터 — 위 명단에서 만든 관리자 INSERT(이메일 + 전화번호 해시)가 들어 있다.
+### 샘플 데이터(test_data_1.sql)는 가짜라 추적한다.
+src/main/resources/db/data/init_data_1.sql
+
 ### Personal handoff note (local only)
 HANDOFF.md
 /docs

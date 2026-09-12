@@ -8,12 +8,33 @@ Flyway 경로(`db/migration`) **밖**이다. 자동 실행되지 않으며, 필�
 
 ## 파일
 
+투입할 파일은 **두 개**다. 나머지는 그 둘이 쓰는 재료다. 이전의 조각이던
+`dev_seed_users.sql` · `dev_seed_stores.sql` 은 `test_data_1.sql` 이 대체해 지웠다 —
+둘을 같이 넣으면 이름이 겹치는 가게가 두 벌 생긴다.
+
 | 파일 | 커밋 | 내용 |
 |---|---|---|
-| `mfds_cookrcp01.sql` | ✗ | 식약처 조리식품 레시피 DB 1,156건 → `recipes` / `recipe_steps` / `recipe_ingredients` / `ingredients` / `recipe_nutrition` / `recipe_tags` |
+| **`init_data_1.sql`** | ✗ | **처음 뜰 때 필요한 실제 데이터** — 레시피 1,156건(`\ir` 로 `mfds_cookrcp01.sql` 을 읽어 온다) + 관리자 9명. 관리자 INSERT 에 팀원 이메일과 전화번호 해시가 들어가 `.gitignore` 한다. `create_admins.sh` 로 언제든 다시 만든다 |
+| **`test_data_1.sql`** | ✓ | **런칭 전 샘플** — 가게 7곳 · 상품 25개 · 유저 12명. 전부 가짜다. 기준점에서 거리가 0 / 234 / 701 / 1,501 / 3,002 / 5,993m 로 갈리게 배치해 `radiusMeters` 를 500 → 5000 으로 올리면 매장이 1 → 3 → 4 → 5곳으로 늘어난다. 픽업 시각이 `now()` 상대값이라 언제 넣어도 판매중이고, 다시 돌리면 갱신된다 |
+| `mfds_cookrcp01.sql` | ✗ | 식약처 조리식품 레시피 DB 1,156건 → `recipes` / `recipe_steps` / `recipe_ingredients` / `ingredients` / `recipe_nutrition` / `recipe_tags`. `init_data_1.sql` 이 이 파일을 읽는다 |
 | `mfds_cookrcp01_raw.sql` | ✗ | 원본 API 응답 → `recipe_raw`. 선택 사항이며, 재수집 없이 파서만 고쳐 다시 만들 때 쓴다. 본체를 먼저 넣어야 한다 |
-| `dev_seed_admin.sql` | ✓ | 로컬 개발용 SUPER 관리자. **운영 금지** |
 | `team_admins.tsv` | ✗ | 관리자 계정 명단(이메일·이름·타입·전화번호). 개인정보이고 이 저장소는 public 이라 `.gitignore` 한다 |
+| `dev_seed_admin.sql` | ✓ | 로컬 개발용 SUPER 관리자(`admin@swyp.com`). **운영 금지** — `init_data_1.sql` 에 일부러 넣지 않았다 |
+
+## 투입 (권장 순서)
+
+```sh
+DB="postgresql://swyp:swyp@localhost:5432/swyp"
+psql "$DB" -v ON_ERROR_STOP=1 -f src/main/resources/db/data/init_data_1.sql   # 레시피 + 관리자
+psql "$DB" -v ON_ERROR_STOP=1 -f src/main/resources/db/data/test_data_1.sql   # 샘플 가게·상품
+```
+
+둘 다 **재실행해도 안전**하다. `init_data_1.sql` 은 이미 있는 행을 건드리지 않고,
+`test_data_1.sql` 은 자기가 만든 행(`users.oauth_provider = 'seed'`)만 지우고 다시 넣는다 —
+동료들이 관리자 페이지에서 만든 데이터는 남는다.
+
+`init_data_1.sql` 의 `\ir` 은 **그 파일이 있는 디렉터리**를 기준으로 레시피 파일을 찾으므로,
+파이프(stdin)로 흘려보낼 때는 동작하지 않는다. 원격은 아래 `seed-remote.sh` 를 쓴다.
 
 ## 재생성
 
@@ -23,7 +44,10 @@ Flyway 경로(`db/migration`) **밖**이다. 자동 실행되지 않으며, 필�
 python3 scripts/mfds_ingest.py
 ```
 
-## 투입
+## 레시피만 따로 넣을 때
+
+`init_data_1.sql` 이 레시피를 함께 넣으므로 보통은 필요 없다. 원본(`_raw`)을 추가로 넣거나
+관리자 없이 레시피만 갱신할 때 쓴다.
 
 ```sh
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f src/main/resources/db/data/mfds_cookrcp01.sql
