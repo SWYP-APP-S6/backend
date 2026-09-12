@@ -46,7 +46,7 @@ public class ProductBrowseService {
 		List<SellableStoreGroup> nearby = productFunction.findSellableGroupedByStore(
 				request.lat(),
 				request.lng(),
-				browseProperties.nearbyRadiusMeters(),
+				radiusOf(request),
 				request.category());
 
 		List<NearbyStoreGroupResponse> groups = nearby.stream()
@@ -55,6 +55,12 @@ public class ProductBrowseService {
 				.toList();
 
 		return NearbyProductsResponse.of(groups, request.page(), request.size());
+	}
+
+	private int radiusOf(NearbyProductsRequest request) {
+		return request.radiusMeters() == null
+				? browseProperties.nearbyRadiusMeters()
+				: request.radiusMeters();
 	}
 
 	public ProductBrowseDetailResponse getProductDetail(
