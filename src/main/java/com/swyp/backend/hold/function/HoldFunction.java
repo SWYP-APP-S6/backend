@@ -18,6 +18,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -112,6 +113,22 @@ public class HoldFunction {
 				filter == null ? null : filter.status(),
 				filter == null ? null : filter.canceledBy(),
 				PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sortFor(filter)));
+	}
+
+	public Page<Hold> findUserHolds(Long userId, Pageable pageable) {
+		Page<Long> ids = holdRepository.findUserHoldIds(
+				userId,
+				PageRequest.of(
+						pageable.getPageNumber(),
+						pageable.getPageSize(),
+						Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by(Sort.Direction.DESC, "id"))));
+		if (ids.isEmpty()) {
+			return new PageImpl<>(List.of(), ids.getPageable(), ids.getTotalElements());
+		}
+		Map<Long, Hold> byId = holdRepository.findDetailsByIds(ids.getContent()).stream()
+				.collect(Collectors.toMap(Hold::getId, hold -> hold));
+		List<Hold> ordered = ids.getContent().stream().map(byId::get).toList();
+		return new PageImpl<>(ordered, ids.getPageable(), ids.getTotalElements());
 	}
 
 	public Hold getDetailById(Long holdId) {
