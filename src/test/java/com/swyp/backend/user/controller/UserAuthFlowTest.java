@@ -54,7 +54,7 @@ class UserAuthFlowTest {
 	private static String signupBody(String signupToken, boolean allTermsAgreed) {
 		return """
 			{"signupToken":"%s","serviceTermsAgreed":%b,"privacyTermsAgreed":%b,\
-			"locationTermsAgreed":true,"marketingOptIn":false}"""
+			"locationTermsAgreed":true,"thirdPartyTermsAgreed":true,"marketingOptIn":false}"""
 			.formatted(signupToken, allTermsAgreed, allTermsAgreed);
 	}
 
@@ -122,6 +122,24 @@ class UserAuthFlowTest {
 			.andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
 
 		assertThat(storedUser("kakao-1003", UserRole.CONSUMER)).isEmpty();
+	}
+
+	@Test
+	void signup_withoutTheThirdPartyConsent_isRejected() throws Exception {
+		String signupToken = signupTokenFor(UserRole.CONSUMER, "token-no-third", "kakao-1007", "제3자미동의");
+
+		mockMvc.perform(post("/auth/signup")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"signupToken":"%s","serviceTermsAgreed":true,"privacyTermsAgreed":true,\
+					"locationTermsAgreed":true,"thirdPartyTermsAgreed":false,"marketingOptIn":false}"""
+					.formatted(signupToken)))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+			.andExpect(jsonPath("$.fieldErrors.thirdPartyTermsAgreed")
+				.value("개인정보 제3자 제공 동의가 필요합니다."));
+
+		assertThat(storedUser("kakao-1007", UserRole.CONSUMER)).isEmpty();
 	}
 
 	@Test

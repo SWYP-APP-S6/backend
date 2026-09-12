@@ -20,7 +20,9 @@ import com.swyp.backend.user.entity.User;
 import com.swyp.backend.user.entity.UserRole;
 import com.swyp.backend.user.repository.UserRepository;
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -63,6 +65,9 @@ class StoreMapControllerTest {
 
 	@Autowired
 	JwtTokenProvider tokenProvider;
+
+	@Autowired
+	Clock clock;
 
 	private LocalDateTime now;
 
@@ -143,6 +148,23 @@ class StoreMapControllerTest {
 				.header("Authorization", bearer(TokenRealm.GUEST, "GUEST")))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.totalStoreCount").value(2));
+	}
+
+	@Test
+	void aStoreThatIsClosedTodayGetsNoMarker() throws Exception {
+		seedTwoSellingStores();
+		Store restingToday = store("오늘휴무", "37.558000", "126.903000", true);
+		restingToday.replaceBusinessDays(
+				EnumSet.complementOf(EnumSet.of(LocalDate.now(clock).getDayOfWeek())));
+		storeRepository.saveAndFlush(restingToday);
+		product(restingToday, "감자 1kg", now.plusHours(2));
+
+		mockMvc.perform(get("/stores/nearby?" + BOUNDS)
+				.header("Authorization", bearer(TokenRealm.GUEST, "GUEST")))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.totalStoreCount").value(2))
+			.andExpect(jsonPath("$.data.stores[*].name")
+				.value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem("오늘휴무"))));
 	}
 
 	@Test

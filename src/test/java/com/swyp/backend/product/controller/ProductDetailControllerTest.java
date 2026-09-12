@@ -30,6 +30,7 @@ import com.swyp.backend.user.repository.UserRepository;
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.EnumSet;
@@ -58,6 +59,9 @@ class ProductDetailControllerTest {
 
 	@Autowired
 	StoreRepository storeRepository;
+
+	@Autowired
+	java.time.Clock clock;
 
 	@Autowired
 	ProductRepository productRepository;
@@ -313,6 +317,19 @@ class ProductDetailControllerTest {
 		mockMvc.perform(get("/products/" + stale.getId()).header("Authorization", guest()))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.holdButton").value("CLOSED"));
+	}
+
+	@Test
+	void aStoreRestingTodayReadsAsClosedSoTheButtonMatchesWhatAHoldWouldAnswer() throws Exception {
+		Store store = product.getStore();
+		store.replaceBusinessDays(
+				EnumSet.complementOf(EnumSet.of(LocalDate.now(clock).getDayOfWeek())));
+		storeRepository.saveAndFlush(store);
+
+		mockMvc.perform(get("/products/" + product.getId()).header("Authorization", guest()))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.holdButton").value("CLOSED"))
+			.andExpect(jsonPath("$.data.store.openNow").value(false));
 	}
 
 	@Test
