@@ -2,7 +2,9 @@ package com.swyp.backend.hold.service;
 
 import com.swyp.backend.common.exception.BusinessException;
 import com.swyp.backend.common.response.PageResponse;
+import com.swyp.backend.hold.dto.OwnerHoldCounts;
 import com.swyp.backend.hold.dto.OwnerHoldDetailResponse;
+import com.swyp.backend.hold.dto.OwnerHoldListResponse;
 import com.swyp.backend.hold.dto.OwnerHoldStatus;
 import com.swyp.backend.hold.dto.OwnerHoldSummaryResponse;
 import com.swyp.backend.hold.HoldProperties;
@@ -42,14 +44,16 @@ public class OwnerHoldService {
 	private final HoldProperties holdProperties;
 	private final Clock clock;
 
-	public PageResponse<OwnerHoldSummaryResponse> getHolds(
+	public OwnerHoldListResponse getHolds(
 			Long ownerId, OwnerHoldStatus filter, Pageable pageable) {
 		Store store = storeFunction.getByOwnerId(ownerId);
 		Page<Hold> holds = holdFunction.findStoreHolds(store.getId(), filter, pageable);
 		List<OwnerHoldSummaryResponse> content = holds.getContent().stream()
 				.map(OwnerHoldSummaryResponse::from)
 				.toList();
-		return PageResponse.of(content, holds);
+		return new OwnerHoldListResponse(
+				OwnerHoldCounts.from(holdFunction.countStoreHoldsByStatus(store.getId())),
+				PageResponse.of(content, holds));
 	}
 
 	public OwnerHoldDetailResponse getHold(Long ownerId, Long holdId) {
