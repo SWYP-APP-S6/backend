@@ -80,11 +80,14 @@
 - 소비자 앱과 점주 앱은 **별개의 카카오 앱**이라 회원번호도 앱마다 다르게 발급된다 — 그래서 유저
   식별자가 `(oauth_provider, oauth_provider_id, role)`이고, 한 사람이 소비자 계정과 점주 계정을
   각각 가질 수 있다.
-- **로컬 테스트 토큰**: `POST /dev/test-token`이 카카오 왕복 없이 소비자/점주 access 토큰을 준다
-  (admin-web `/hold-test`가 앱 전용 API를 호출하는 데 쓴다). 계정은
-  `(oauth_provider='dev', 'test-consumer'|'test-owner')` 한 건을 재사용한다. `dev.test-token.enabled`
-  스위치를 **운영 프로파일이 false로 덮어쓰고**, 그러면 컨트롤러 빈 자체가 만들어지지 않는다 —
-  `SecurityConfig`의 permitAll도 같은 스위치를 보므로 규칙과 엔드포인트가 어긋날 수 없다.
+- **테스트 토큰**: `POST /dev/test-token`이 카카오 왕복 없이 소비자/점주 access 토큰을 준다
+  (admin-web `/app`이 앱 전용 API를 호출하는 데 쓴다). 계정은
+  `(oauth_provider='dev', 'test-consumer'|'test-owner')` 한 건을 재사용한다.
+  **`REALM_ADMIN`을 요구한다** — 인증 없이 열어 두면 URL을 아는 누구나 로그인 없이 소비자 토큰을
+  받아 남의 자리에 앉는다. CORS로는 못 막는다(브라우저 밖에서는 지켜지지 않는다). 백오피스에
+  로그인한 관리자만 부를 수 있게 해서 남는 위험을 "관리자가 고정된 테스트 계정을 흉내낼 수 있다"로
+  줄인 것이고, 운영에서도 그 전제로 켜 둔다(`dev.test-token.enabled`). 끄면 컨트롤러 빈 자체가
+  만들어지지 않고 `SecurityConfig`의 규칙도 같은 스위치를 보므로 둘이 어긋날 수 없다.
 - **새 엔드포인트를 만들면 `SecurityConfig`에 realm과 role을 함께 등록해야 한다** — 빠뜨리면 다른
   주체가 통과한다. 등록 규칙·카카오 검증·가입 2단계·guest·rate limit 상세는
   **`.claude/rules/security.md`**(보안·컨트롤러 파일 작성 시 자동 로드), env 변수는

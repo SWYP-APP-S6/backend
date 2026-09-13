@@ -158,6 +158,7 @@ where v.closed_on is null or d.day_of_week <> v.closed_on;
 -- 계산해 넣는다 -- 컬럼이 not null 이라 비워 둘 수 없고, 손으로 적으면 가격과 어긋난다.
 --
 -- 상태를 섞어 둔다: 마감 임박(40분) · 품절(SOLD_OUT) · 판매 종료(CLOSED) · 재고 2개 이하.
+-- 카테고리도 홈의 칩 여덟을 모두 덮는다(V0022) -- 칩 하나가 늘 빈 화면이면 필터를 못 눌러 본다.
 insert into products (store_id, name, category, initial_qty, available_qty, held_qty,
                       original_price, sale_price, discount_rate,
                       pickup_start_at, pickup_end_at, photo_url, status, created_at, updated_at)
@@ -173,10 +174,15 @@ from (values
   ('seed-o1', '감자 1kg',         'VEGETABLE', 5, 5,  6000,  3000, interval '-1 hour', interval '4 hours',  'potato',    'ON_SALE'),
   ('seed-o1', '애호박 2개',       'VEGETABLE', 2, 2,  3000,  1500, interval '-2 hours', interval '40 minutes', 'zucchini', 'ON_SALE'),
   ('seed-o1', '오이 5입',         'VEGETABLE', 3, 0,  5000,  2500, interval '-1 hour', interval '4 hours',  'cucumber',  'SOLD_OUT'),
+  -- 동네 채소가게가 계란·빵·생수를 함께 파는 건 흔하다. 기준점에서 0m 이고 매일 여는 가게라,
+  -- 유제품·베이커리·기타 칩이 요일이나 반경에 걸려 빈 화면이 되지 않는다.
+  ('seed-o1', '계란 10구',        'DAIRY_EGG', 5, 5,  4000,  2400, interval '-1 hour', interval '4 hours',  'eggbox',    'ON_SALE'),
+  ('seed-o1', '모닝빵 6개',       'BAKERY',    3, 3,  4000,  2000, interval '-1 hour', interval '4 hours',  'bun',       'ON_SALE'),
+  ('seed-o1', '생수 2L 6입',      'ETC',       4, 4,  6000,  3600, interval '-1 hour', interval '4 hours',  'water',     'ON_SALE'),
   -- 역삼 정육 (701 m, 일요일 휴무)
   ('seed-o2', '삼겹살 500g',      'MEAT',      2, 2, 18000, 12000, interval '-1 hour', interval '3 hours',  'pork',      'ON_SALE'),
   ('seed-o2', '닭다리살 800g',    'MEAT',      3, 3, 14000,  8400, interval '-1 hour', interval '3 hours',  'chicken',   'ON_SALE'),
-  ('seed-o2', '계란 한판',        'ETC',       7, 7,  9000,  5400, interval '-1 hour', interval '6 hours',  'egg',       'ON_SALE'),
+  ('seed-o2', '계란 한판',        'DAIRY_EGG',       7, 7,  9000,  5400, interval '-1 hour', interval '6 hours',  'egg',       'ON_SALE'),
   ('seed-o2', '수제 떡갈비 6쪽',  'SIDE_DISH', 4, 4, 12000,  6000, interval '-1 hour', interval '2 hours',  'patty',     'ON_SALE'),
   -- 역삼 청과 (701 m)
   ('seed-o3', '복숭아 4입',       'FRUIT',     3, 3, 10000,  4000, interval '-2 hours', interval '5 hours', 'peach',     'ON_SALE'),
@@ -193,9 +199,9 @@ from (values
   ('seed-o5', '고등어 2손',       'SEAFOOD',   4, 4, 12000,  7200, interval '-1 hour', interval '4 hours',  'mackerel',  'ON_SALE'),
   ('seed-o5', '오징어 2마리',     'SEAFOOD',   2, 2, 10000,  5000, interval '-2 hours', interval '40 minutes', 'squid',  'ON_SALE'),
   -- 성수 베이커리 (6 km, 화요일 휴무)
-  ('seed-o6', '식빵 1봉',         'ETC',       6, 6,  5000,  2500, interval '-1 hour', interval '3 hours',  'bread',     'ON_SALE'),
-  ('seed-o6', '크루아상 4개',     'ETC',       3, 3, 12000,  6000, interval '-1 hour', interval '3 hours',  'croissant', 'ON_SALE'),
-  ('seed-o6', '우유 1L',          'ETC',       5, 5,  3000,  1800, interval '-6 hours', interval '-1 hour', 'milk',     'CLOSED'),
+  ('seed-o6', '식빵 1봉',         'BAKERY',       6, 6,  5000,  2500, interval '-1 hour', interval '3 hours',  'bread',     'ON_SALE'),
+  ('seed-o6', '크루아상 4개',     'BAKERY',       3, 3, 12000,  6000, interval '-1 hour', interval '3 hours',  'croissant', 'ON_SALE'),
+  ('seed-o6', '우유 1L',          'DAIRY_EGG',       5, 5,  3000,  1800, interval '-6 hours', interval '-1 hour', 'milk',     'CLOSED'),
   -- 신사 반찬 (234 m, 승인 대기 -- 탐색에 뜨지 않는다)
   ('seed-o7', '모둠전 4종',       'SIDE_DISH', 3, 3, 14000,  7000, interval '-1 hour', interval '3 hours',  'jeon',      'ON_SALE'),
   ('seed-o7', '잡채 500g',        'SIDE_DISH', 2, 2, 10000,  5000, interval '-1 hour', interval '3 hours',  'japchae',   'ON_SALE')

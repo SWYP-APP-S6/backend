@@ -22,7 +22,9 @@ public record HoldSummaryResponse(
 		Instant expiresAt,
 		@Nullable Instant completedAt,
 		@Nullable Instant canceledAt,
-		@Nullable HoldCanceledBy canceledBy) {
+		@Nullable HoldCanceledBy canceledBy,
+		/** 이 찜이 취소권을 실제로 깎았는지. 오조작 유예 안의 취소와 잔액 0 에서의 노쇼는 false. */
+		boolean cancelCreditUsed) {
 
 	public record HoldSummaryItem(
 			Long productId, String name, String photoUrl, int qty, int lineTotal) {
@@ -38,7 +40,8 @@ public record HoldSummaryResponse(
 		}
 	}
 
-	public static HoldSummaryResponse from(Hold hold, Instant serverTime) {
+	public static HoldSummaryResponse from(
+			Hold hold, Instant serverTime, boolean cancelCreditUsed) {
 		List<HoldSummaryItem> items = hold.getItems().stream()
 				.sorted(Comparator.comparing(item -> item.getProduct().getId()))
 				.map(HoldSummaryItem::from)
@@ -55,6 +58,7 @@ public record HoldSummaryResponse(
 				hold.getExpiresAt(),
 				hold.getCompletedAt(),
 				hold.getCanceledAt(),
-				hold.getCanceledBy());
+				hold.getCanceledBy(),
+				cancelCreditUsed);
 	}
 }

@@ -14,6 +14,7 @@ import com.swyp.backend.hold.entity.HoldItem;
 import com.swyp.backend.hold.entity.HoldStatus;
 import com.swyp.backend.hold.exception.HoldErrorCode;
 import com.swyp.backend.hold.entity.HoldCancelCredit;
+import com.swyp.backend.hold.entity.HoldCancelCreditReason;
 import com.swyp.backend.hold.function.HoldCancelCreditFunction;
 import com.swyp.backend.hold.function.HoldFunction;
 import com.swyp.backend.notification.entity.NotificationType;
@@ -32,6 +33,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -105,7 +107,11 @@ public class HoldService {
 		if (hold.getCreatedAt().plus(holdProperties.freeCancelWindow()).isAfter(now)) {
 			return;
 		}
-		settleCredits(user, now).spend(1);
+		int spent = settleCredits(user, now).spend(1);
+		if (spent > 0) {
+			holdCancelCreditFunction.record(
+					user, hold, HoldCancelCreditReason.CANCEL, -spent, now);
+		}
 	}
 
 	public HoldDetailResponse getHold(Long userId, Long holdId) {
@@ -117,8 +123,12 @@ public class HoldService {
 	public HoldHistoryResponse getHolds(Long userId, Pageable pageable) {
 		Instant now = Instant.now(clock);
 		Page<Hold> holds = holdFunction.findUserHolds(userId, pageable);
+		// 어느 찜이 취소권을 먹었는지는 잔액만 봐서는 알 수 없다. 차감은 방금 한 행동과 무관한
+		// 순간(밀린 노쇼 정산)에도 일어나므로, 행마다 표시해 줘야 숫자가 왜 줄었는지 읽힌다.
+		Set<Long> charged = holdCancelCreditFunction.chargedHoldIdsAmong(
+				holds.getContent().stream().map(Hold::getId).toList());
 		List<HoldSummaryResponse> content = holds.getContent().stream()
-				.map(hold -> HoldSummaryResponse.from(hold, now))
+				.map(hold -> HoldSummaryResponse.from(hold, now, charged.contains(hold.getId())))
 				.toList();
 		return new HoldHistoryResponse(now, PageResponse.of(content, holds));
 	}
@@ -200,15 +210,29 @@ public class HoldService {
 		}
 	}
 
+	// 밀려 있던 노쇼를 여기서 정산한다. 찜 하나당 한 번 깎고 그 찜을 가리키는 이력을 남긴다 --
+	// 묶어서 한 번에 깎으면 나중에 "어느 찜 때문이었나"를 되짚을 수 없다.
 	private HoldCancelCredit settleCredits(User user, Instant now) {
 		HoldCancelCredit credit = holdCancelCreditFunction.getOrStart(
 				user, holdProperties.cancelCreditMax(), now);
-		credit.refill(now, holdProperties.cancelCreditRefill(), holdProperties.cancelCreditMax());
+		int refilled = credit.refill(
+				now, holdProperties.cancelCreditRefill(), holdProperties.cancelCreditMax());
+		if (refilled > 0) {
+			holdCancelCreditFunction.record(
+					user, null, HoldCancelCreditReason.REFILL, refilled, now);
+		}
 
 		List<Hold> noShows = holdFunction.findUnchargedNoShows(
 				user.getId(), now.minus(holdProperties.noShowGrace()));
-		noShows.forEach(noShow -> noShow.markNoShowCharged(now));
-		credit.spend(noShows.size());
+		for (Hold noShow : noShows) {
+			// 잔액이 없어 못 깎아도 표시는 남긴다. 안 그러면 다음 정산에서 또 걸린다.
+			noShow.markNoShowCharged(now);
+			int spent = credit.spend(1);
+			if (spent > 0) {
+				holdCancelCreditFunction.record(
+						user, noShow, HoldCancelCreditReason.NO_SHOW, -spent, now);
+			}
+		}
 		return credit;
 	}
 
