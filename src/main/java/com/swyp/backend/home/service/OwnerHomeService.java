@@ -48,7 +48,7 @@ public class OwnerHomeService {
 				holdFunction.countCompletedTodayOfStore(storeId),
 				sumAvailableQty(productCards));
 		OwnerHomeIssues issues = new OwnerHomeIssues(
-				holdFunction.countExpiredTodayOfStore(storeId),
+				(int) holdFunction.countExpiredTodayOfStore(storeId),
 				(int) products.stream().filter(product -> product.shortfallQty() > 0).count(),
 				products.stream().mapToInt(Product::shortfallQty).sum());
 		long unreadNotificationCount = notificationFunction.countUnread(ownerId);

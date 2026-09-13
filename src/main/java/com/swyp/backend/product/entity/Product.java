@@ -31,6 +31,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Product extends BaseTimeEntity {
 
+	private static final int RECONFIRM_THRESHOLD_NUMERATOR = 3;
+	private static final int RECONFIRM_THRESHOLD_DENOMINATOR = 5;
+
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
@@ -52,8 +55,6 @@ public class Product extends BaseTimeEntity {
 	@Column(name = "available_qty", nullable = false)
 	private int availableQty;
 
-	// 매장에 실제로 있는 총 수량. 찜된 몫까지 포함한다. availableQty 는 여기서 찜을 뺀 나머지고
-	// 0 에서 잘리므로, 모자란 정도는 이 값으로만 알 수 있다.
 	@Column(name = "stock_qty", nullable = false)
 	private int stockQty;
 
@@ -157,7 +158,7 @@ public class Product extends BaseTimeEntity {
 		syncAvailableWithStock();
 	}
 
-	public void takeFromAvailable(int qty) {
+	public void takeFromStock(int qty) {
 		if (qty <= 0) {
 			throw new IllegalArgumentException("take qty must be positive");
 		}
@@ -175,18 +176,14 @@ public class Product extends BaseTimeEntity {
 		if (qty > heldQty) {
 			throw new IllegalStateException("complete qty exceeds held qty");
 		}
-		// 물건이 매장을 떠났다. 예약도 실제 재고도 함께 줄어든다.
 		this.heldQty -= qty;
 		this.stockQty -= qty;
 		syncAvailableWithStock();
 	}
 
-	// 찜이 최초 등록의 이만큼에 닿으면 재고를 다시 묻는다. 남은 수량이 적을수록 한 건의
-	// 오차가 손님 한 명의 헛걸음이 된다.
-	private static final double RECONFIRM_THRESHOLD_RATIO = 0.6;
-
 	public int reconfirmThresholdQty() {
-		return (int) Math.ceil(initialQty * RECONFIRM_THRESHOLD_RATIO);
+		return (initialQty * RECONFIRM_THRESHOLD_NUMERATOR + RECONFIRM_THRESHOLD_DENOMINATOR - 1)
+				/ RECONFIRM_THRESHOLD_DENOMINATOR;
 	}
 
 	public boolean needsStockReconfirm() {
@@ -205,9 +202,6 @@ public class Product extends BaseTimeEntity {
 		return status != ProductStatus.CLOSED && !isStockLocked(now);
 	}
 
-	// 재확인을 묻기 전까지는 최초 등록의 60% 밑으로 내리지 못한다. 팔리지도 않은 상품이
-	// 목록에서 사라지는 걸 막기 위해서다. 재확인이 시작된 뒤에는 실제 재고를 적어야 하므로
-	// 0 까지 열린다.
 	public int minAdjustableQty() {
 		return reconfirmSentAt == null ? reconfirmThresholdQty() : 0;
 	}
@@ -221,8 +215,6 @@ public class Product extends BaseTimeEntity {
 		this.reconfirmAnsweredAt = answeredAt;
 	}
 
-	// 점주가 적는 수는 매장에 실제로 있는 총 수량이다. 그중 찜이 잡고 있는 몫을 빼야
-	// 새 손님에게 보여줄 수량이 된다. 찜이 더 많으면 보여줄 것은 없다(오버셀, BR-015).
 	public void restock(int stockQty) {
 		if (stockQty < 0) {
 			throw new IllegalArgumentException("stock qty must not be negative");
@@ -239,20 +231,7 @@ public class Product extends BaseTimeEntity {
 		adjustAvailableQty(Math.max(0, stockQty - heldQty));
 	}
 
-	// 없는 물건에 걸린 예약을 걷어낸다. 재고가 돌아오는 게 아니라 애초에 없었던 것이라
-	// availableQty 는 건드리지 않는다.
-	public void dropHeldQty(int qty) {
-		if (qty <= 0) {
-			throw new IllegalArgumentException("dropped qty must be positive");
-		}
-		if (qty > heldQty) {
-			throw new IllegalStateException("dropped qty exceeds held qty");
-		}
-		this.heldQty -= qty;
-		syncAvailableWithStock();
-	}
-
-	public void adjustAvailableQty(int availableQty) {
+	private void adjustAvailableQty(int availableQty) {
 		if (availableQty < 0) {
 			throw new IllegalArgumentException("available qty must not be negative");
 		}

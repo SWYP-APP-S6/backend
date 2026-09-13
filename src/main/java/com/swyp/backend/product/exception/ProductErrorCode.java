@@ -14,10 +14,10 @@ public enum ProductErrorCode implements ApiCode {
 	INVALID_PICKUP_WINDOW(HttpStatus.BAD_REQUEST, "픽업 마감 시간은 현재 시각 이후 24시간 이내여야 합니다."),
 	INGREDIENT_NOT_FOUND(HttpStatus.BAD_REQUEST, "존재하지 않는 재료가 포함되어 있습니다."),
 	PRODUCT_CLOSED(HttpStatus.CONFLICT, "마감된 상품은 수정할 수 없습니다."),
-	DISPOSITION_REQUIRED(HttpStatus.BAD_REQUEST, "진행 중인 찜이 있어 처리 방법을 선택해야 합니다."),
 	STOCK_LOCKED(HttpStatus.CONFLICT, "수량이 맞다고 확인한 상품은 픽업 마감까지 수정할 수 없습니다."),
-	QTY_BELOW_MINIMUM(HttpStatus.BAD_REQUEST, "최초 등록 수량의 60% 미만으로는 내릴 수 없습니다."),
-	RECONFIRM_NOT_REQUESTED(HttpStatus.CONFLICT, "재고 재확인을 요청하지 않은 상품입니다.");
+	QTY_BELOW_MINIMUM(HttpStatus.BAD_REQUEST, "재고 재확인 전에는 최초 등록 수량의 일부 아래로 내릴 수 없습니다."),
+	RECONFIRM_NOT_REQUESTED(HttpStatus.CONFLICT, "재고 재확인을 요청하지 않은 상품입니다."),
+	STOCK_SHORT_OF_HOLDS(HttpStatus.CONFLICT, "찜된 수량보다 재고가 모자랍니다. 먼저 찜 취소를 처리해 주세요.");
 
 	private final HttpStatus status;
 	private final String message;

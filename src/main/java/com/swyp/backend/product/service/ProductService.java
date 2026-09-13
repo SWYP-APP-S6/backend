@@ -139,6 +139,9 @@ public class ProductService {
 
 		Instant now = Instant.now(clock);
 		if (request.confirmed()) {
+			if (product.shortfallQty() > 0) {
+				throw new BusinessException(ProductErrorCode.STOCK_SHORT_OF_HOLDS);
+			}
 			product.confirmStock(now);
 		} else {
 			product.denyStockConfirmation(now);
@@ -147,8 +150,6 @@ public class ProductService {
 				product, completedQtyOf(productId), LocalDateTime.now(clock));
 	}
 
-	// 먼저 찜한 손님부터 재고를 배정하고, 배정받지 못한 찜을 취소한다. 뒤에 찜한 사람이
-	// 앞사람의 몫을 빼앗지 않게 하는 것이 선착순의 뜻이다.
 	private void cancelOverflowHolds(Product product, int stockQty) {
 		int remaining = stockQty;
 		for (Long holdId : holdFunction.findActiveHoldIdsOfProduct(product.getId())) {
@@ -161,7 +162,7 @@ public class ProductService {
 				continue;
 			}
 			hold.cancelByOwner(Instant.now(clock), OWNER_SHORTAGE_REASON);
-			product.dropHeldQty(hold.getQty());
+			product.releaseHold(hold.getQty());
 			notificationFunction.notify(
 					hold.getUser(),
 					NotificationType.HOLD_CANCELED_BY_OWNER,
