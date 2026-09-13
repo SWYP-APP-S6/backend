@@ -30,10 +30,10 @@ where first_item.hold_id = h.id;
 -- 나머지 항목은 새 찜 행으로 펼친다. 상태·시각은 부모 찜의 것을 그대로 물려받는다 --
 -- 만료 시각을 공유한다는 정책이 데이터에서도 그대로 성립한다.
 insert into holds (user_id, store_id, product_id, qty, group_id, status, expires_at, completed_at,
-                   canceled_at, canceled_by, cancel_reason, no_show_charged_at,
+                   canceled_at, canceled_by, cancel_reason, no_show_charged_at, expiry_reminded_at,
                    created_at, updated_at)
 select h.user_id, h.store_id, i.product_id, i.qty, h.id, h.status, h.expires_at, h.completed_at,
-       h.canceled_at, h.canceled_by, h.cancel_reason, h.no_show_charged_at,
+       h.canceled_at, h.canceled_by, h.cancel_reason, h.no_show_charged_at, h.expiry_reminded_at,
        i.created_at, i.updated_at
 from hold_items i
          join holds h on h.id = i.hold_id
