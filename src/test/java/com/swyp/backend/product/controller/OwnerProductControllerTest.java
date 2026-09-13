@@ -1,6 +1,8 @@
 package com.swyp.backend.product.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.endsWith;
+import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -108,6 +110,86 @@ class OwnerProductControllerTest {
 
 	private User createConsumer() {
 		return userRepository.saveAndFlush(new User(UserRole.CONSUMER, "소비자", null, false, Instant.now()));
+	}
+
+	@Test
+	void previewProduct_showsTheCardTheConsumerWillSee() throws Exception {
+		mockMvc.perform(post("/owner/products/preview")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(registerBody("복숭아 4입", 10000, 4000)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.name").value("복숭아 4입"))
+			.andExpect(jsonPath("$.data.salePrice").value(4000))
+			.andExpect(jsonPath("$.data.originalPrice").value(10000))
+			.andExpect(jsonPath("$.data.discountRate").value(60))
+			.andExpect(jsonPath("$.data.initialQty").value(10))
+			.andExpect(jsonPath("$.data.category").value("VEGETABLE"));
+	}
+
+	@Test
+	void previewProduct_registersNothing() throws Exception {
+		mockMvc.perform(post("/owner/products/preview")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(registerBody("복숭아 4입", 10000, 4000)))
+			.andExpect(status().isOk());
+
+		assertThat(productRepository.count()).isZero();
+	}
+
+	@Test
+	void previewProduct_fillsThePickupEndFromTheStoreClosingTime() throws Exception {
+		mockMvc.perform(post("/owner/products/preview")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(registerBody("복숭아 4입", 10000, 4000)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.pickupEndAt").value(endsWith("21:00:00")));
+	}
+
+	@Test
+	void previewProduct_keepsAPickupEndTheOwnerChose() throws Exception {
+		LocalDateTime chosen = LocalDateTime.now().plusHours(2).withNano(0).withSecond(0);
+
+		mockMvc.perform(post("/owner/products/preview")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(registerBodyWithPickupEndAt(chosen)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.pickupEndAt").value(startsWith(chosen.toString())));
+	}
+
+	@Test
+	void previewProduct_rejectsWhatRegisteringWouldReject() throws Exception {
+		mockMvc.perform(post("/owner/products/preview")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(registerBody("복숭아 4입", 10000, 10000)))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("INVALID_PRICE"));
+
+		mockMvc.perform(post("/owner/products/preview")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(registerBodyWithPickupEndAt(LocalDateTime.now().plusDays(2))))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("INVALID_PICKUP_WINDOW"));
+	}
+
+	@Test
+	void previewProduct_withoutAStore_isRejected() throws Exception {
+		User ownerWithoutStore = userRepository.saveAndFlush(
+			new User(UserRole.OWNER, "가게없는점주", null, false, Instant.now()));
+		String tokenWithoutStore =
+			tokenProvider.createAccessToken(TokenRealm.USER, ownerWithoutStore.getId(), UserRole.OWNER.name());
+
+		mockMvc.perform(post("/owner/products/preview")
+				.header("Authorization", "Bearer " + tokenWithoutStore)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(registerBody("복숭아 4입", 10000, 4000)))
+			.andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.code").value("STORE_NOT_REGISTERED"));
 	}
 
 	@Test
