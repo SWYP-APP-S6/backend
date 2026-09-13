@@ -51,10 +51,26 @@ public class ProductBrowseService {
 
 		List<NearbyStoreGroupResponse> groups = nearby.stream()
 				.sorted(comparatorFor(request.sort()))
-				.map(NearbyStoreGroupResponse::from)
+				.map(group -> NearbyStoreGroupResponse.from(withSortedProducts(group, request.sort())))
 				.toList();
 
 		return NearbyProductsResponse.of(groups, request.page(), request.size());
+	}
+
+	// 매장 카드는 상품을 10개까지만 보여준다. 할인율순인데 상품이 마감순으로 잘리면, 매장을 위로
+	// 올린 그 할인 상품이 잘려 나가 카드가 정렬 이유를 보여주지 못한다.
+	private static SellableStoreGroup withSortedProducts(
+			SellableStoreGroup group, NearbyProductSort sort) {
+		if (sort != NearbyProductSort.DISCOUNT_RATE) {
+			return group;
+		}
+		return new SellableStoreGroup(
+				group.store(),
+				group.products().stream()
+						.sorted(Comparator.comparing(Product::getDiscountRate).reversed()
+								.thenComparing(Product::getId))
+						.toList(),
+				group.distanceMeters());
 	}
 
 	private int radiusOf(NearbyProductsRequest request) {
@@ -109,6 +125,10 @@ public class ProductBrowseService {
 					.thenComparing(group -> group.store().getId());
 			case PICKUP_DEADLINE -> Comparator
 					.comparing(SellableStoreGroup::earliestPickupEndAt)
+					.thenComparing(group -> group.store().getId());
+			case DISCOUNT_RATE -> Comparator
+					.comparing(SellableStoreGroup::bestDiscountRate)
+					.reversed()
 					.thenComparing(group -> group.store().getId());
 		};
 	}
