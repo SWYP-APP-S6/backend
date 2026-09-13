@@ -94,6 +94,10 @@ fi
 
 apply "$DATA_DIR/mfds_cookrcp01.sql"
 
+# 난이도·조리시간 추정값. 위 파일이 만든 행을 갱신하므로 순서를 바꾸면 아무것도 맞지 않는다.
+# 사람이 고친 행(*_source = 'HUMAN')은 건드리지 않으므로 다시 돌려도 안전하다.
+apply "$DATA_DIR/recipe_estimates.sql"
+
 if [ "$WITH_RAW" -eq 1 ]; then
 	apply "$DATA_DIR/mfds_cookrcp01_raw.sql"
 fi
@@ -102,4 +106,5 @@ echo "==> 적용 결과"
 count recipes
 count recipe_steps
 count ingredients
+remote_psql -tA <<< "select 'recipes(난이도 채움)=' || count(*) from recipes where difficulty is not null"
 echo "==> done"

@@ -1,11 +1,14 @@
 package com.swyp.backend.recipe.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.swyp.backend.TestcontainersConfiguration;
 import com.swyp.backend.common.JpaAuditingConfig;
+import com.swyp.backend.recipe.entity.EstimateSource;
 import com.swyp.backend.recipe.entity.Ingredient;
 import com.swyp.backend.recipe.entity.Recipe;
+import com.swyp.backend.recipe.entity.RecipeDifficulty;
 import com.swyp.backend.recipe.entity.RecipeIngredient;
 import com.swyp.backend.recipe.entity.RecipeStep;
 import com.swyp.backend.recipe.entity.RecipeTag;
@@ -113,6 +116,54 @@ class RecipeRepositoryTest {
 		assertThat(recipeTagRepository.findByRecipeIdOrderByIdAsc(recipe.getId()))
 				.extracting(RecipeTag::getTag)
 				.containsExactly("간단요리", "저칼로리");
+	}
+
+	@Test
+	void assignDifficulty_keepsValueAndSourceTogether() {
+		Recipe recipe = recipe("반찬", true);
+		recipe.assignDifficulty(RecipeDifficulty.EASY, EstimateSource.AI);
+		recipe.assignCookTimeMinutes((short) 20, EstimateSource.HUMAN);
+		entityManager.persist(recipe);
+		entityManager.flush();
+		entityManager.clear();
+
+		Recipe found = recipeRepository.findById(recipe.getId()).orElseThrow();
+
+		assertThat(found.getDifficulty()).isEqualTo(RecipeDifficulty.EASY);
+		assertThat(found.getDifficultySource()).isEqualTo(EstimateSource.AI);
+		assertThat(found.getCookTimeMinutes()).isEqualTo((short) 20);
+		assertThat(found.getCookTimeSource()).isEqualTo(EstimateSource.HUMAN);
+	}
+
+	@Test
+	void assignDifficulty_clearingTheValueAlsoClearsTheSource() {
+		Recipe recipe = recipe("반찬", true);
+		recipe.assignDifficulty(RecipeDifficulty.HARD, EstimateSource.AI);
+		entityManager.persist(recipe);
+		entityManager.flush();
+
+		recipe.assignDifficulty(null, EstimateSource.AI);
+		entityManager.flush();
+		entityManager.clear();
+
+		Recipe found = recipeRepository.findById(recipe.getId()).orElseThrow();
+
+		assertThat(found.getDifficulty()).isNull();
+		assertThat(found.getDifficultySource()).isNull();
+	}
+
+	@Test
+	void difficultyWithoutSource_isRejectedByTheDatabase() {
+		Recipe recipe = entityManager.persist(recipe("반찬", true));
+		entityManager.flush();
+
+		assertThatThrownBy(() -> {
+			entityManager.getEntityManager()
+					.createNativeQuery("update recipes set difficulty = 'EASY' where id = :id")
+					.setParameter("id", recipe.getId())
+					.executeUpdate();
+			entityManager.flush();
+		}).hasMessageContaining("chk_recipes_difficulty_source");
 	}
 
 	private static Recipe recipe(String category, boolean published) {

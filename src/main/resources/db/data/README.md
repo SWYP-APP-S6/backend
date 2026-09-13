@@ -14,8 +14,9 @@ Flyway 경로(`db/migration`) **밖**이다. 자동 실행되지 않으며, 필�
 
 | 파일 | 커밋 | 내용 |
 |---|---|---|
-| **`init_data_1.sql`** | ✗ | **처음 뜰 때 필요한 실제 데이터** — 레시피 1,156건(`\ir` 로 `mfds_cookrcp01.sql` 을 읽어 온다) + 관리자 9명. 관리자 INSERT 에 팀원 이메일과 전화번호 해시가 들어가 `.gitignore` 한다. `create_admins.sh` 로 언제든 다시 만든다 |
+| **`init_data_1.sql`** | ✗ | **처음 뜰 때 필요한 실제 데이터** — 레시피 1,156건(`\ir` 로 `mfds_cookrcp01.sql` + `recipe_estimates.sql` 을 읽어 온다) + 관리자 9명. 관리자 INSERT 에 팀원 이메일과 전화번호 해시가 들어가 `.gitignore` 한다. `create_admins.sh` 로 언제든 다시 만든다 |
 | **`test_data_1.sql`** | ✓ | **런칭 전 샘플** — 가게 7곳 · 상품 25개 · 유저 12명. 전부 가짜다. 기준점에서 거리가 0 / 234 / 701 / 1,501 / 3,002 / 5,993m 로 갈리게 배치해 `radiusMeters` 를 500 → 5000 으로 올리면 매장이 1 → 3 → 4 → 5곳으로 늘어난다. 픽업 시각이 `now()` 상대값이라 언제 넣어도 판매중이고, 다시 돌리면 갱신된다 |
+| **`recipe_estimates.sql`** | ✓ | **레시피 난이도·조리시간 추정값 1,156건** — 식약처 원본에 두 항목이 없어 LLM 이 제목·조리법·재료 수로 판단해 채웠다. `(source, source_id)` 로 조인해 `update` 하므로 **레시피 본체 뒤에** 넣어야 하고, 사람이 고친 행(`*_source = 'HUMAN'`)은 건드리지 않는다. `docs/recipe-backfill/to_sql.py` 가 만들지만 판단 결과가 저장소 밖에 있어 **재생성 경로가 없다 — 그래서 유일하게 커밋하는 파생 파일이다** |
 | `mfds_cookrcp01.sql` | ✗ | 식약처 조리식품 레시피 DB 1,156건 → `recipes` / `recipe_steps` / `recipe_ingredients` / `ingredients` / `recipe_nutrition` / `recipe_tags`. `init_data_1.sql` 이 이 파일을 읽는다 |
 | `mfds_cookrcp01_raw.sql` | ✗ | 원본 API 응답 → `recipe_raw`. 선택 사항이며, 재수집 없이 파서만 고쳐 다시 만들 때 쓴다. 본체를 먼저 넣어야 한다 |
 | `team_admins.tsv` | ✗ | 관리자 계정 명단(이메일·이름·타입·전화번호). 개인정보이고 이 저장소는 public 이라 `.gitignore` 한다 |
@@ -51,8 +52,11 @@ python3 scripts/mfds_ingest.py
 
 ```sh
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f src/main/resources/db/data/mfds_cookrcp01.sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f src/main/resources/db/data/recipe_estimates.sql
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f src/main/resources/db/data/mfds_cookrcp01_raw.sql   # 선택
 ```
+
+`recipe_estimates.sql` 은 레시피 본체가 만든 행을 갱신하므로 **순서를 지켜야 한다.**
 
 전체가 한 트랜잭션이고 모든 INSERT 가 `on conflict do nothing` 이라 **재실행해도 안전**하다.
 자식 행은 id 를 박지 않고 `(source, source_id)` 로 조인해 부모를 찾으므로 identity 컬럼과 충돌하지 않는다.
