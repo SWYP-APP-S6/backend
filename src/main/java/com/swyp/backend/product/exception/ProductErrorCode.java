@@ -17,7 +17,8 @@ public enum ProductErrorCode implements ApiCode {
 	STOCK_LOCKED(HttpStatus.CONFLICT, "수량이 맞다고 확인한 상품은 픽업 마감까지 수정할 수 없습니다."),
 	QTY_BELOW_MINIMUM(HttpStatus.BAD_REQUEST, "재고 재확인 전에는 최초 등록 수량의 일부 아래로 내릴 수 없습니다."),
 	RECONFIRM_NOT_REQUESTED(HttpStatus.CONFLICT, "재고 재확인을 요청하지 않은 상품입니다."),
-	STOCK_SHORT_OF_HOLDS(HttpStatus.CONFLICT, "찜된 수량보다 재고가 모자랍니다. 먼저 찜 취소를 처리해 주세요.");
+	STOCK_SHORT_OF_HOLDS(HttpStatus.CONFLICT, "찜된 수량보다 재고가 모자랍니다. 먼저 찜 취소를 처리해 주세요."),
+	INVALID_PHOTO_URL(HttpStatus.BAD_REQUEST, "이 서버에 올린 사진만 상품에 쓸 수 있습니다.");
 
 	private final HttpStatus status;
 	private final String message;

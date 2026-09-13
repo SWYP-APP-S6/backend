@@ -38,6 +38,10 @@ public class SecurityConfig {
 	private static final String OWNER_ROLE = "OWNER";
 	private static final String CONSUMER_ROLE = "CONSUMER";
 
+	private static final String[] PUBLIC_IMAGE_ENDPOINTS = {
+		"/uploads/**",
+	};
+
 	private static final String[] PUBLIC_ENDPOINTS = {
 		"/ping",
 		"/admin/auth/login",
@@ -123,6 +127,7 @@ public class SecurityConfig {
 			.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 			.authorizeHttpRequests(auth -> {
 				auth.requestMatchers(PUBLIC_ENDPOINTS).permitAll();
+				auth.requestMatchers(HttpMethod.GET, PUBLIC_IMAGE_ENDPOINTS).permitAll();
 				if (apiDocsEnabled) {
 					auth.requestMatchers(API_DOCS_ENDPOINTS).permitAll();
 				}
