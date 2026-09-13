@@ -1,39 +1,30 @@
 package com.swyp.backend.hold.dto;
 
 import com.swyp.backend.hold.entity.Hold;
-import com.swyp.backend.hold.entity.HoldItem;
+import com.swyp.backend.product.entity.Product;
 import java.time.Instant;
-import java.util.Comparator;
-import java.util.List;
 
 public record OwnerHoldSummaryResponse(
 		Long id,
+		Long groupId,
 		OwnerHoldStatus status,
 		String nickname,
-		int totalQty,
-		List<OwnerHoldItem> items,
+		Long productId,
+		String productName,
+		int qty,
 		Instant heldAt,
 		Instant expiresAt) {
 
-	public record OwnerHoldItem(Long productId, String productName, int qty) {
-
-		static OwnerHoldItem from(HoldItem item) {
-			return new OwnerHoldItem(
-					item.getProduct().getId(), item.getProduct().getName(), item.getQty());
-		}
-	}
-
 	public static OwnerHoldSummaryResponse from(Hold hold) {
-		List<OwnerHoldItem> items = hold.getItems().stream()
-				.sorted(Comparator.comparing(item -> item.getProduct().getId()))
-				.map(OwnerHoldItem::from)
-				.toList();
+		Product product = hold.getProduct();
 		return new OwnerHoldSummaryResponse(
 				hold.getId(),
+				hold.getGroupId(),
 				OwnerHoldStatus.of(hold),
 				hold.getUser().getNickname(),
-				items.stream().mapToInt(OwnerHoldItem::qty).sum(),
-				items,
+				product.getId(),
+				product.getName(),
+				hold.getQty(),
 				hold.getCreatedAt(),
 				hold.getExpiresAt());
 	}

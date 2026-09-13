@@ -1,7 +1,6 @@
 package com.swyp.backend.hold.dto;
 
 import com.swyp.backend.hold.entity.Hold;
-import com.swyp.backend.hold.entity.HoldItem;
 import com.swyp.backend.product.entity.Product;
 import java.time.Instant;
 import java.util.Comparator;
@@ -9,7 +8,7 @@ import java.util.List;
 import org.jspecify.annotations.Nullable;
 
 public record OwnerHoldDetailResponse(
-		Long id,
+		Long groupId,
 		OwnerHoldStatus status,
 		String nickname,
 		String storeName,
@@ -24,6 +23,7 @@ public record OwnerHoldDetailResponse(
 		@Nullable String cancelReason) {
 
 	public record OwnerHoldItem(
+			Long holdId,
 			Long productId,
 			String productName,
 			String photoUrl,
@@ -31,25 +31,27 @@ public record OwnerHoldDetailResponse(
 			int unitPrice,
 			int lineTotal) {
 
-		static OwnerHoldItem from(HoldItem item) {
-			Product product = item.getProduct();
+		static OwnerHoldItem from(Hold hold) {
+			Product product = hold.getProduct();
 			return new OwnerHoldItem(
+					hold.getId(),
 					product.getId(),
 					product.getName(),
 					product.getPhotoUrl(),
-					item.getQty(),
+					hold.getQty(),
 					product.getSalePrice(),
-					product.getSalePrice() * item.getQty());
+					product.getSalePrice() * hold.getQty());
 		}
 	}
 
-	public static OwnerHoldDetailResponse from(Hold hold, Instant serverTime) {
-		List<OwnerHoldItem> items = hold.getItems().stream()
-				.sorted(Comparator.comparing(item -> item.getProduct().getId()))
+	public static OwnerHoldDetailResponse of(List<Hold> group, Instant serverTime) {
+		List<OwnerHoldItem> items = group.stream()
+				.sorted(Comparator.comparing(held -> held.getProduct().getId()))
 				.map(OwnerHoldItem::from)
 				.toList();
+		Hold hold = group.stream().min(Comparator.comparing(Hold::getId)).orElseThrow();
 		return new OwnerHoldDetailResponse(
-				hold.getId(),
+				hold.getGroupId(),
 				OwnerHoldStatus.of(hold),
 				hold.getUser().getNickname(),
 				hold.getStore().getName(),

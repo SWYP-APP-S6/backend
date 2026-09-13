@@ -30,6 +30,9 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class HoldFunction {
 
+	private static final List<HoldStatus> PICKUPABLE =
+			List.of(HoldStatus.HOLDING, HoldStatus.EXPIRED);
+
 	private final HoldRepository holdRepository;
 	private final Clock clock;
 
@@ -43,28 +46,49 @@ public class HoldFunction {
 				.orElseThrow(() -> new BusinessException(HoldErrorCode.HOLD_NOT_FOUND));
 	}
 
-	public Optional<Hold> findActiveOf(Long userId, Instant now) {
-		return holdRepository.findActiveDetailByUserId(userId, now);
+	public List<Hold> findActiveGroupOf(Long userId, Instant now) {
+		return holdRepository.findActiveDetailsByUserId(userId, now);
 	}
 
 	public Optional<HoldRef> findHoldingRefOf(Long userId) {
-		return holdRepository.findHoldingRefByUserId(userId);
+		return holdRepository.findHoldingRefsByUserId(userId).stream().findFirst();
 	}
 
-	public List<Long> getProductIdsOfUserHold(Long userId, Long holdId) {
-		List<Long> productIds = holdRepository.findProductIdsOfUserHold(userId, holdId);
+	public Long getProductIdOfUserHold(Long userId, Long holdId) {
+		return holdRepository.findProductIdOfUserHold(userId, holdId)
+				.orElseThrow(() -> new BusinessException(HoldErrorCode.HOLD_NOT_FOUND));
+	}
+
+	public List<Long> getProductIdsOfGroupOfHold(Long holdId) {
+		List<Long> productIds = holdRepository.findProductIdsOfGroupOfHold(holdId);
 		if (productIds.isEmpty()) {
 			throw new BusinessException(HoldErrorCode.HOLD_NOT_FOUND);
 		}
 		return productIds;
 	}
 
-	public List<Long> getProductIdsOfHold(Long holdId) {
-		List<Long> productIds = holdRepository.findProductIdsOfHold(holdId);
-		if (productIds.isEmpty()) {
-			throw new BusinessException(HoldErrorCode.HOLD_NOT_FOUND);
+	public List<Long> findProductIdsOfGroup(Long groupId) {
+		return holdRepository.findProductIdsOfGroup(groupId);
+	}
+
+	public List<Hold> findHoldingOfGroup(Long groupId) {
+		return holdRepository.findGroupByStatus(groupId, HoldStatus.HOLDING);
+	}
+
+	public long nextGroupId() {
+		return holdRepository.nextGroupId();
+	}
+
+	public List<Long> getPickupableHoldIdsOfGroup(Long holdId) {
+		List<Long> ids = holdRepository.findGroupHoldIdsOfHold(holdId, PICKUPABLE);
+		if (ids.isEmpty()) {
+			throw new BusinessException(HoldErrorCode.HOLD_ALREADY_RESOLVED);
 		}
-		return productIds;
+		return ids;
+	}
+
+	public List<Long> getPickupableProductIdsOfGroup(Long holdId) {
+		return holdRepository.findGroupProductIdsOfHold(holdId, PICKUPABLE);
 	}
 
 	public Long getStoreIdOfHold(Long holdId) {
@@ -110,7 +134,7 @@ public class HoldFunction {
 	}
 
 	public List<Hold> findActiveHoldsOfProduct(Long productId) {
-		return holdRepository.findByItemProductIdAndStatus(productId, HoldStatus.HOLDING);
+		return holdRepository.findByProductIdAndStatus(productId, HoldStatus.HOLDING);
 	}
 
 	public List<Hold> findHoldingOfStore(Long storeId) {
@@ -163,7 +187,7 @@ public class HoldFunction {
 	}
 
 	public long completedQtyOfProduct(Long productId) {
-		return holdRepository.sumItemQtyByProductIdAndStatus(productId, HoldStatus.COMPLETED);
+		return holdRepository.sumQtyByProductIdAndStatus(productId, HoldStatus.COMPLETED);
 	}
 
 	private Instant startOfToday() {

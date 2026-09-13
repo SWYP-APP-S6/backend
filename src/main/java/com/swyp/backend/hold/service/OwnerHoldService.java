@@ -9,7 +9,6 @@ import com.swyp.backend.hold.dto.OwnerHoldStatus;
 import com.swyp.backend.hold.dto.OwnerHoldSummaryResponse;
 import com.swyp.backend.hold.HoldProperties;
 import com.swyp.backend.hold.entity.Hold;
-import com.swyp.backend.hold.entity.HoldItem;
 import com.swyp.backend.hold.entity.HoldCancelCreditReason;
 import com.swyp.backend.hold.entity.HoldStatus;
 import com.swyp.backend.hold.exception.HoldErrorCode;
@@ -61,7 +60,10 @@ public class OwnerHoldService {
 		Store store = storeFunction.getByOwnerId(ownerId);
 		Hold hold = holdFunction.getDetailById(holdId);
 		requireOwnedBy(hold, store);
-		return OwnerHoldDetailResponse.from(hold, Instant.now(clock));
+		List<Hold> group = hold.getStatus() == HoldStatus.HOLDING
+				? holdFunction.findHoldingOfGroup(hold.getGroupId())
+				: List.of(hold);
+		return OwnerHoldDetailResponse.of(group, Instant.now(clock));
 	}
 
 	private static void requireOwnedBy(Hold hold, Store store) {
@@ -76,40 +78,53 @@ public class OwnerHoldService {
 		if (!holdFunction.getStoreIdOfHold(holdId).equals(store.getId())) {
 			throw new BusinessException(HoldErrorCode.HOLD_NOT_FOUND);
 		}
+		// 손님이 한 번에 담은 것은 한 번에 넘겨준다. 점주가 상품마다 완료를 누르게 하지 않는다.
 		Map<Long, Product> locked = new LinkedHashMap<>();
-		holdFunction.getProductIdsOfHold(holdId).stream().distinct().sorted()
+		holdFunction.getPickupableProductIdsOfGroup(holdId).stream().distinct().sorted()
 				.forEach(id -> locked.put(id, productFunction.getByIdForUpdate(id)));
 
-		Hold hold = holdFunction.getByIdForUpdate(holdId);
-		Instant now = Instant.now(clock);
-		boolean late = requireCompletable(hold, now);
+		List<Hold> group = holdFunction.getPickupableHoldIdsOfGroup(holdId).stream()
+				.map(holdFunction::getByIdForUpdate)
+				.toList();
+		Hold requested = group.stream()
+				.filter(hold -> hold.getId().equals(holdId))
+				.findFirst()
+				.orElseThrow(() -> new BusinessException(HoldErrorCode.HOLD_ALREADY_RESOLVED));
 
-		for (HoldItem item : hold.getItems()) {
-			Product product = locked.get(item.getProduct().getId());
+		Instant now = Instant.now(clock);
+		boolean late = requireCompletable(requested, now);
+
+		for (Hold hold : group) {
+			Product product = locked.get(hold.getProduct().getId());
 			if (late) {
-				requireStockLeft(product, item.getQty());
-				product.takeFromAvailable(item.getQty());
+				requireStockLeft(product, hold.getQty());
+				product.takeFromAvailable(hold.getQty());
 			} else {
-				product.completeHold(item.getQty());
+				product.completeHold(hold.getQty());
 			}
-		}
-		hold.complete(now);
-		if (hold.wasChargedAsNoShow()) {
-			int given = holdCancelCreditFunction
-					.getOrStart(hold.getUser(), holdProperties.cancelCreditMax(), now)
-					.giveBack(holdProperties.cancelCreditMax());
-			if (given > 0) {
-				holdCancelCreditFunction.record(
-						hold.getUser(), hold, HoldCancelCreditReason.GIVE_BACK, given, now);
-			}
+			hold.complete(now);
+			giveBackNoShowCredit(hold, now);
 		}
 		notificationFunction.notify(
-				hold.getUser(),
+				requested.getUser(),
 				NotificationType.PICKUP_COMPLETED,
 				"수령이 완료됐어요",
-				hold.getStore().getName() + " 수령이 완료됐어요.",
+				requested.getStore().getName() + " 수령이 완료됐어요.",
 				null);
-		return OwnerHoldDetailResponse.from(hold, now);
+		return OwnerHoldDetailResponse.of(group, now);
+	}
+
+	private void giveBackNoShowCredit(Hold hold, Instant now) {
+		if (!hold.wasChargedAsNoShow()) {
+			return;
+		}
+		int given = holdCancelCreditFunction
+				.getOrStart(hold.getUser(), holdProperties.cancelCreditMax(), now)
+				.giveBack(holdProperties.cancelCreditMax());
+		if (given > 0) {
+			holdCancelCreditFunction.record(
+					hold.getUser(), hold, HoldCancelCreditReason.GIVE_BACK, given, now);
+		}
 	}
 
 	private boolean requireCompletable(Hold hold, Instant now) {

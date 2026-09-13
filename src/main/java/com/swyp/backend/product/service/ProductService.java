@@ -2,7 +2,6 @@ package com.swyp.backend.product.service;
 
 import com.swyp.backend.common.exception.BusinessException;
 import com.swyp.backend.hold.entity.Hold;
-import com.swyp.backend.hold.entity.HoldItem;
 import com.swyp.backend.hold.function.HoldFunction;
 import com.swyp.backend.notification.entity.NotificationType;
 import com.swyp.backend.notification.function.NotificationFunction;
@@ -139,9 +138,7 @@ public class ProductService {
 			Instant now = Instant.now(clock);
 			for (Hold hold : activeHolds) {
 				hold.cancelByOwner(now, OWNER_CANCEL_REASON);
-				for (HoldItem item : hold.getItems()) {
-					locked.get(item.getProduct().getId()).releaseHold(item.getQty());
-				}
+				locked.get(hold.getProduct().getId()).releaseHold(hold.getQty());
 				notificationFunction.notify(
 						hold.getUser(),
 						NotificationType.HOLD_CANCELED_BY_OWNER,
