@@ -10,6 +10,7 @@ import com.swyp.backend.TestcontainersConfiguration;
 import com.swyp.backend.common.security.JwtTokenProvider;
 import com.swyp.backend.common.security.TokenRealm;
 import com.swyp.backend.hold.repository.HoldRepository;
+import com.swyp.backend.product.PhotoFixture;
 import com.swyp.backend.product.entity.Product;
 import com.swyp.backend.product.repository.ProductRepository;
 import com.swyp.backend.store.entity.Store;
@@ -62,9 +63,10 @@ class OwnerProductDefaultPickupWindowTest {
 	JwtTokenProvider tokenProvider;
 
 	private String token;
+	private String photoUrl;
 
 	@BeforeEach
-	void setUp() {
+	void setUp() throws Exception {
 		holdRepository.deleteAll();
 		productRepository.deleteAll();
 		storeRepository.deleteAll();
@@ -76,6 +78,7 @@ class OwnerProductDefaultPickupWindowTest {
 			new BigDecimal("37.500000"), new BigDecimal("127.030000"),
 			LocalTime.of(9, 0), CLOSE_TIME));
 		token = tokenProvider.createAccessToken(TokenRealm.USER, owner.getId(), owner.getRole().name());
+		photoUrl = PhotoFixture.uploadedPhotoUrl(mockMvc, token);
 	}
 
 	@Test
@@ -85,7 +88,7 @@ class OwnerProductDefaultPickupWindowTest {
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
 					{"name":"당근","category":"VEGETABLE","initialQty":10,"originalPrice":1000,"salePrice":800,\
-					"photoUrl":"https://example.com/a.jpg"}"""))
+					"photoUrl":"%s"}""".formatted(photoUrl)))
 			.andExpect(status().isCreated())
 			.andReturn().getResponse().getContentAsString();
 

@@ -59,6 +59,8 @@ tasks.withType<Test> {
 	// 푸시 아웃박스 배치는 운영 주기(3초)로 두면 테스트가 알림을 넣는 동안 끼어들어 같은 행의
 	// push_state 를 바꾼다. 스케줄러는 사실상 꺼 두고, 배치를 검증하는 테스트가 직접 호출한다.
 	systemProperty("notification.push.scan-interval", "1h")
+	// 업로드 테스트가 레포 안에 파일을 남기지 않도록 저장 위치를 빌드 디렉터리로 돌린다.
+	systemProperty("storage.image.root-dir", "build/test-uploads")
 }
 
 // db/data 의 시드 SQL 은 psql 로 직접 넣는 운영 산출물이라 클래스패스에 올릴 이유가 없다.

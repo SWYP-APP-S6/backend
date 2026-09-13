@@ -20,6 +20,7 @@ import com.swyp.backend.hold.entity.Hold;
 import com.swyp.backend.hold.entity.HoldStatus;
 import com.swyp.backend.hold.repository.HoldRepository;
 import com.swyp.backend.notification.repository.NotificationRepository;
+import com.swyp.backend.product.PhotoFixture;
 import com.swyp.backend.product.entity.Product;
 import com.swyp.backend.product.entity.ProductCategory;
 import com.swyp.backend.product.repository.ProductRepository;
@@ -72,9 +73,10 @@ class OwnerProductControllerTest {
 	private User owner;
 	private Store store;
 	private String token;
+	private String photoUrl;
 
 	@BeforeEach
-	void setUp() {
+	void setUp() throws Exception {
 		holdRepository.deleteAll();
 		notificationRepository.deleteAll();
 		productRepository.deleteAll();
@@ -87,18 +89,20 @@ class OwnerProductControllerTest {
 			new BigDecimal("37.500000"), new BigDecimal("127.030000"),
 			LocalTime.of(9, 0), LocalTime.of(21, 0)));
 		token = tokenProvider.createAccessToken(TokenRealm.USER, owner.getId(), owner.getRole().name());
+		photoUrl = PhotoFixture.uploadedPhotoUrl(mockMvc, token);
 	}
 
-	private static String registerBody(String name, int originalPrice, int salePrice) {
+	private String registerBody(String name, int originalPrice, int salePrice) {
 		return """
 			{"name":"%s","category":"VEGETABLE","initialQty":10,"originalPrice":%d,"salePrice":%d,\
-			"photoUrl":"https://example.com/a.jpg","ingredientTags":[]}""".formatted(name, originalPrice, salePrice);
+			"photoUrl":"%s","ingredientTags":[]}"""
+				.formatted(name, originalPrice, salePrice, photoUrl);
 	}
 
-	private static String registerBodyWithPickupEndAt(LocalDateTime pickupEndAt) {
+	private String registerBodyWithPickupEndAt(LocalDateTime pickupEndAt) {
 		return """
 			{"name":"당근","category":"VEGETABLE","initialQty":10,"originalPrice":1000,"salePrice":800,\
-			"photoUrl":"https://example.com/a.jpg","pickupEndAt":"%s"}""".formatted(pickupEndAt);
+			"photoUrl":"%s","pickupEndAt":"%s"}""".formatted(photoUrl, pickupEndAt);
 	}
 
 	@Test
@@ -485,7 +489,7 @@ class OwnerProductControllerTest {
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
 					{"name":"당근","initialQty":10,"originalPrice":1000,"salePrice":800,\
-					"photoUrl":"https://example.com/a.jpg"}"""))
+					"photoUrl":"%s"}""".formatted(photoUrl)))
 			.andExpect(status().isCreated())
 			.andExpect(jsonPath("$.data.category").value("ETC"));
 	}
@@ -539,7 +543,7 @@ class OwnerProductControllerTest {
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
 					{"name":"당근","category":"VEGETABLE","initialQty":10,"originalPrice":1000,"salePrice":800,\
-					"photoUrl":"https://example.com/a.jpg","ingredientTags":[999999]}"""))
+					"photoUrl":"%s","ingredientTags":[999999]}""".formatted(photoUrl)))
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.code").value("INGREDIENT_NOT_FOUND"));
 	}
