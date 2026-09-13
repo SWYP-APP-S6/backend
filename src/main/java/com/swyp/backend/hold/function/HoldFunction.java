@@ -84,6 +84,10 @@ public class HoldFunction {
 		return holdRepository.findExpiringSoon(HoldStatus.HOLDING, now, now.plus(reminderLead));
 	}
 
+	public boolean markExpiryReminded(Long holdId, Instant now) {
+		return holdRepository.markExpiryReminded(holdId, now) == 1;
+	}
+
 	public List<Hold> findUnchargedNoShows(Long userId, Instant decidedBefore) {
 		return holdRepository.findUnchargedNoShows(userId, decidedBefore);
 	}

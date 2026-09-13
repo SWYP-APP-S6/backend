@@ -33,18 +33,22 @@ public class HoldReminderService {
 		List<Hold> expiringSoon =
 				holdFunction.findExpiringSoon(now, holdProperties.expiryReminderLead());
 
+		int reminded = 0;
 		for (Hold hold : expiringSoon) {
-			hold.markExpiryReminded(now);
+			if (!holdFunction.markExpiryReminded(hold.getId(), now)) {
+				continue;
+			}
 			notificationFunction.notify(
 					hold.getUser(),
 					NotificationType.HOLD_EXPIRING_SOON,
 					"찜 시간이 곧 끝나요",
 					hold.getStore().getName() + " 픽업 마감이 얼마 남지 않았어요.",
 					null);
+			reminded++;
 		}
-		if (!expiringSoon.isEmpty()) {
-			log.info("Reminded {} holds that are about to expire", expiringSoon.size());
+		if (reminded > 0) {
+			log.info("Reminded {} holds that are about to expire", reminded);
 		}
-		return expiringSoon.size();
+		return reminded;
 	}
 }

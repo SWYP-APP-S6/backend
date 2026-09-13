@@ -128,10 +128,6 @@ public class Hold extends BaseTimeEntity {
 		this.completedAt = completedAt;
 	}
 
-	public void markExpiryReminded(Instant remindedAt) {
-		this.expiryRemindedAt = remindedAt;
-	}
-
 	public void markNoShowCharged(Instant chargedAt) {
 		this.noShowChargedAt = chargedAt;
 	}

@@ -15,6 +15,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -108,6 +109,15 @@ public interface HoldRepository extends JpaRepository<Hold, Long> {
 			""")
 	List<OverdueHold> findOverdueByStatus(
 			@Param("status") HoldStatus status, @Param("expiresAt") Instant expiresAt);
+
+	@Modifying
+	@Query("""
+			update Hold h set h.expiryRemindedAt = :now
+			where h.id = :id
+				and h.status = com.swyp.backend.hold.entity.HoldStatus.HOLDING
+				and h.expiryRemindedAt is null
+			""")
+	int markExpiryReminded(@Param("id") Long id, @Param("now") Instant now);
 
 	@Query("""
 			select h from Hold h
