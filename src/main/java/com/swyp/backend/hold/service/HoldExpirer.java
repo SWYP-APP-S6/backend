@@ -35,8 +35,6 @@ public class HoldExpirer {
 		hold.expire();
 		locked.get(hold.getProduct().getId()).releaseHold(hold.getQty());
 		holdFunction.flush();
-		// 한 번에 담은 것이 한꺼번에 만료되면 알림도 한 번이어야 한다. 묶음의 마지막 찜이
-		// 만료되는 순간에만 알린다.
 		if (!holdFunction.findHoldingOfGroup(hold.getGroupId()).isEmpty()) {
 			return true;
 		}

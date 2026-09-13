@@ -41,7 +41,7 @@ public interface HoldRepository extends JpaRepository<Hold, Long> {
 			where h.user.id = :userId
 				and h.status = com.swyp.backend.hold.entity.HoldStatus.HOLDING
 				and h.expiresAt > :now
-			order by h.product.id
+			order by h.groupId, h.product.id
 			""")
 	List<Hold> findActiveDetailsByUserId(@Param("userId") Long userId, @Param("now") Instant now);
 
@@ -50,20 +50,13 @@ public interface HoldRepository extends JpaRepository<Hold, Long> {
 			from Hold h
 			where h.user.id = :userId
 				and h.status = com.swyp.backend.hold.entity.HoldStatus.HOLDING
+			order by h.groupId
 			""")
 	List<HoldRef> findHoldingRefsByUserId(@Param("userId") Long userId);
 
 	@Query("select h.product.id from Hold h where h.id = :holdId and h.user.id = :userId")
 	Optional<Long> findProductIdOfUserHold(
 			@Param("userId") Long userId, @Param("holdId") Long holdId);
-
-	@Query("""
-			select h.product.id from Hold h
-			where h.groupId = (select g.groupId from Hold g where g.id = :holdId)
-				and h.status = com.swyp.backend.hold.entity.HoldStatus.HOLDING
-			order by h.product.id
-			""")
-	List<Long> findProductIdsOfGroupOfHold(@Param("holdId") Long holdId);
 
 	@Query("""
 			select h.product.id from Hold h
@@ -158,16 +151,6 @@ public interface HoldRepository extends JpaRepository<Hold, Long> {
 			""")
 	List<Long> findIdsByProductIdAndStatus(
 			@Param("productId") Long productId, @Param("status") HoldStatus status);
-
-	@Query("""
-			select distinct sibling.product.id from Hold sibling
-			where sibling.status = com.swyp.backend.hold.entity.HoldStatus.HOLDING
-				and sibling.groupId in (select h.groupId from Hold h
-					where h.product.id = :productId
-						and h.status = com.swyp.backend.hold.entity.HoldStatus.HOLDING)
-			order by sibling.product.id
-			""")
-	List<Long> findProductIdsOfActiveHoldsContaining(@Param("productId") Long productId);
 
 	@Query("""
 			select coalesce(sum(h.qty), 0) from Hold h

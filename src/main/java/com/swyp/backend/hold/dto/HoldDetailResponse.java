@@ -17,6 +17,7 @@ import org.jspecify.annotations.Nullable;
 
 public record HoldDetailResponse(
 		Long id,
+		Long groupId,
 		HoldStatus status,
 		int totalQty,
 		int totalPrice,
@@ -93,6 +94,7 @@ public record HoldDetailResponse(
 		Hold hold = group.stream().min(Comparator.comparing(Hold::getId)).orElseThrow();
 		return new HoldDetailResponse(
 				hold.getId(),
+				hold.getGroupId(),
 				hold.statusAt(serverTime),
 				items.stream().mapToInt(HoldItemResponse::qty).sum(),
 				items.stream().mapToInt(HoldItemResponse::lineTotal).sum(),

@@ -78,7 +78,6 @@ public class OwnerHoldService {
 		if (!holdFunction.getStoreIdOfHold(holdId).equals(store.getId())) {
 			throw new BusinessException(HoldErrorCode.HOLD_NOT_FOUND);
 		}
-		// 손님이 한 번에 담은 것은 한 번에 넘겨준다. 점주가 상품마다 완료를 누르게 하지 않는다.
 		List<Long> holdIds = holdFunction.getPickupableHoldIdsOfGroup(holdId);
 		Map<Long, Product> locked = new LinkedHashMap<>();
 		holdFunction.findProductIdsOfHolds(holdIds).stream().distinct().sorted()
@@ -100,7 +99,7 @@ public class OwnerHoldService {
 			Product product = locked.get(hold.getProduct().getId());
 			if (hold.getStatus() == HoldStatus.EXPIRED) {
 				requireStockLeft(product, hold.getQty());
-				product.takeFromAvailable(hold.getQty());
+				product.takeFromStock(hold.getQty());
 			} else {
 				product.completeHold(hold.getQty());
 			}

@@ -47,7 +47,12 @@ public class HoldFunction {
 	}
 
 	public List<Hold> findActiveGroupOf(Long userId, Instant now) {
-		return holdRepository.findActiveDetailsByUserId(userId, now);
+		List<Hold> active = holdRepository.findActiveDetailsByUserId(userId, now);
+		if (active.isEmpty()) {
+			return active;
+		}
+		Long groupId = active.getFirst().getGroupId();
+		return active.stream().filter(hold -> hold.getGroupId().equals(groupId)).toList();
 	}
 
 	public Optional<HoldRef> findHoldingRefOf(Long userId) {
@@ -57,14 +62,6 @@ public class HoldFunction {
 	public Long getProductIdOfUserHold(Long userId, Long holdId) {
 		return holdRepository.findProductIdOfUserHold(userId, holdId)
 				.orElseThrow(() -> new BusinessException(HoldErrorCode.HOLD_NOT_FOUND));
-	}
-
-	public List<Long> getProductIdsOfGroupOfHold(Long holdId) {
-		List<Long> productIds = holdRepository.findProductIdsOfGroupOfHold(holdId);
-		if (productIds.isEmpty()) {
-			throw new BusinessException(HoldErrorCode.HOLD_NOT_FOUND);
-		}
-		return productIds;
 	}
 
 	public List<Long> findProductIdsOfGroup(Long groupId) {
@@ -135,10 +132,6 @@ public class HoldFunction {
 	public Map<Long, Long> activeQtyByProductOfStore(Long storeId) {
 		return holdRepository.findActiveHoldQtyByStoreId(storeId).stream()
 				.collect(Collectors.toMap(ActiveHoldQty::productId, ActiveHoldQty::qty));
-	}
-
-	public List<Long> findProductIdsSharingActiveHoldsWith(Long productId) {
-		return holdRepository.findProductIdsOfActiveHoldsContaining(productId);
 	}
 
 	public List<Hold> findActiveHoldsOfProduct(Long productId) {

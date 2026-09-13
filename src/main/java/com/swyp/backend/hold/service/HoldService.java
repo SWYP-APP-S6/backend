@@ -70,9 +70,7 @@ public class HoldService {
 		Product product = locked.get(request.productId());
 
 		GroupSlot slot = resolveGroup(current, product, now, locked);
-		// 한 번의 방문이 열릴 때만 점주에게 알린다. 같은 묶음에 더 담는 것은 새 방문이 아니다.
 		boolean opensAPickup = current.filter(ref -> ref.expiresAt().isAfter(now)).isEmpty();
-		// 같은 상품을 더 담는 것은 새 찜이 아니라 그 찜의 수량이 늘어나는 일이다.
 		Optional<Hold> existing = holdFunction.findHoldingIdOf(userId, product.getId())
 				.map(holdFunction::getByIdForUpdate);
 		requireWithinQtyLimit(existing.map(Hold::getQty).orElse(0) + request.qty());
@@ -98,8 +96,6 @@ public class HoldService {
 
 	private record GroupSlot(Long groupId, Instant expiresAt) {}
 
-	// 찜이 최초 등록의 60% 에 닿으면 한 번만 묻는다. 남은 수량이 적어질수록 장부와 매장이
-	// 어긋났을 때의 대가가 커지기 때문이다.
 	private void askOwnerToReconfirmStock(Product product, Instant now) {
 		if (!product.needsStockReconfirm()) {
 			return;
@@ -188,8 +184,6 @@ public class HoldService {
 		return credit;
 	}
 
-	// 이어 담는 찜은 처음 찜의 카운트다운을 그대로 물려받는다. 담을 때마다 시간이 늘어나면
-	// 손님이 계속 담아 재고를 무한정 붙잡아 둘 수 있다.
 	private GroupSlot resolveGroup(Optional<HoldRef> current, Product product, Instant now,
 			Map<Long, Product> locked) {
 		if (current.isEmpty()) {
@@ -222,11 +216,31 @@ public class HoldService {
 	}
 
 	private void expireGroup(Long groupId, Map<Long, Product> locked) {
-		for (Hold hold : lockHoldingOf(groupId)) {
+		List<Hold> expiring = lockHoldingOf(groupId);
+		if (expiring.isEmpty()) {
+			return;
+		}
+		for (Hold hold : expiring) {
 			locked.get(hold.getProduct().getId()).releaseHold(hold.getQty());
 			hold.expire();
 		}
 		holdFunction.flush();
+		tellTheVisitExpired(expiring.getFirst());
+	}
+
+	private void tellTheVisitExpired(Hold hold) {
+		notificationFunction.notify(
+				hold.getUser(),
+				NotificationType.HOLD_EXPIRED,
+				"찜 시간이 끝났어요",
+				hold.getStore().getName() + "에서 찜한 상품의 픽업 시간이 지났어요.",
+				null);
+		notificationFunction.notify(
+				hold.getStore().getOwner(),
+				NotificationType.HOLD_UNCONFIRMED,
+				"수령 확인이 안 된 찜이 있어요",
+				hold.getUser().getNickname() + "님의 찜 시간이 지났어요. 이미 수령했다면 수령 완료를 눌러주세요.",
+				null);
 	}
 
 	private List<Long> productIdsToLock(Optional<HoldRef> current, Long productId) {
