@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "점주 가게")
+@Tag(name = "OwnerStore", description = "점주 가게")
 @RestController
 @RequestMapping("/owner/stores")
 @RequiredArgsConstructor
