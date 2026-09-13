@@ -2,6 +2,7 @@ package com.swyp.backend.recipe.dto;
 
 import com.swyp.backend.recipe.entity.Recipe;
 import java.util.List;
+import com.swyp.backend.recipe.entity.RecipeDifficulty;
 import org.jspecify.annotations.Nullable;
 
 public record RecipeDetailResponse(
@@ -10,6 +11,7 @@ public record RecipeDetailResponse(
 		@Nullable String category,
 		@Nullable String cookMethod,
 		@Nullable Short cookTimeMinutes,
+		@Nullable RecipeDifficulty difficulty,
 		short servings,
 		@Nullable String imageUrl,
 		@Nullable String imageThumbUrl,
@@ -33,6 +35,7 @@ public record RecipeDetailResponse(
 				recipe.getCategory(),
 				recipe.getCookMethod(),
 				recipe.getCookTimeMinutes(),
+				recipe.getDifficulty(),
 				recipe.getServings(),
 				recipe.getImageUrl(),
 				recipe.getImageThumbUrl(),

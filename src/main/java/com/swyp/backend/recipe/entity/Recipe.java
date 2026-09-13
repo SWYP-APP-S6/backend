@@ -2,7 +2,9 @@ package com.swyp.backend.recipe.entity;
 
 import com.swyp.backend.common.BaseTimeEntity;
 import jakarta.persistence.Column;
+import jakarta.persistence.EnumType;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -38,6 +40,18 @@ public class Recipe extends BaseTimeEntity {
 
 	@Column(name = "cook_time_minutes")
 	private Short cookTimeMinutes;
+
+	@Enumerated(EnumType.STRING)
+	@Column(name = "cook_time_source", length = 10)
+	private EstimateSource cookTimeSource;
+
+	@Enumerated(EnumType.STRING)
+	@Column(length = 10)
+	private RecipeDifficulty difficulty;
+
+	@Enumerated(EnumType.STRING)
+	@Column(name = "difficulty_source", length = 10)
+	private EstimateSource difficultySource;
 
 	@Column(nullable = false)
 	private short servings;
@@ -83,8 +97,14 @@ public class Recipe extends BaseTimeEntity {
 		this.license = license;
 	}
 
-	public void assignCookTimeMinutes(Short cookTimeMinutes) {
+	public void assignCookTimeMinutes(Short cookTimeMinutes, EstimateSource source) {
 		this.cookTimeMinutes = cookTimeMinutes;
+		this.cookTimeSource = cookTimeMinutes == null ? null : source;
+	}
+
+	public void assignDifficulty(RecipeDifficulty difficulty, EstimateSource source) {
+		this.difficulty = difficulty;
+		this.difficultySource = difficulty == null ? null : source;
 	}
 
 	public void assignImages(String imageUrl, String imageThumbUrl, String originImageUrl) {

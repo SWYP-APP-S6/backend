@@ -1,6 +1,7 @@
 package com.swyp.backend.recipe.dto;
 
 import com.swyp.backend.recipe.entity.Recipe;
+import com.swyp.backend.recipe.entity.RecipeDifficulty;
 import org.jspecify.annotations.Nullable;
 
 public record RecipeSummaryResponse(
@@ -8,6 +9,7 @@ public record RecipeSummaryResponse(
 		String title,
 		@Nullable String category,
 		@Nullable Short cookTimeMinutes,
+		@Nullable RecipeDifficulty difficulty,
 		@Nullable String imageThumbUrl,
 		int viewCount,
 		int likeCount) {
@@ -18,6 +20,7 @@ public record RecipeSummaryResponse(
 				recipe.getTitle(),
 				recipe.getCategory(),
 				recipe.getCookTimeMinutes(),
+				recipe.getDifficulty(),
 				recipe.getImageThumbUrl(),
 				recipe.getViewCount(),
 				recipe.getLikeCount());
