@@ -8,6 +8,8 @@ import com.swyp.backend.TestcontainersConfiguration;
 import com.swyp.backend.hold.HoldFixture;
 import com.swyp.backend.hold.HoldProperties;
 import com.swyp.backend.hold.entity.Hold;
+import com.swyp.backend.hold.entity.HoldStatus;
+import com.swyp.backend.hold.function.HoldFunction;
 import com.swyp.backend.hold.repository.HoldRepository;
 import com.swyp.backend.notification.entity.NotificationType;
 import com.swyp.backend.notification.repository.NotificationRepository;
@@ -26,6 +28,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
@@ -34,6 +38,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.test.context.TestPropertySource;
 
 @SpringBootTest
@@ -64,6 +70,15 @@ class HoldReminderServiceTest {
 
 	@Autowired
 	NotificationRepository notificationRepository;
+
+	@Autowired
+	HoldFunction holdFunction;
+
+	@Autowired
+	TransactionTemplate transactionTemplate;
+
+	@Autowired
+	JdbcTemplate jdbcTemplate;
 
 	private Product product;
 
@@ -161,6 +176,57 @@ class HoldReminderServiceTest {
 
 		assertThat(holdRepository.findById(closing.getId()).orElseThrow().getExpiryRemindedAt())
 			.isNotNull();
+	}
+
+	@Test
+	void aHoldResolvedBetweenTheScanAndTheMarkIsNeitherRemindedNorRevived() {
+		Hold closing = holding("취소할소비자", withinLead());
+		Instant now = Instant.now();
+
+		Boolean marked = transactionTemplate.execute(status -> {
+			assertThat(holdFunction.findExpiringSoon(now, holdProperties.expiryReminderLead()))
+				.extracting(Hold::getId)
+				.contains(closing.getId());
+
+			jdbcTemplate.update(
+				"update holds set status = 'CANCELED', canceled_at = now(), canceled_by = 'USER' "
+					+ "where id = ?",
+				closing.getId());
+
+			return holdFunction.markExpiryReminded(closing.getId(), now);
+		});
+
+		assertThat(marked)
+			.as("the scan read the hold while it was still HOLDING -- the mark has to re-check")
+			.isFalse();
+		Hold reloaded = holdRepository.findById(closing.getId()).orElseThrow();
+		assertThat(reloaded.getStatus())
+			.as("marking through the entity writes every column back, which would revive a hold "
+					+ "the consumer already cancelled and hand its stock out twice")
+			.isEqualTo(HoldStatus.CANCELED);
+		assertThat(reloaded.getExpiryRemindedAt()).isNull();
+		assertThat(notificationRepository.count()).isZero();
+	}
+
+	@Test
+	void theMarkIsRefusedTheSecondTimeEvenWithinOnePass() {
+		Hold closing = holding("곧끝날소비자", withinLead());
+		Instant now = Instant.now();
+
+		transactionTemplate.executeWithoutResult(status -> {
+			assertThat(holdFunction.markExpiryReminded(closing.getId(), now)).isTrue();
+			assertThat(holdFunction.markExpiryReminded(closing.getId(), now))
+				.as("the condition lives in the UPDATE, not in a prior read")
+				.isFalse();
+		});
+	}
+
+	@Test
+	void theHoldOffersNoWayToMarkTheReminderThroughTheEntity() {
+		assertThat(Arrays.stream(Hold.class.getMethods()).map(Method::getName))
+			.as("an entity setter here is a loaded gun: dirty checking writes every column of the "
+					+ "row back, and this batch reads holds without locking them")
+			.doesNotContain("markExpiryReminded");
 	}
 
 	private Instant withinLead() {
