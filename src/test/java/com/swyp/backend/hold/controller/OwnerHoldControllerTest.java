@@ -95,11 +95,11 @@ class OwnerHoldControllerTest {
 		mockMvc.perform(get("/owner/holds?status=HOLDING").header("Authorization", "Bearer " + token))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.holds.totalElements").value(2))
-			.andExpect(jsonPath("$.data.holds.content[0].totalQty").value(2))
+			.andExpect(jsonPath("$.data.holds.content[0].qty").value(2))
 			.andExpect(jsonPath("$.data.holds.content[0].status").value("HOLDING"))
 			.andExpect(jsonPath("$.data.holds.content[0].nickname").value("윤지현"))
-			.andExpect(jsonPath("$.data.holds.content[0].items[0].productName").value("시금치 한 단"))
-			.andExpect(jsonPath("$.data.holds.content[1].totalQty").value(1));
+			.andExpect(jsonPath("$.data.holds.content[0].productName").value("시금치 한 단"))
+			.andExpect(jsonPath("$.data.holds.content[1].qty").value(1));
 	}
 
 	@Test
@@ -114,13 +114,13 @@ class OwnerHoldControllerTest {
 		mockMvc.perform(get("/owner/holds?status=CANCELED_BY_OWNER").header("Authorization", "Bearer " + token))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.holds.totalElements").value(1))
-			.andExpect(jsonPath("$.data.holds.content[0].totalQty").value(1))
+			.andExpect(jsonPath("$.data.holds.content[0].qty").value(1))
 			.andExpect(jsonPath("$.data.holds.content[0].status").value("CANCELED_BY_OWNER"));
 
 		mockMvc.perform(get("/owner/holds?status=CANCELED_BY_USER").header("Authorization", "Bearer " + token))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.holds.totalElements").value(1))
-			.andExpect(jsonPath("$.data.holds.content[0].totalQty").value(2));
+			.andExpect(jsonPath("$.data.holds.content[0].qty").value(2));
 	}
 
 	@Test
@@ -292,9 +292,39 @@ class OwnerHoldControllerTest {
 			.andExpect(jsonPath("$.code").value("HOLD_ALREADY_RESOLVED"));
 	}
 
+	@Test
+	void completePickup_whenTheBatchAlreadyExpiredOneOfTheGroup_settlesEachHoldOnItsOwnState()
+			throws Exception {
+		Product spinach = createProduct("시금치 한 단", 10);
+		Product zucchini = createProduct("애호박", 10);
+		List<Hold> group = holdRepository.saveAllAndFlush(HoldFixture.group(
+			newConsumer(), Instant.now().minus(Duration.ofMinutes(1)), spinach, 2, zucchini, 3));
+		spinach.hold(2);
+		zucchini.hold(3);
+		productRepository.saveAllAndFlush(List.of(spinach, zucchini));
+		expireWithStockBack(group.get(0), spinach);
+
+		mockMvc.perform(post("/owner/holds/" + group.get(1).getId() + "/complete")
+				.header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk());
+
+		Product soldExpired = productRepository.findById(spinach.getId()).orElseThrow();
+		assertThat(soldExpired.getHeldQty())
+			.as("the batch had already given this reservation back")
+			.isZero();
+		assertThat(soldExpired.getAvailableQty()).isEqualTo(8);
+		Product soldHolding = productRepository.findById(zucchini.getId()).orElseThrow();
+		assertThat(soldHolding.getHeldQty())
+			.as("a sibling still holding must not keep its reservation after the visit is done")
+			.isZero();
+		assertThat(soldHolding.getAvailableQty()).isEqualTo(7);
+		assertThat(holdRepository.findAllById(List.of(group.get(0).getId(), group.get(1).getId())))
+			.allSatisfy(hold -> assertThat(hold.getStatus()).isEqualTo(HoldStatus.COMPLETED));
+	}
+
 	private void expireWithStockBack(Hold hold, Product product) {
 		hold.expire();
-		product.releaseHold(hold.getItems().getFirst().getQty());
+		product.releaseHold(hold.getQty());
 		holdRepository.saveAndFlush(hold);
 		productRepository.saveAndFlush(product);
 	}

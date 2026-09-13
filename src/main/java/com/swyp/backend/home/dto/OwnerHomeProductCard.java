@@ -10,6 +10,7 @@ public record OwnerHomeProductCard(
 		int salePrice,
 		int availableQty,
 		long activeHoldQty,
+		int shortfallQty,
 		String status,
 		boolean reconfirmPending) {
 
@@ -22,6 +23,7 @@ public record OwnerHomeProductCard(
 				product.getSalePrice(),
 				product.getAvailableQty(),
 				activeHoldQty,
+				product.shortfallQty(),
 				product.getStatus().name(),
 				product.getReconfirmSentAt() != null && product.getReconfirmAnsweredAt() == null);
 	}

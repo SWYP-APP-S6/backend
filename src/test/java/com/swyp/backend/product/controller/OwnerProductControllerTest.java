@@ -101,6 +101,269 @@ class OwnerProductControllerTest {
 			"photoUrl":"https://example.com/a.jpg","pickupEndAt":"%s"}""".formatted(pickupEndAt);
 	}
 
+	@Test
+	void updateStock_countsWhatIsInTheShop_notWhatIsLeftOverTheHolds() throws Exception {
+		Product product = createProduct("당근", 10);
+		holdRepository.saveAndFlush(
+			HoldFixture.hold(createConsumer(), product, 3, Instant.now().plus(Duration.ofMinutes(15))));
+		product.hold(3);
+		productRepository.saveAndFlush(product);
+
+		mockMvc.perform(patch("/owner/products/" + product.getId() + "/stock")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"stockQty":8,"cancelOverflow":false}"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.availableQty").value(5))
+			.andExpect(jsonPath("$.data.heldQty").value(3))
+			.andExpect(jsonPath("$.data.shortfallQty").value(0));
+	}
+
+	@Test
+	void updateStock_belowSixtyPercentOfWhatWasRegistered_isRejected() throws Exception {
+		Product product = createProduct("당근", 10);
+
+		mockMvc.perform(patch("/owner/products/" + product.getId() + "/stock")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"stockQty":5,"cancelOverflow":false}"""))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("QTY_BELOW_MINIMUM"));
+	}
+
+	@Test
+	void updateStock_belowSixtyPercent_opensUpOnceTheReconfirmWasAsked() throws Exception {
+		Product product = createProduct("당근", 10);
+		product.markReconfirmSent(Instant.now());
+		productRepository.saveAndFlush(product);
+
+		mockMvc.perform(patch("/owner/products/" + product.getId() + "/stock")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"stockQty":0,"cancelOverflow":false}"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.availableQty").value(0))
+			.andExpect(jsonPath("$.data.status").value("SOLD_OUT"));
+	}
+
+	@Test
+	void updateStock_leavingTheOverflowAlone_keepsTheHoldsAndReportsTheShortfall() throws Exception {
+		Product product = askedToReconfirm("당근", 10);
+		holdRepository.saveAndFlush(
+			HoldFixture.hold(createConsumer(), product, 3, Instant.now().plus(Duration.ofMinutes(15))));
+		product.hold(3);
+		productRepository.saveAndFlush(product);
+
+		mockMvc.perform(patch("/owner/products/" + product.getId() + "/stock")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"stockQty":1,"cancelOverflow":false}"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.heldQty").value(3))
+			.andExpect(jsonPath("$.data.availableQty").value(0))
+			.andExpect(jsonPath("$.data.shortfallQty").value(2));
+
+		assertThat(holdRepository.findAll())
+			.as("BR-015: a shortfall never cancels on its own")
+			.allMatch(hold -> hold.getStatus() == HoldStatus.HOLDING);
+	}
+
+	@Test
+	void updateStock_cancelingTheOverflow_keepsWhoeverHeldFirst() throws Exception {
+		Product product = askedToReconfirm("당근", 10);
+		Hold first = holdWithQty(product, 1, Duration.ofMinutes(15));
+		Hold second = holdWithQty(product, 2, Duration.ofMinutes(14));
+		Hold third = holdWithQty(product, 1, Duration.ofMinutes(13));
+		long notificationsBefore = notificationRepository.count();
+
+		mockMvc.perform(patch("/owner/products/" + product.getId() + "/stock")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"stockQty":1,"cancelOverflow":true}"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.heldQty").value(1))
+			.andExpect(jsonPath("$.data.availableQty").value(0))
+			.andExpect(jsonPath("$.data.shortfallQty").value(0));
+
+		assertThat(holdRepository.findById(first.getId()).orElseThrow().getStatus())
+			.as("the customer who held first keeps the one unit that exists")
+			.isEqualTo(HoldStatus.HOLDING);
+		assertThat(holdRepository.findById(second.getId()).orElseThrow().getStatus())
+			.isEqualTo(HoldStatus.CANCELED);
+		assertThat(holdRepository.findById(third.getId()).orElseThrow().getStatus())
+			.isEqualTo(HoldStatus.CANCELED);
+		assertThat(notificationRepository.count()).isEqualTo(notificationsBefore + 2);
+	}
+
+	@Test
+	void stockReconfirm_sayingTheQuantityIsRight_locksItUntilPickupCloses() throws Exception {
+		Product product = askedToReconfirm("당근", 10);
+
+		mockMvc.perform(post("/owner/products/" + product.getId() + "/stock-reconfirm")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"confirmed":true}"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.stockEditable").value(false))
+			.andExpect(jsonPath("$.data.reconfirmPending").value(false));
+
+		mockMvc.perform(patch("/owner/products/" + product.getId() + "/stock")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"stockQty":6,"cancelOverflow":false}"""))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("STOCK_LOCKED"));
+	}
+
+	@Test
+	void stockReconfirm_sayingItIsWrong_leavesTheQuantityEditable() throws Exception {
+		Product product = askedToReconfirm("당근", 10);
+
+		mockMvc.perform(post("/owner/products/" + product.getId() + "/stock-reconfirm")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"confirmed":false}"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.stockEditable").value(true))
+			.andExpect(jsonPath("$.data.minAdjustableQty").value(0));
+	}
+
+	@Test
+	void stockReconfirm_onAProductNobodyWasAskedAbout_isRejected() throws Exception {
+		Product product = createProduct("당근", 10);
+
+		mockMvc.perform(post("/owner/products/" + product.getId() + "/stock-reconfirm")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"confirmed":true}"""))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("RECONFIRM_NOT_REQUESTED"));
+	}
+
+	@Test
+	void updateStock_onAClosedProduct_isRejected() throws Exception {
+		Product product = createProduct("당근", 10);
+		product.close();
+		productRepository.saveAndFlush(product);
+
+		mockMvc.perform(patch("/owner/products/" + product.getId() + "/stock")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"stockQty":8,"cancelOverflow":false}"""))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("PRODUCT_CLOSED"));
+
+		assertThat(productRepository.findById(product.getId()).orElseThrow().getAvailableQty())
+			.isEqualTo(10);
+	}
+
+	@Test
+	void stockReconfirm_answeredTwice_isRejected() throws Exception {
+		Product product = askedToReconfirm("당근", 10);
+
+		mockMvc.perform(post("/owner/products/" + product.getId() + "/stock-reconfirm")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"confirmed":false}"""))
+			.andExpect(status().isOk());
+
+		mockMvc.perform(post("/owner/products/" + product.getId() + "/stock-reconfirm")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"confirmed":true}"""))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("RECONFIRM_NOT_REQUESTED"));
+
+		mockMvc.perform(get("/owner/products/" + product.getId())
+				.header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.stockEditable").value(true));
+	}
+
+	@Test
+	void stockReconfirm_confirmingIt_stopsLockingOncePickupHasClosed() throws Exception {
+		Product product = productRepository.saveAndFlush(new Product(
+			store, "지난 당근", ProductCategory.VEGETABLE, 10, 1000, 800,
+			LocalDateTime.now().minusHours(2), LocalDateTime.now().minusMinutes(1),
+			"https://example.com/a.jpg"));
+		product.markReconfirmSent(Instant.now());
+		product.confirmStock(Instant.now());
+		productRepository.saveAndFlush(product);
+
+		mockMvc.perform(get("/owner/products/" + product.getId())
+				.header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.stockEditable").value(true));
+
+		mockMvc.perform(patch("/owner/products/" + product.getId() + "/stock")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"stockQty":4,"cancelOverflow":false}"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.stockQty").value(4));
+	}
+
+	@Test
+	void updateStock_beyondTheCap_isRejected() throws Exception {
+		Product product = askedToReconfirm("당근", 10);
+
+		mockMvc.perform(patch("/owner/products/" + product.getId() + "/stock")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"stockQty":2147483647,"cancelOverflow":false}"""))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+	}
+
+	@Test
+	void stockReconfirm_whileTheHoldsOutrunTheShelf_isRejected() throws Exception {
+		Product product = askedToReconfirm("당근", 10);
+		product.hold(6);
+		product.restock(4);
+		productRepository.saveAndFlush(product);
+
+		mockMvc.perform(post("/owner/products/" + product.getId() + "/stock-reconfirm")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"confirmed":true}"""))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("STOCK_SHORT_OF_HOLDS"));
+
+		mockMvc.perform(get("/owner/products/" + product.getId())
+				.header("Authorization", "Bearer " + token))
+			.andExpect(jsonPath("$.data.stockEditable").value(true))
+			.andExpect(jsonPath("$.data.shortfallQty").value(2));
+	}
+
+	private Product askedToReconfirm(String name, int initialQty) {
+		Product product = createProduct(name, initialQty);
+		product.markReconfirmSent(Instant.now());
+		return productRepository.saveAndFlush(product);
+	}
+
+	private Hold holdWithQty(Product product, int qty, Duration until) {
+		Hold hold = holdRepository.saveAndFlush(
+			HoldFixture.hold(createConsumer(), product, qty, Instant.now().plus(until)));
+		product.hold(qty);
+		productRepository.saveAndFlush(product);
+		return hold;
+	}
+
 	private Product createProduct(String name, int initialQty) {
 		Product product = new Product(
 			store, name, ProductCategory.VEGETABLE, initialQty, 1000, 800,
@@ -338,111 +601,9 @@ class OwnerProductControllerTest {
 			.andExpect(jsonPath("$.code").value("PRODUCT_NOT_FOUND"));
 	}
 
-	@Test
-	void updateAvailableQty_toZeroWithNoActiveHolds_needsNoDisposition() throws Exception {
-		Product product = createProduct("당근", 10);
 
-		mockMvc.perform(patch("/owner/products/" + product.getId() + "/available-qty")
-				.header("Authorization", "Bearer " + token)
-				.contentType(MediaType.APPLICATION_JSON)
-				.content("""
-					{"availableQty":0}"""))
-			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.availableQty").value(0))
-			.andExpect(jsonPath("$.data.status").value("SOLD_OUT"));
-	}
 
-	@Test
-	void updateAvailableQty_toZeroWithActiveHolds_requiresDisposition() throws Exception {
-		Product product = createProduct("당근", 10);
-		User consumer = createConsumer();
-		holdRepository.saveAndFlush(HoldFixture.hold(consumer, product, 3, Instant.now().plus(Duration.ofMinutes(15))));
 
-		mockMvc.perform(patch("/owner/products/" + product.getId() + "/available-qty")
-				.header("Authorization", "Bearer " + token)
-				.contentType(MediaType.APPLICATION_JSON)
-				.content("""
-					{"availableQty":0}"""))
-			.andExpect(status().isBadRequest())
-			.andExpect(jsonPath("$.code").value("DISPOSITION_REQUIRED"));
-	}
 
-	@Test
-	void updateAvailableQty_toZeroKeepingHolds_leavesActiveHoldsUntouched() throws Exception {
-		Product product = createProduct("당근", 10);
-		User consumer = createConsumer();
-		Hold hold = holdRepository.saveAndFlush(HoldFixture.hold(consumer, product, 3, Instant.now().plus(Duration.ofMinutes(15))));
 
-		mockMvc.perform(patch("/owner/products/" + product.getId() + "/available-qty")
-				.header("Authorization", "Bearer " + token)
-				.contentType(MediaType.APPLICATION_JSON)
-				.content("""
-					{"availableQty":0,"disposition":"KEEP_HOLDS"}"""))
-			.andExpect(status().isOk());
-
-		Hold reloaded = holdRepository.findById(hold.getId()).orElseThrow();
-		assertThat(reloaded.getStatus()).isEqualTo(HoldStatus.HOLDING);
-	}
-
-	@Test
-	void updateAvailableQty_toZeroCancelingAllHolds_cancelsThemAndNotifies() throws Exception {
-		Product product = createProduct("당근", 10);
-		User consumer = createConsumer();
-		product.hold(3);
-		productRepository.saveAndFlush(product);
-		Hold hold = holdRepository.saveAndFlush(HoldFixture.hold(consumer, product, 3, Instant.now().plus(Duration.ofMinutes(15))));
-		long notificationsBefore = notificationRepository.count();
-
-		String body = mockMvc.perform(patch("/owner/products/" + product.getId() + "/available-qty")
-				.header("Authorization", "Bearer " + token)
-				.contentType(MediaType.APPLICATION_JSON)
-				.content("""
-					{"availableQty":0,"disposition":"CANCEL_ALL"}"""))
-			.andExpect(status().isOk())
-			.andReturn().getResponse().getContentAsString();
-		assertThat((String) JsonPath.read(body, "$.data.status")).isEqualTo("SOLD_OUT");
-
-		Hold reloaded = holdRepository.findById(hold.getId()).orElseThrow();
-		assertThat(reloaded.getStatus()).isEqualTo(HoldStatus.CANCELED);
-		assertThat(notificationRepository.count()).isEqualTo(notificationsBefore + 1);
-		assertThat(productRepository.findById(product.getId()).orElseThrow().getHeldQty())
-			.as("canceling the hold has to let go of what it was holding")
-			.isZero();
-	}
-
-	@Test
-	void updateAvailableQty_onAClosedProduct_isRejected() throws Exception {
-		Product product = createProduct("당근", 10);
-		product.close();
-		productRepository.saveAndFlush(product);
-
-		mockMvc.perform(patch("/owner/products/" + product.getId() + "/available-qty")
-				.header("Authorization", "Bearer " + token)
-				.contentType(MediaType.APPLICATION_JSON)
-				.content("""
-					{"availableQty":5}"""))
-			.andExpect(status().isConflict())
-			.andExpect(jsonPath("$.code").value("PRODUCT_CLOSED"));
-
-		assertThat(productRepository.findById(product.getId()).orElseThrow().getAvailableQty()).isEqualTo(10);
-	}
-
-	@Test
-	void updateAvailableQty_aboveZero_doesNotTouchExistingHolds() throws Exception {
-		Product product = createProduct("당근", 10);
-		User consumer = createConsumer();
-		Hold hold = holdRepository.saveAndFlush(HoldFixture.hold(consumer, product, 3, Instant.now().plus(Duration.ofMinutes(15))));
-
-		mockMvc.perform(patch("/owner/products/" + product.getId() + "/available-qty")
-				.header("Authorization", "Bearer " + token)
-				.contentType(MediaType.APPLICATION_JSON)
-				.content("""
-					{"availableQty":5}"""))
-			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.availableQty").value(5))
-			.andExpect(jsonPath("$.data.status").value("ON_SALE"));
-
-		Hold reloaded = holdRepository.findById(hold.getId()).orElseThrow();
-		assertThat(reloaded.getStatus()).isEqualTo(HoldStatus.HOLDING);
-	}
 }

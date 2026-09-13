@@ -2,7 +2,6 @@ package com.swyp.backend.hold.dto;
 
 import com.swyp.backend.hold.entity.Hold;
 import com.swyp.backend.hold.entity.HoldCanceledBy;
-import com.swyp.backend.hold.entity.HoldItem;
 import com.swyp.backend.hold.entity.HoldStatus;
 import com.swyp.backend.product.entity.Product;
 import com.swyp.backend.product.entity.ProductStatus;
@@ -18,6 +17,7 @@ import org.jspecify.annotations.Nullable;
 
 public record HoldDetailResponse(
 		Long id,
+		Long groupId,
 		HoldStatus status,
 		int totalQty,
 		int totalPrice,
@@ -32,6 +32,7 @@ public record HoldDetailResponse(
 		List<HoldItemResponse> items) {
 
 	public record HoldItemResponse(
+			Long holdId,
 			Long productId,
 			String name,
 			String photoUrl,
@@ -42,9 +43,10 @@ public record HoldDetailResponse(
 			int qty,
 			int lineTotal) {
 
-		static HoldItemResponse from(HoldItem item) {
-			Product product = item.getProduct();
+		static HoldItemResponse from(Hold hold) {
+			Product product = hold.getProduct();
 			return new HoldItemResponse(
+					hold.getId(),
 					product.getId(),
 					product.getName(),
 					product.getPhotoUrl(),
@@ -52,8 +54,8 @@ public record HoldDetailResponse(
 					product.getSalePrice(),
 					product.getDiscountRate(),
 					product.getStatus(),
-					item.getQty(),
-					product.getSalePrice() * item.getQty());
+					hold.getQty(),
+					product.getSalePrice() * hold.getQty());
 		}
 	}
 
@@ -84,13 +86,15 @@ public record HoldDetailResponse(
 		}
 	}
 
-	public static HoldDetailResponse from(Hold hold, Instant serverTime, ZoneId zone) {
-		List<HoldItemResponse> items = hold.getItems().stream()
-				.sorted(Comparator.comparing(item -> item.getProduct().getId()))
+	public static HoldDetailResponse of(List<Hold> group, Instant serverTime, ZoneId zone) {
+		List<HoldItemResponse> items = group.stream()
+				.sorted(Comparator.comparing(held -> held.getProduct().getId()))
 				.map(HoldItemResponse::from)
 				.toList();
+		Hold hold = group.stream().min(Comparator.comparing(Hold::getId)).orElseThrow();
 		return new HoldDetailResponse(
 				hold.getId(),
+				hold.getGroupId(),
 				hold.statusAt(serverTime),
 				items.stream().mapToInt(HoldItemResponse::qty).sum(),
 				items.stream().mapToInt(HoldItemResponse::lineTotal).sum(),

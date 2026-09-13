@@ -28,8 +28,7 @@ public interface HoldRepository extends JpaRepository<Hold, Long> {
 	@Query("""
 			select h from Hold h
 			join fetch h.store
-			join fetch h.items i
-			join fetch i.product
+			join fetch h.product
 			where h.user.id = :userId and h.id = :holdId
 			""")
 	Optional<Hold> findDetailByUserIdAndHoldId(
@@ -38,32 +37,34 @@ public interface HoldRepository extends JpaRepository<Hold, Long> {
 	@Query("""
 			select h from Hold h
 			join fetch h.store
-			join fetch h.items i
-			join fetch i.product
+			join fetch h.product
 			where h.user.id = :userId
 				and h.status = com.swyp.backend.hold.entity.HoldStatus.HOLDING
 				and h.expiresAt > :now
+			order by h.groupId, h.product.id
 			""")
-	Optional<Hold> findActiveDetailByUserId(@Param("userId") Long userId, @Param("now") Instant now);
+	List<Hold> findActiveDetailsByUserId(@Param("userId") Long userId, @Param("now") Instant now);
 
 	@Query("""
-			select new com.swyp.backend.hold.dto.HoldRef(h.id, h.store.id, h.expiresAt)
+			select distinct new com.swyp.backend.hold.dto.HoldRef(h.groupId, h.store.id, h.expiresAt)
 			from Hold h
 			where h.user.id = :userId
 				and h.status = com.swyp.backend.hold.entity.HoldStatus.HOLDING
+			order by h.groupId
 			""")
-	Optional<HoldRef> findHoldingRefByUserId(@Param("userId") Long userId);
+	List<HoldRef> findHoldingRefsByUserId(@Param("userId") Long userId);
 
-	@Query("""
-			select i.product.id from HoldItem i
-			where i.hold.id = :holdId and i.hold.user.id = :userId
-			order by i.product.id
-			""")
-	List<Long> findProductIdsOfUserHold(
+	@Query("select h.product.id from Hold h where h.id = :holdId and h.user.id = :userId")
+	Optional<Long> findProductIdOfUserHold(
 			@Param("userId") Long userId, @Param("holdId") Long holdId);
 
-	@Query("select i.product.id from HoldItem i where i.hold.id = :holdId order by i.product.id")
-	List<Long> findProductIdsOfHold(@Param("holdId") Long holdId);
+	@Query("""
+			select h.product.id from Hold h
+			where h.groupId = :groupId
+				and h.status = com.swyp.backend.hold.entity.HoldStatus.HOLDING
+			order by h.product.id
+			""")
+	List<Long> findProductIdsOfGroup(@Param("groupId") Long groupId);
 
 	@Query("""
 			select h from Hold h
@@ -81,10 +82,9 @@ public interface HoldRepository extends JpaRepository<Hold, Long> {
 	Page<Long> findUserHoldIds(@Param("userId") Long userId, Pageable pageable);
 
 	@Query("""
-			select distinct h from Hold h
+			select h from Hold h
 			join fetch h.store
-			left join fetch h.items i
-			left join fetch i.product
+			join fetch h.product
 			where h.id in :ids
 			""")
 	List<Hold> findDetailsByIds(@Param("ids") List<Long> ids);
@@ -93,19 +93,19 @@ public interface HoldRepository extends JpaRepository<Hold, Long> {
 	Optional<Long> findStoreIdById(@Param("holdId") Long holdId);
 
 	@Query("""
-			select i.hold.id from HoldItem i
-			where i.hold.user.id = :userId
-				and i.product.id = :productId
-				and i.hold.status = com.swyp.backend.hold.entity.HoldStatus.HOLDING
+			select h.id from Hold h
+			where h.user.id = :userId
+				and h.product.id = :productId
+				and h.status = com.swyp.backend.hold.entity.HoldStatus.HOLDING
 			""")
 	Optional<Long> findHoldingIdOfProduct(
 			@Param("userId") Long userId, @Param("productId") Long productId);
 
 	@Query("""
-			select new com.swyp.backend.hold.dto.OverdueHold(h.id, i.product.id)
-			from HoldItem i join i.hold h
+			select new com.swyp.backend.hold.dto.OverdueHold(h.id, h.product.id)
+			from Hold h
 			where h.status = :status and h.expiresAt <= :expiresAt
-			order by h.id, i.product.id
+			order by h.id
 			""")
 	List<OverdueHold> findOverdueByStatus(
 			@Param("status") HoldStatus status, @Param("expiresAt") Instant expiresAt);
@@ -137,28 +137,26 @@ public interface HoldRepository extends JpaRepository<Hold, Long> {
 	@Query("""
 			select h from Hold h
 			join fetch h.user
-			join fetch h.items i
-			join fetch i.product
-			where i.product.id = :productId and h.status = :status
+			join fetch h.product
+			where h.product.id = :productId and h.status = :status
+			order by h.createdAt asc, h.id asc
 			""")
-	List<Hold> findByItemProductIdAndStatus(
+	List<Hold> findByProductIdAndStatus(
 			@Param("productId") Long productId, @Param("status") HoldStatus status);
 
 	@Query("""
-			select distinct sibling.product.id from HoldItem i
-			join i.hold h
-			join h.items sibling
-			where i.product.id = :productId
-				and h.status = com.swyp.backend.hold.entity.HoldStatus.HOLDING
-			order by sibling.product.id
+			select h.id from Hold h
+			where h.product.id = :productId and h.status = :status
+			order by h.createdAt asc, h.id asc
 			""")
-	List<Long> findProductIdsOfActiveHoldsContaining(@Param("productId") Long productId);
+	List<Long> findIdsByProductIdAndStatus(
+			@Param("productId") Long productId, @Param("status") HoldStatus status);
 
 	@Query("""
-			select coalesce(sum(i.qty), 0) from HoldItem i
-			where i.product.id = :productId and i.hold.status = :status
+			select coalesce(sum(h.qty), 0) from Hold h
+			where h.product.id = :productId and h.status = :status
 			""")
-	long sumItemQtyByProductIdAndStatus(
+	long sumQtyByProductIdAndStatus(
 			@Param("productId") Long productId, @Param("status") HoldStatus status);
 
 	@Query("""
@@ -178,10 +176,9 @@ public interface HoldRepository extends JpaRepository<Hold, Long> {
 	long countExpiredSince(@Param("storeId") Long storeId, @Param("since") Instant since);
 
 	@Query("""
-			select distinct h from Hold h
+			select h from Hold h
 			join fetch h.user
-			join fetch h.items i
-			join fetch i.product
+			join fetch h.product
 			where h.store.id = :storeId and h.status = :status
 			order by h.expiresAt asc
 			""")
@@ -199,6 +196,7 @@ public interface HoldRepository extends JpaRepository<Hold, Long> {
 	@Query(value = """
 			select h from Hold h
 			join fetch h.user
+			join fetch h.product
 			where h.store.id = :storeId
 				and (:status is null or h.status = :status)
 				and (:canceledBy is null or h.canceledBy = :canceledBy)
@@ -219,18 +217,64 @@ public interface HoldRepository extends JpaRepository<Hold, Long> {
 			select h from Hold h
 			join fetch h.user
 			join fetch h.store
-			join fetch h.items i
-			join fetch i.product
+			join fetch h.product
 			where h.id = :id
 			""")
 	Optional<Hold> findDetailById(@Param("id") Long id);
 
 	@Query("""
-			select new com.swyp.backend.hold.dto.ActiveHoldQty(i.product.id, sum(i.qty))
-			from HoldItem i join i.hold h
+			select h from Hold h
+			join fetch h.user
+			join fetch h.store
+			join fetch h.product
+			where h.groupId = :groupId and h.status = :status
+			order by h.product.id
+			""")
+	List<Hold> findGroupByStatus(
+			@Param("groupId") Long groupId, @Param("status") HoldStatus status);
+
+	@Query(value = "select nextval('holds_group_id_seq')", nativeQuery = true)
+	long nextGroupId();
+
+	@Query("""
+			select h.id from Hold h
+			where h.groupId = :groupId
+				and h.status = com.swyp.backend.hold.entity.HoldStatus.HOLDING
+			order by h.id
+			""")
+	List<Long> findHoldingIdsOfGroup(@Param("groupId") Long groupId);
+
+	@Query("""
+			select distinct h.product.id from Hold h
+			where h.id in :holdIds
+			order by h.product.id
+			""")
+	List<Long> findProductIdsOfHolds(@Param("holdIds") List<Long> holdIds);
+
+	@Query("""
+			select h.id from Hold h
+			where h.groupId = (select g.groupId from Hold g where g.id = :holdId)
+				and h.status in :statuses
+			order by h.id
+			""")
+	List<Long> findGroupHoldIdsOfHold(
+			@Param("holdId") Long holdId, @Param("statuses") List<HoldStatus> statuses);
+
+	@Query("""
+			select h.product.id from Hold h
+			where h.groupId = (select g.groupId from Hold g where g.id = :holdId)
+				and h.status in :statuses
+			order by h.product.id
+			""")
+	List<Long> findGroupProductIdsOfHold(
+			@Param("holdId") Long holdId, @Param("statuses") List<HoldStatus> statuses);
+
+	@Query("""
+			select new com.swyp.backend.hold.dto.ActiveHoldQty(h.product.id, sum(h.qty))
+			from Hold h
 			where h.store.id = :storeId
 				and h.status = com.swyp.backend.hold.entity.HoldStatus.HOLDING
-			group by i.product.id
+			group by h.product.id
 			""")
 	List<ActiveHoldQty> findActiveHoldQtyByStoreId(@Param("storeId") Long storeId);
 

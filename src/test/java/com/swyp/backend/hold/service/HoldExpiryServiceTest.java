@@ -114,11 +114,14 @@ class HoldExpiryServiceTest {
 		Hold hold = hold("두가지담은소비자", 2, Instant.now().minusSeconds(60));
 		onion.hold(3);
 		productRepository.saveAndFlush(onion);
-		hold.addItem(onion, 3);
-		holdRepository.saveAndFlush(hold);
+		holdRepository.saveAndFlush(new Hold(
+				hold.getUser(), onion.getStore(), onion, 3,
+				hold.getGroupId(), hold.getExpiresAt()));
 		long notificationsBefore = notificationRepository.count();
 
-		assertThat(holdExpiryService.expireOverdueHolds()).isEqualTo(1);
+		assertThat(holdExpiryService.expireOverdueHolds())
+			.as("each product in the group is its own hold now")
+			.isEqualTo(2);
 
 		assertThat(reloaded().getAvailableQty()).isEqualTo(5);
 		assertThat(productRepository.findById(onion.getId()).orElseThrow().getAvailableQty())

@@ -2,10 +2,11 @@ package com.swyp.backend.product.controller;
 
 import com.swyp.backend.common.response.ApiResponse;
 import com.swyp.backend.common.response.SuccessCode;
-import com.swyp.backend.product.dto.ProductAvailableQtyUpdateRequest;
 import com.swyp.backend.product.dto.ProductDetailResponse;
 import com.swyp.backend.product.dto.ProductPreviewResponse;
 import com.swyp.backend.product.dto.ProductRegisterRequest;
+import com.swyp.backend.product.dto.StockReconfirmRequest;
+import com.swyp.backend.product.dto.StockUpdateRequest;
 import com.swyp.backend.product.service.ProductService;
 import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -48,11 +49,20 @@ public class OwnerProductController {
 		return ApiResponse.of(SuccessCode.OK, productService.getMyProduct(ownerId, id));
 	}
 
-	@PatchMapping("/{id}/available-qty")
-	public ApiResponse<ProductDetailResponse> updateAvailableQty(
+	@PatchMapping("/{id}/stock")
+	public ApiResponse<ProductDetailResponse> updateStock(
 			@AuthenticationPrincipal Long ownerId,
 			@PathVariable Long id,
-			@Valid @RequestBody ProductAvailableQtyUpdateRequest request) {
-		return ApiResponse.of(SuccessCode.OK, productService.updateAvailableQty(ownerId, id, request));
+			@Valid @RequestBody StockUpdateRequest request) {
+		return ApiResponse.of(SuccessCode.OK, productService.updateStock(ownerId, id, request));
+	}
+
+	@PostMapping("/{id}/stock-reconfirm")
+	public ApiResponse<ProductDetailResponse> answerStockReconfirm(
+			@AuthenticationPrincipal Long ownerId,
+			@PathVariable Long id,
+			@Valid @RequestBody StockReconfirmRequest request) {
+		return ApiResponse.of(
+				SuccessCode.OK, productService.answerStockReconfirm(ownerId, id, request));
 	}
 }

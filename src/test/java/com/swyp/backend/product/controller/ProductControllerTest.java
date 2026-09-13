@@ -270,7 +270,7 @@ class ProductControllerTest {
 		product(pending, "숨은 상품", ProductCategory.VEGETABLE, now.plusHours(2));
 		product(approved, "마감된 상품", ProductCategory.VEGETABLE, now.minusMinutes(1));
 		Product soldOut = product(approved, "품절 상품", ProductCategory.VEGETABLE, now.plusHours(2));
-		soldOut.adjustAvailableQty(0);
+		soldOut.restock(0);
 		productRepository.saveAndFlush(soldOut);
 		product(approved, "판매중 상품", ProductCategory.VEGETABLE, now.plusHours(2));
 

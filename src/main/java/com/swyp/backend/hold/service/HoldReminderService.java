@@ -7,7 +7,9 @@ import com.swyp.backend.notification.entity.NotificationType;
 import com.swyp.backend.notification.function.NotificationFunction;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -34,8 +36,12 @@ public class HoldReminderService {
 				holdFunction.findExpiringSoon(now, holdProperties.expiryReminderLead());
 
 		int reminded = 0;
+		Set<Long> told = new HashSet<>();
 		for (Hold hold : expiringSoon) {
 			if (!holdFunction.markExpiryReminded(hold.getId(), now)) {
+				continue;
+			}
+			if (!told.add(hold.getGroupId())) {
 				continue;
 			}
 			notificationFunction.notify(

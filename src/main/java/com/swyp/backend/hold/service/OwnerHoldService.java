@@ -9,7 +9,6 @@ import com.swyp.backend.hold.dto.OwnerHoldStatus;
 import com.swyp.backend.hold.dto.OwnerHoldSummaryResponse;
 import com.swyp.backend.hold.HoldProperties;
 import com.swyp.backend.hold.entity.Hold;
-import com.swyp.backend.hold.entity.HoldItem;
 import com.swyp.backend.hold.entity.HoldCancelCreditReason;
 import com.swyp.backend.hold.entity.HoldStatus;
 import com.swyp.backend.hold.exception.HoldErrorCode;
@@ -61,7 +60,10 @@ public class OwnerHoldService {
 		Store store = storeFunction.getByOwnerId(ownerId);
 		Hold hold = holdFunction.getDetailById(holdId);
 		requireOwnedBy(hold, store);
-		return OwnerHoldDetailResponse.from(hold, Instant.now(clock));
+		List<Hold> group = hold.getStatus() == HoldStatus.HOLDING
+				? holdFunction.findHoldingOfGroup(hold.getGroupId())
+				: List.of(hold);
+		return OwnerHoldDetailResponse.of(group, Instant.now(clock));
 	}
 
 	private static void requireOwnedBy(Hold hold, Store store) {
@@ -76,49 +78,63 @@ public class OwnerHoldService {
 		if (!holdFunction.getStoreIdOfHold(holdId).equals(store.getId())) {
 			throw new BusinessException(HoldErrorCode.HOLD_NOT_FOUND);
 		}
+		List<Long> holdIds = holdFunction.getPickupableHoldIdsOfGroup(holdId);
 		Map<Long, Product> locked = new LinkedHashMap<>();
-		holdFunction.getProductIdsOfHold(holdId).stream().distinct().sorted()
+		holdFunction.findProductIdsOfHolds(holdIds).stream().distinct().sorted()
 				.forEach(id -> locked.put(id, productFunction.getByIdForUpdate(id)));
 
-		Hold hold = holdFunction.getByIdForUpdate(holdId);
-		Instant now = Instant.now(clock);
-		boolean late = requireCompletable(hold, now);
+		List<Hold> group = holdIds.stream()
+				.map(holdFunction::getByIdForUpdate)
+				.toList();
+		Hold requested = group.stream()
+				.filter(hold -> hold.getId().equals(holdId))
+				.findFirst()
+				.orElseThrow(() -> new BusinessException(HoldErrorCode.HOLD_ALREADY_RESOLVED));
 
-		for (HoldItem item : hold.getItems()) {
-			Product product = locked.get(item.getProduct().getId());
-			if (late) {
-				requireStockLeft(product, item.getQty());
-				product.takeFromAvailable(item.getQty());
+		Instant now = Instant.now(clock);
+		requireCompletable(requested, now);
+
+		boolean chargedAsNoShow = false;
+		for (Hold hold : group) {
+			Product product = locked.get(hold.getProduct().getId());
+			if (hold.getStatus() == HoldStatus.EXPIRED) {
+				requireStockLeft(product, hold.getQty());
+				product.takeFromStock(hold.getQty());
 			} else {
-				product.completeHold(item.getQty());
+				product.completeHold(hold.getQty());
 			}
+			chargedAsNoShow |= hold.wasChargedAsNoShow();
+			hold.complete(now);
 		}
-		hold.complete(now);
-		if (hold.wasChargedAsNoShow()) {
-			int given = holdCancelCreditFunction
-					.getOrStart(hold.getUser(), holdProperties.cancelCreditMax(), now)
-					.giveBack(holdProperties.cancelCreditMax());
-			if (given > 0) {
-				holdCancelCreditFunction.record(
-						hold.getUser(), hold, HoldCancelCreditReason.GIVE_BACK, given, now);
-			}
+		if (chargedAsNoShow) {
+			giveBackNoShowCredit(requested, now);
 		}
 		notificationFunction.notify(
-				hold.getUser(),
+				requested.getUser(),
 				NotificationType.PICKUP_COMPLETED,
 				"수령이 완료됐어요",
-				hold.getStore().getName() + " 수령이 완료됐어요.",
+				requested.getStore().getName() + " 수령이 완료됐어요.",
 				null);
-		return OwnerHoldDetailResponse.from(hold, now);
+		return OwnerHoldDetailResponse.of(group, now);
 	}
 
-	private boolean requireCompletable(Hold hold, Instant now) {
+	private void giveBackNoShowCredit(Hold hold, Instant now) {
+		int given = holdCancelCreditFunction
+				.getOrStart(hold.getUser(), holdProperties.cancelCreditMax(), now)
+				.giveBack(holdProperties.cancelCreditMax());
+		if (given > 0) {
+			holdCancelCreditFunction.record(
+					hold.getUser(), hold, HoldCancelCreditReason.GIVE_BACK, given, now);
+		}
+	}
+
+	private void requireCompletable(Hold hold, Instant now) {
 		if (hold.getStatus() == HoldStatus.HOLDING) {
-			return false;
+			return;
 		}
 		if (hold.getStatus() == HoldStatus.EXPIRED
 				&& now.isBefore(hold.getExpiresAt().plus(holdProperties.noShowGrace()))) {
-			return true;
+			return;
 		}
 		throw new BusinessException(HoldErrorCode.HOLD_ALREADY_RESOLVED);
 	}

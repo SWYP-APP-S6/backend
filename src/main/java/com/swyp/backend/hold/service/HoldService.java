@@ -10,7 +10,6 @@ import com.swyp.backend.hold.dto.HoldHistoryResponse;
 import com.swyp.backend.hold.dto.HoldRef;
 import com.swyp.backend.hold.dto.HoldSummaryResponse;
 import com.swyp.backend.hold.entity.Hold;
-import com.swyp.backend.hold.entity.HoldItem;
 import com.swyp.backend.hold.entity.HoldStatus;
 import com.swyp.backend.hold.exception.HoldErrorCode;
 import com.swyp.backend.hold.entity.HoldCancelCredit;
@@ -29,6 +28,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,9 +47,9 @@ public class HoldService {
 
 	private final HoldFunction holdFunction;
 	private final HoldCancelCreditFunction holdCancelCreditFunction;
+	private final NotificationFunction notificationFunction;
 	private final ProductFunction productFunction;
 	private final UserFunction userFunction;
-	private final NotificationFunction notificationFunction;
 	private final HoldProperties holdProperties;
 	private final Clock clock;
 
@@ -66,41 +66,64 @@ public class HoldService {
 							holdProperties.cancelCreditRefill(), holdProperties.cancelCreditMax()));
 		}
 		Optional<HoldRef> current = holdFunction.findHoldingRefOf(userId);
-		Map<Long, Product> locked = lockProducts(productIdsToLock(current, request.productId(), now));
+		Map<Long, Product> locked = lockProducts(productIdsToLock(current, request.productId()));
 		Product product = locked.get(request.productId());
 
-		Hold hold = resolveHold(user, current, product, now, locked);
-		boolean opensAPickup = hold.getItems().isEmpty();
-		requireWithinQtyLimit(hold, product, request.qty());
+		GroupSlot slot = resolveGroup(current, product, now, locked);
+		boolean opensAPickup = current.filter(ref -> ref.expiresAt().isAfter(now)).isEmpty();
+		Optional<Hold> existing = holdFunction.findHoldingIdOf(userId, product.getId())
+				.map(holdFunction::getByIdForUpdate);
+		requireWithinQtyLimit(existing.map(Hold::getQty).orElse(0) + request.qty());
 		requireSellable(product, request.qty(), now);
 		product.hold(request.qty());
-		hold.addItem(product, request.qty());
-		hold.restrictExpiryTo(pickupBound(product));
+		existing.ifPresentOrElse(
+				hold -> hold.addQty(request.qty()),
+				() -> holdFunction.save(new Hold(user, product.getStore(), product, request.qty(),
+						slot.groupId(), slot.expiresAt())));
+		askOwnerToReconfirmStock(product, now);
+		holdFunction.flush();
 		if (opensAPickup) {
 			notificationFunction.notify(
-					hold.getStore().getOwner(),
+					product.getStore().getOwner(),
 					NotificationType.NEW_HOLD_RECEIVED,
 					"새 찜이 들어왔어요",
 					user.getNickname() + "님이 " + product.getName() + " 상품을 찜했어요.",
 					null);
 		}
-		return HoldDetailResponse.from(hold, now, clock.getZone());
+		return HoldDetailResponse.of(
+				holdFunction.findHoldingOfGroup(slot.groupId()), now, clock.getZone());
 	}
+
+	private record GroupSlot(Long groupId, Instant expiresAt) {}
+
+	private void askOwnerToReconfirmStock(Product product, Instant now) {
+		if (!product.needsStockReconfirm()) {
+			return;
+		}
+		product.markReconfirmSent(now);
+		notificationFunction.notify(
+				product.getStore().getOwner(),
+				NotificationType.STOCK_RECONFIRM_REQUEST,
+				"재고가 맞는지 확인해주세요",
+				product.getName() + " 찜이 등록 수량의 60%에 닿았어요. 지금 남은 수량을 확인해주세요.",
+				null);
+	}
+
 
 	@Transactional
 	public HoldDetailResponse cancel(Long userId, Long holdId) {
-		List<Long> productIds = holdFunction.getProductIdsOfUserHold(userId, holdId);
+		Long productId = holdFunction.getProductIdOfUserHold(userId, holdId);
 		User user = userFunction.getByIdForUpdate(userId);
-		Map<Long, Product> locked = lockProducts(productIds);
+		Map<Long, Product> locked = lockProducts(List.of(productId));
 		Hold hold = holdFunction.getByIdForUpdate(holdId);
 		Instant now = Instant.now(clock);
 
 		requireCancelable(hold, now);
 
-		releaseAll(hold, locked);
+		locked.get(productId).releaseHold(hold.getQty());
 		hold.cancelByUser(now);
 		chargeUnlessMisTap(hold, user, now);
-		return HoldDetailResponse.from(hold, now, clock.getZone());
+		return HoldDetailResponse.of(List.of(hold), now, clock.getZone());
 	}
 
 	private void chargeUnlessMisTap(Hold hold, User user, Instant now) {
@@ -116,8 +139,11 @@ public class HoldService {
 
 	public HoldDetailResponse getHold(Long userId, Long holdId) {
 		Instant now = Instant.now(clock);
-		return HoldDetailResponse.from(
-				holdFunction.getDetailOfUserHold(userId, holdId), now, clock.getZone());
+		Hold hold = holdFunction.getDetailOfUserHold(userId, holdId);
+		List<Hold> group = hold.getStatus() == HoldStatus.HOLDING
+				? holdFunction.findHoldingOfGroup(hold.getGroupId())
+				: List.of(hold);
+		return HoldDetailResponse.of(group, now, clock.getZone());
 	}
 
 	public HoldHistoryResponse getHolds(Long userId, Pageable pageable) {
@@ -136,10 +162,9 @@ public class HoldService {
 	public ActiveHoldResponse getActiveHold(Long userId) {
 		Instant now = Instant.now(clock);
 		HoldCancelCredit credit = creditsAsOf(userId, now);
+		List<Hold> active = holdFunction.findActiveGroupOf(userId, now);
 		return new ActiveHoldResponse(
-				holdFunction.findActiveOf(userId, now)
-						.map(hold -> HoldDetailResponse.from(hold, now, clock.getZone()))
-						.orElse(null),
+				active.isEmpty() ? null : HoldDetailResponse.of(active, now, clock.getZone()),
 				credit.getCredits(),
 				credit.nextRefillAt(
 						holdProperties.cancelCreditRefill(), holdProperties.cancelCreditMax()));
@@ -150,43 +175,78 @@ public class HoldService {
 				.orElseGet(() -> new HoldCancelCredit(
 						null, holdProperties.cancelCreditMax(), now));
 		credit.refill(now, holdProperties.cancelCreditRefill(), holdProperties.cancelCreditMax());
-		credit.spend(holdFunction
+		credit.spend((int) holdFunction
 				.findUnchargedNoShows(userId, now.minus(holdProperties.noShowGrace()))
-				.size());
+				.stream()
+				.map(Hold::getGroupId)
+				.distinct()
+				.count());
 		return credit;
 	}
 
-	private Hold resolveHold(User user, Optional<HoldRef> current, Product product, Instant now,
+	private GroupSlot resolveGroup(Optional<HoldRef> current, Product product, Instant now,
 			Map<Long, Product> locked) {
 		if (current.isEmpty()) {
-			return newHold(user, product, now);
+			return newGroup(product, now);
 		}
-		Hold existing = holdFunction.getByIdForUpdate(current.get().holdId());
-		if (existing.getStatus() != HoldStatus.HOLDING) {
-			return newHold(user, product, now);
+		HoldRef ref = current.get();
+		if (!ref.expiresAt().isAfter(now)) {
+			expireGroup(ref.groupId(), locked);
+			return newGroup(product, now);
 		}
-		if (existing.isOverdueAt(now)) {
-			releaseAll(existing, locked);
-			existing.expire();
-			holdFunction.flush();
-			return newHold(user, product, now);
-		}
-		if (!existing.getStore().getId().equals(product.getStore().getId())) {
+		if (!ref.storeId().equals(product.getStore().getId())) {
 			throw new BusinessException(HoldErrorCode.OTHER_STORE_HOLD_ACTIVE);
 		}
-		return existing;
+		Instant pickupBound = pickupBound(product);
+		if (pickupBound.isBefore(ref.expiresAt())) {
+			lockHoldingOf(ref.groupId()).forEach(sibling -> sibling.restrictExpiryTo(pickupBound));
+			return new GroupSlot(ref.groupId(), pickupBound);
+		}
+		return new GroupSlot(ref.groupId(), ref.expiresAt());
 	}
 
-	private Hold newHold(User user, Product product, Instant now) {
-		return holdFunction.save(new Hold(user, product.getStore(), expiresAt(product, now)));
+	private GroupSlot newGroup(Product product, Instant now) {
+		return new GroupSlot(holdFunction.nextGroupId(), expiresAt(product, now));
 	}
 
-	private List<Long> productIdsToLock(
-			Optional<HoldRef> current, Long productId, Instant now) {
+	private List<Hold> lockHoldingOf(Long groupId) {
+		return holdFunction.findHoldingIdsOfGroup(groupId).stream()
+				.map(holdFunction::getByIdForUpdate)
+				.toList();
+	}
+
+	private void expireGroup(Long groupId, Map<Long, Product> locked) {
+		List<Hold> expiring = lockHoldingOf(groupId);
+		if (expiring.isEmpty()) {
+			return;
+		}
+		for (Hold hold : expiring) {
+			locked.get(hold.getProduct().getId()).releaseHold(hold.getQty());
+			hold.expire();
+		}
+		holdFunction.flush();
+		tellTheVisitExpired(expiring.getFirst());
+	}
+
+	private void tellTheVisitExpired(Hold hold) {
+		notificationFunction.notify(
+				hold.getUser(),
+				NotificationType.HOLD_EXPIRED,
+				"찜 시간이 끝났어요",
+				hold.getStore().getName() + "에서 찜한 상품의 픽업 시간이 지났어요.",
+				null);
+		notificationFunction.notify(
+				hold.getStore().getOwner(),
+				NotificationType.HOLD_UNCONFIRMED,
+				"수령 확인이 안 된 찜이 있어요",
+				hold.getUser().getNickname() + "님의 찜 시간이 지났어요. 이미 수령했다면 수령 완료를 눌러주세요.",
+				null);
+	}
+
+	private List<Long> productIdsToLock(Optional<HoldRef> current, Long productId) {
 		List<Long> ids = new ArrayList<>();
 		ids.add(productId);
-		current.filter(ref -> !ref.expiresAt().isAfter(now))
-				.ifPresent(ref -> ids.addAll(holdFunction.getProductIdsOfHold(ref.holdId())));
+		current.ifPresent(ref -> ids.addAll(holdFunction.findProductIdsOfGroup(ref.groupId())));
 		return ids;
 	}
 
@@ -197,15 +257,8 @@ public class HoldService {
 		return locked;
 	}
 
-	private void releaseAll(Hold hold, Map<Long, Product> locked) {
-		for (HoldItem item : hold.getItems()) {
-			locked.get(item.getProduct().getId()).releaseHold(item.getQty());
-		}
-	}
-
-	private void requireWithinQtyLimit(Hold hold, Product product, int qty) {
-		int held = hold.itemOf(product.getId()).map(HoldItem::getQty).orElse(0);
-		if (held + qty > holdProperties.userQtyLimit()) {
+	private void requireWithinQtyLimit(int qty) {
+		if (qty > holdProperties.userQtyLimit()) {
 			throw new BusinessException(HoldErrorCode.HOLD_LIMIT_EXCEEDED);
 		}
 	}
@@ -224,9 +277,13 @@ public class HoldService {
 
 		List<Hold> noShows = holdFunction.findUnchargedNoShows(
 				user.getId(), now.minus(holdProperties.noShowGrace()));
+		Set<Long> charged = new HashSet<>();
 		for (Hold noShow : noShows) {
 			// 잔액이 없어 못 깎아도 표시는 남긴다. 안 그러면 다음 정산에서 또 걸린다.
 			noShow.markNoShowCharged(now);
+			if (!charged.add(noShow.getGroupId())) {
+				continue;
+			}
 			int spent = credit.spend(1);
 			if (spent > 0) {
 				holdCancelCreditFunction.record(

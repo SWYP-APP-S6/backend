@@ -31,6 +31,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Product extends BaseTimeEntity {
 
+	private static final int RECONFIRM_THRESHOLD_NUMERATOR = 3;
+	private static final int RECONFIRM_THRESHOLD_DENOMINATOR = 5;
+
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
@@ -51,6 +54,9 @@ public class Product extends BaseTimeEntity {
 
 	@Column(name = "available_qty", nullable = false)
 	private int availableQty;
+
+	@Column(name = "stock_qty", nullable = false)
+	private int stockQty;
 
 	@Column(name = "held_qty", nullable = false)
 	private int heldQty;
@@ -83,6 +89,9 @@ public class Product extends BaseTimeEntity {
 	@Column(name = "reconfirm_answered_at")
 	private Instant reconfirmAnsweredAt;
 
+	@Column(name = "stock_confirmed_at")
+	private Instant stockConfirmedAt;
+
 	@ElementCollection
 	@CollectionTable(
 			name = "product_ingredients",
@@ -105,6 +114,7 @@ public class Product extends BaseTimeEntity {
 		this.category = category;
 		this.initialQty = initialQty;
 		this.availableQty = initialQty;
+		this.stockQty = initialQty;
 		this.originalPrice = originalPrice;
 		this.salePrice = salePrice;
 		this.discountRate = discountRateOf(originalPrice, salePrice);
@@ -133,9 +143,8 @@ public class Product extends BaseTimeEntity {
 		if (qty > availableQty) {
 			throw new IllegalStateException("hold qty exceeds available qty");
 		}
-		this.availableQty -= qty;
 		this.heldQty += qty;
-		syncStatusWithAvailableQty();
+		syncAvailableWithStock();
 	}
 
 	public void releaseHold(int qty) {
@@ -145,20 +154,19 @@ public class Product extends BaseTimeEntity {
 		if (qty > heldQty) {
 			throw new IllegalStateException("release qty exceeds held qty");
 		}
-		this.availableQty += qty;
 		this.heldQty -= qty;
-		syncStatusWithAvailableQty();
+		syncAvailableWithStock();
 	}
 
-	public void takeFromAvailable(int qty) {
+	public void takeFromStock(int qty) {
 		if (qty <= 0) {
 			throw new IllegalArgumentException("take qty must be positive");
 		}
 		if (qty > availableQty) {
 			throw new IllegalStateException("take qty exceeds available qty");
 		}
-		this.availableQty -= qty;
-		syncStatusWithAvailableQty();
+		this.stockQty -= qty;
+		syncAvailableWithStock();
 	}
 
 	public void completeHold(int qty) {
@@ -169,9 +177,61 @@ public class Product extends BaseTimeEntity {
 			throw new IllegalStateException("complete qty exceeds held qty");
 		}
 		this.heldQty -= qty;
+		this.stockQty -= qty;
+		syncAvailableWithStock();
 	}
 
-	public void adjustAvailableQty(int availableQty) {
+	public int reconfirmThresholdQty() {
+		return (initialQty * RECONFIRM_THRESHOLD_NUMERATOR + RECONFIRM_THRESHOLD_DENOMINATOR - 1)
+				/ RECONFIRM_THRESHOLD_DENOMINATOR;
+	}
+
+	public boolean needsStockReconfirm() {
+		return reconfirmSentAt == null && heldQty >= reconfirmThresholdQty();
+	}
+
+	public boolean isStockReconfirmPending() {
+		return reconfirmSentAt != null && reconfirmAnsweredAt == null;
+	}
+
+	public boolean isStockLocked(LocalDateTime now) {
+		return stockConfirmedAt != null && now.isBefore(pickupEndAt);
+	}
+
+	public boolean isStockEditableAt(LocalDateTime now) {
+		return status != ProductStatus.CLOSED && !isStockLocked(now);
+	}
+
+	public int minAdjustableQty() {
+		return reconfirmSentAt == null ? reconfirmThresholdQty() : 0;
+	}
+
+	public void confirmStock(Instant confirmedAt) {
+		this.reconfirmAnsweredAt = confirmedAt;
+		this.stockConfirmedAt = confirmedAt;
+	}
+
+	public void denyStockConfirmation(Instant answeredAt) {
+		this.reconfirmAnsweredAt = answeredAt;
+	}
+
+	public void restock(int stockQty) {
+		if (stockQty < 0) {
+			throw new IllegalArgumentException("stock qty must not be negative");
+		}
+		this.stockQty = stockQty;
+		syncAvailableWithStock();
+	}
+
+	public int shortfallQty() {
+		return Math.max(0, heldQty - stockQty);
+	}
+
+	private void syncAvailableWithStock() {
+		adjustAvailableQty(Math.max(0, stockQty - heldQty));
+	}
+
+	private void adjustAvailableQty(int availableQty) {
 		if (availableQty < 0) {
 			throw new IllegalArgumentException("available qty must not be negative");
 		}

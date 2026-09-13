@@ -4,7 +4,6 @@ import com.swyp.backend.common.BaseTimeEntity;
 import com.swyp.backend.product.entity.Product;
 import com.swyp.backend.store.entity.Store;
 import com.swyp.backend.user.entity.User;
-import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -15,15 +14,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
-import org.hibernate.annotations.BatchSize;
-
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -46,10 +38,15 @@ public class Hold extends BaseTimeEntity {
 	@JoinColumn(name = "store_id", nullable = false)
 	private Store store;
 
-	@Getter(AccessLevel.NONE)
-	@BatchSize(size = 50)
-	@OneToMany(mappedBy = "hold", cascade = CascadeType.ALL, orphanRemoval = true)
-	private final List<HoldItem> items = new ArrayList<>();
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "product_id", nullable = false)
+	private Product product;
+
+	@Column(nullable = false)
+	private int qty;
+
+	@Column(name = "group_id", nullable = false)
+	private Long groupId;
 
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 20)
@@ -77,32 +74,25 @@ public class Hold extends BaseTimeEntity {
 	@Column(name = "expiry_reminded_at")
 	private Instant expiryRemindedAt;
 
-	public Hold(User user, Store store, Instant expiresAt) {
+	public Hold(User user, Store store, Product product, int qty, Long groupId, Instant expiresAt) {
+		if (qty < 1) {
+			throw new IllegalArgumentException("hold qty must be positive");
+		}
 		this.user = user;
 		this.store = store;
+		this.product = product;
+		this.qty = qty;
+		this.groupId = groupId;
 		this.status = HoldStatus.HOLDING;
 		this.expiresAt = expiresAt;
 	}
 
-	public List<HoldItem> getItems() {
-		return Collections.unmodifiableList(items);
-	}
-
-	public int totalQty() {
-		return items.stream().mapToInt(HoldItem::getQty).sum();
-	}
-
-	public Optional<HoldItem> itemOf(Long productId) {
-		return items.stream()
-				.filter(item -> item.getProduct().getId().equals(productId))
-				.findFirst();
-	}
-
-	public void addItem(Product product, int qty) {
+	public void addQty(int more) {
 		requireHolding();
-		itemOf(product.getId())
-				.ifPresentOrElse(
-						item -> item.addQty(qty), () -> items.add(new HoldItem(this, product, qty)));
+		if (more < 1) {
+			throw new IllegalArgumentException("added qty must be positive");
+		}
+		this.qty += more;
 	}
 
 	public void restrictExpiryTo(Instant limit) {

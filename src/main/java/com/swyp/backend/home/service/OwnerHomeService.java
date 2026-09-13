@@ -47,8 +47,10 @@ public class OwnerHomeService {
 				upcomingVisits.size(),
 				holdFunction.countCompletedTodayOfStore(storeId),
 				sumAvailableQty(productCards));
-		OwnerHomeIssues issues =
-				new OwnerHomeIssues(holdFunction.countExpiredTodayOfStore(storeId));
+		OwnerHomeIssues issues = new OwnerHomeIssues(
+				(int) holdFunction.countExpiredTodayOfStore(storeId),
+				(int) products.stream().filter(product -> product.shortfallQty() > 0).count(),
+				products.stream().mapToInt(Product::shortfallQty).sum());
 		long unreadNotificationCount = notificationFunction.countUnread(ownerId);
 		int reconfirmPendingCount = countReconfirmPending(productCards);
 		boolean hasRegisteredProduct = productFunction.hasAnyProduct(storeId);

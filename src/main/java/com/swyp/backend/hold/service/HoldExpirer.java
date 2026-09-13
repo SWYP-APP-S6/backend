@@ -1,7 +1,6 @@
 package com.swyp.backend.hold.service;
 
 import com.swyp.backend.hold.entity.Hold;
-import com.swyp.backend.hold.entity.HoldItem;
 import com.swyp.backend.hold.entity.HoldStatus;
 import com.swyp.backend.hold.function.HoldFunction;
 import com.swyp.backend.notification.entity.NotificationType;
@@ -34,8 +33,10 @@ public class HoldExpirer {
 			return false;
 		}
 		hold.expire();
-		for (HoldItem item : hold.getItems()) {
-			locked.get(item.getProduct().getId()).releaseHold(item.getQty());
+		locked.get(hold.getProduct().getId()).releaseHold(hold.getQty());
+		holdFunction.flush();
+		if (!holdFunction.findHoldingOfGroup(hold.getGroupId()).isEmpty()) {
+			return true;
 		}
 		notificationFunction.notify(
 				hold.getUser(),

@@ -2,15 +2,15 @@ package com.swyp.backend.product.service;
 
 import com.swyp.backend.common.exception.BusinessException;
 import com.swyp.backend.hold.entity.Hold;
-import com.swyp.backend.hold.entity.HoldItem;
+import com.swyp.backend.hold.entity.HoldStatus;
 import com.swyp.backend.hold.function.HoldFunction;
 import com.swyp.backend.notification.entity.NotificationType;
 import com.swyp.backend.notification.function.NotificationFunction;
-import com.swyp.backend.product.dto.HoldDisposition;
-import com.swyp.backend.product.dto.ProductAvailableQtyUpdateRequest;
 import com.swyp.backend.product.dto.ProductDetailResponse;
 import com.swyp.backend.product.dto.ProductPreviewResponse;
 import com.swyp.backend.product.dto.ProductRegisterRequest;
+import com.swyp.backend.product.dto.StockReconfirmRequest;
+import com.swyp.backend.product.dto.StockUpdateRequest;
 import com.swyp.backend.product.entity.Product;
 import com.swyp.backend.product.entity.ProductCategory;
 import com.swyp.backend.product.entity.ProductStatus;
@@ -35,7 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class ProductService {
 
-	private static final String OWNER_CANCEL_REASON = "점주가 판매를 종료해 찜이 취소됐어요.";
+	private static final String OWNER_SHORTAGE_REASON = "매장 재고가 모자라 찜이 취소됐어요.";
 	private static final int MAX_PICKUP_WINDOW_HOURS = 24;
 
 	private final ProductFunction productFunction;
@@ -49,7 +49,7 @@ public class ProductService {
 	public ProductDetailResponse registerProduct(Long ownerId, ProductRegisterRequest request) {
 		Product product = buildProduct(ownerId, request);
 		productFunction.save(product);
-		return ProductDetailResponse.from(product, 0L);
+		return ProductDetailResponse.from(product, 0L, LocalDateTime.now(clock));
 	}
 
 	public ProductPreviewResponse previewProduct(Long ownerId, ProductRegisterRequest request) {
@@ -92,63 +92,83 @@ public class ProductService {
 	public ProductDetailResponse getMyProduct(Long ownerId, Long productId) {
 		Store store = storeFunction.getByOwnerId(ownerId);
 		Product product = productFunction.getByIdAndStoreId(productId, store.getId());
-		return ProductDetailResponse.from(product, completedQtyOf(productId));
+		return ProductDetailResponse.from(
+				product, completedQtyOf(productId), LocalDateTime.now(clock));
 	}
 
 	@Transactional
-	public ProductDetailResponse updateAvailableQty(
-			Long ownerId, Long productId, ProductAvailableQtyUpdateRequest request) {
+	public ProductDetailResponse updateStock(
+			Long ownerId, Long productId, StockUpdateRequest request) {
 		Store store = storeFunction.getByOwnerId(ownerId);
-		Map<Long, Product> locked = lockProducts(productId, request.availableQty() == 0);
-		Product product = locked.get(productId);
+		Product product = productFunction.getByIdForUpdate(productId);
 		if (!product.getStore().getId().equals(store.getId())) {
 			throw new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND);
 		}
 		if (product.getStatus() == ProductStatus.CLOSED) {
 			throw new BusinessException(ProductErrorCode.PRODUCT_CLOSED);
 		}
-
-		if (request.availableQty() == 0) {
-			applyZeroQtyDisposition(product, request.disposition(), locked);
+		LocalDateTime now = LocalDateTime.now(clock);
+		if (product.isStockLocked(now)) {
+			throw new BusinessException(ProductErrorCode.STOCK_LOCKED);
 		}
-		product.adjustAvailableQty(request.availableQty());
-		return ProductDetailResponse.from(product, completedQtyOf(productId));
+		if (request.stockQty() < product.minAdjustableQty()) {
+			throw new BusinessException(ProductErrorCode.QTY_BELOW_MINIMUM);
+		}
+
+		if (request.cancelOverflow()) {
+			cancelOverflowHolds(product, request.stockQty());
+		}
+		product.restock(request.stockQty());
+		return ProductDetailResponse.from(product, completedQtyOf(productId), now);
 	}
 
-	private Map<Long, Product> lockProducts(Long productId, boolean withHoldSiblings) {
-		List<Long> ids = new ArrayList<>(List.of(productId));
-		if (withHoldSiblings) {
-			ids.addAll(holdFunction.findProductIdsSharingActiveHoldsWith(productId));
+	@Transactional
+	public ProductDetailResponse answerStockReconfirm(
+			Long ownerId, Long productId, StockReconfirmRequest request) {
+		Store store = storeFunction.getByOwnerId(ownerId);
+		Product product = productFunction.getByIdForUpdate(productId);
+		if (!product.getStore().getId().equals(store.getId())) {
+			throw new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND);
 		}
-		Map<Long, Product> locked = new LinkedHashMap<>();
-		ids.stream().distinct().sorted()
-				.forEach(id -> locked.put(id, productFunction.getByIdForUpdate(id)));
-		return locked;
-	}
+		if (product.getStatus() == ProductStatus.CLOSED) {
+			throw new BusinessException(ProductErrorCode.PRODUCT_CLOSED);
+		}
+		if (!product.isStockReconfirmPending()) {
+			throw new BusinessException(ProductErrorCode.RECONFIRM_NOT_REQUESTED);
+		}
 
-	private void applyZeroQtyDisposition(
-			Product product, HoldDisposition disposition, Map<Long, Product> locked) {
-		List<Hold> activeHolds = holdFunction.findActiveHoldsOfProduct(product.getId());
-		if (activeHolds.isEmpty()) {
-			return;
-		}
-		if (disposition == null) {
-			throw new BusinessException(ProductErrorCode.DISPOSITION_REQUIRED);
-		}
-		if (disposition == HoldDisposition.CANCEL_ALL) {
-			Instant now = Instant.now(clock);
-			for (Hold hold : activeHolds) {
-				hold.cancelByOwner(now, OWNER_CANCEL_REASON);
-				for (HoldItem item : hold.getItems()) {
-					locked.get(item.getProduct().getId()).releaseHold(item.getQty());
-				}
-				notificationFunction.notify(
-						hold.getUser(),
-						NotificationType.HOLD_CANCELED_BY_OWNER,
-						"찜이 취소됐어요",
-						product.getName() + " 판매가 종료되어 찜이 취소됐어요.",
-						null);
+		Instant now = Instant.now(clock);
+		if (request.confirmed()) {
+			if (product.shortfallQty() > 0) {
+				throw new BusinessException(ProductErrorCode.STOCK_SHORT_OF_HOLDS);
 			}
+			product.confirmStock(now);
+		} else {
+			product.denyStockConfirmation(now);
+		}
+		return ProductDetailResponse.from(
+				product, completedQtyOf(productId), LocalDateTime.now(clock));
+	}
+
+	private void cancelOverflowHolds(Product product, int stockQty) {
+		int remaining = stockQty;
+		for (Long holdId : holdFunction.findActiveHoldIdsOfProduct(product.getId())) {
+			Hold hold = holdFunction.getByIdForUpdate(holdId);
+			if (hold.getStatus() != HoldStatus.HOLDING) {
+				continue;
+			}
+			if (hold.getQty() <= remaining) {
+				remaining -= hold.getQty();
+				continue;
+			}
+			hold.cancelByOwner(Instant.now(clock), OWNER_SHORTAGE_REASON);
+			product.releaseHold(hold.getQty());
+			notificationFunction.notify(
+					hold.getUser(),
+					NotificationType.HOLD_CANCELED_BY_OWNER,
+					"찜이 취소됐어요",
+					product.getName() + " 재고가 모자라 찜이 취소됐어요. 결제된 금액은 없어요.",
+					null);
 		}
 	}
 
