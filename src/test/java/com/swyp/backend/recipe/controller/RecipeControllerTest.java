@@ -8,9 +8,11 @@ import com.swyp.backend.RedisTestcontainersConfiguration;
 import com.swyp.backend.TestcontainersConfiguration;
 import com.swyp.backend.common.security.JwtTokenProvider;
 import com.swyp.backend.common.security.TokenRealm;
+import com.swyp.backend.recipe.entity.EstimateSource;
 import com.swyp.backend.recipe.entity.Ingredient;
 import com.swyp.backend.recipe.entity.NutritionBasis;
 import com.swyp.backend.recipe.entity.Recipe;
+import com.swyp.backend.recipe.entity.RecipeDifficulty;
 import com.swyp.backend.recipe.entity.RecipeIngredient;
 import com.swyp.backend.recipe.entity.RecipeNutrition;
 import com.swyp.backend.recipe.entity.RecipeStep;
@@ -126,6 +128,41 @@ class RecipeControllerTest {
 			.andExpect(jsonPath("$.data.content.length()").value(2))
 			.andExpect(jsonPath("$.data.content[0].id").value(high.getId()))
 			.andExpect(jsonPath("$.data.totalElements").value(2));
+	}
+
+	@Test
+	void getRecipe_exposesDifficultyAndCookTime() throws Exception {
+		Recipe recipe = recipe("반찬", true);
+		recipe.assignDifficulty(RecipeDifficulty.NORMAL, EstimateSource.AI);
+		recipe.assignCookTimeMinutes((short) 30, EstimateSource.AI);
+		recipeRepository.save(recipe);
+
+		mockMvc.perform(get("/recipes/{id}", recipe.getId()).header("Authorization", guestBearer()))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.difficulty").value("NORMAL"))
+			.andExpect(jsonPath("$.data.cookTimeMinutes").value(30));
+	}
+
+	@Test
+	void getRecipes_exposesDifficultyOnEachSummary() throws Exception {
+		Recipe recipe = recipe("볶음", true);
+		recipe.assignDifficulty(RecipeDifficulty.HARD, EstimateSource.AI);
+		recipe.assignCookTimeMinutes((short) 60, EstimateSource.AI);
+		recipeRepository.save(recipe);
+
+		mockMvc.perform(get("/recipes").param("category", "볶음").header("Authorization", guestBearer()))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.content[0].difficulty").value("HARD"))
+			.andExpect(jsonPath("$.data.content[0].cookTimeMinutes").value(60));
+	}
+
+	@Test
+	void getRecipe_withoutEstimates_returnsNullDifficulty() throws Exception {
+		Recipe recipe = recipeRepository.save(recipe("반찬", true));
+
+		mockMvc.perform(get("/recipes/{id}", recipe.getId()).header("Authorization", guestBearer()))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.difficulty").isEmpty());
 	}
 
 	private static Recipe recipe(String category, boolean published) {
