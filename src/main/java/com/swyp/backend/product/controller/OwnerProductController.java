@@ -13,6 +13,7 @@ import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -40,7 +41,7 @@ public class OwnerProductController {
 		return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.of(SuccessCode.CREATED, response));
 	}
 
-	@PostMapping("/photos")
+	@PostMapping(path = "/photos", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
 	public ApiResponse<ProductPhotoResponse> uploadProductPhoto(
 			@AuthenticationPrincipal Long ownerId, @RequestPart("file") MultipartFile file) {
 		return ApiResponse.of(SuccessCode.OK, productService.uploadPhoto(ownerId, file));
