@@ -9,8 +9,6 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public final class HoldFixture {
 
-	// 애플리케이션은 holds_group_id_seq 에서 묶음 키를 받는다. 픽스처가 만든 찜이 그 값과
-	// 겹치면 서로 다른 방문이 한 묶음으로 읽히므로, 시퀀스가 닿지 않는 높은 값에서 센다.
 	private static final AtomicLong GROUP_IDS = new AtomicLong(900_000_000L);
 
 	private HoldFixture() {}

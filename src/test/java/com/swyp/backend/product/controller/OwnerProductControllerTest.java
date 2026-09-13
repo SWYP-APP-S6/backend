@@ -329,6 +329,27 @@ class OwnerProductControllerTest {
 			.andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
 	}
 
+	@Test
+	void stockReconfirm_whileTheHoldsOutrunTheShelf_isRejected() throws Exception {
+		Product product = askedToReconfirm("당근", 10);
+		product.hold(6);
+		product.restock(4);
+		productRepository.saveAndFlush(product);
+
+		mockMvc.perform(post("/owner/products/" + product.getId() + "/stock-reconfirm")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"confirmed":true}"""))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("STOCK_SHORT_OF_HOLDS"));
+
+		mockMvc.perform(get("/owner/products/" + product.getId())
+				.header("Authorization", "Bearer " + token))
+			.andExpect(jsonPath("$.data.stockEditable").value(true))
+			.andExpect(jsonPath("$.data.shortfallQty").value(2));
+	}
+
 	private Product askedToReconfirm(String name, int initialQty) {
 		Product product = createProduct(name, initialQty);
 		product.markReconfirmSent(Instant.now());
