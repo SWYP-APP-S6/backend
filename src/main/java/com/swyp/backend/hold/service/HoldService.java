@@ -28,6 +28,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -178,9 +179,12 @@ public class HoldService {
 				.orElseGet(() -> new HoldCancelCredit(
 						null, holdProperties.cancelCreditMax(), now));
 		credit.refill(now, holdProperties.cancelCreditRefill(), holdProperties.cancelCreditMax());
-		credit.spend(holdFunction
+		credit.spend((int) holdFunction
 				.findUnchargedNoShows(userId, now.minus(holdProperties.noShowGrace()))
-				.size());
+				.stream()
+				.map(Hold::getGroupId)
+				.distinct()
+				.count());
 		return credit;
 	}
 
@@ -259,9 +263,13 @@ public class HoldService {
 
 		List<Hold> noShows = holdFunction.findUnchargedNoShows(
 				user.getId(), now.minus(holdProperties.noShowGrace()));
+		Set<Long> charged = new HashSet<>();
 		for (Hold noShow : noShows) {
 			// 잔액이 없어 못 깎아도 표시는 남긴다. 안 그러면 다음 정산에서 또 걸린다.
 			noShow.markNoShowCharged(now);
+			if (!charged.add(noShow.getGroupId())) {
+				continue;
+			}
 			int spent = credit.spend(1);
 			if (spent > 0) {
 				holdCancelCreditFunction.record(
