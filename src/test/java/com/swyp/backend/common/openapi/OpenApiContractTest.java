@@ -27,6 +27,8 @@ class OpenApiContractTest {
 	private static final List<String> WRAPPERS_OF_ONE_OPTIONAL_VALUE =
 			List.of("ActiveHoldResponse", "MyLocationResponse");
 
+	private static final String MULTIPART_FORM_DATA = "multipart/form-data";
+
 	private static final List<String> ERROR_STATUSES = List.of("400", "401", "403", "429", "500");
 
 	@Autowired
@@ -128,6 +130,42 @@ class OpenApiContractTest {
 				.as("a property outside required generates as nullable, so the app either sprinkles "
 						+ "!! or null-checks a field the server always sends")
 				.isEmpty();
+	}
+
+	@Test
+	void aFileUploadIsDeclaredAsMultipart() throws Exception {
+		List<String> misdeclared = new ArrayList<>();
+		for (Endpoint endpoint : endpoints()) {
+			JsonNode content = endpoint.operation().at("/requestBody/content");
+			if (!content.isObject()) {
+				continue;
+			}
+			content.propertyNames().forEach(mediaType -> {
+				if (!MULTIPART_FORM_DATA.equals(mediaType) && carriesBinary(content.get(mediaType))) {
+					misdeclared.add(endpoint.method() + " " + endpoint.path() + " -> " + mediaType);
+				}
+			});
+		}
+
+		assertThat(misdeclared)
+				.as("springdoc falls back to application/json unless the mapping declares consumes, "
+						+ "and the generator then builds a @Body call the endpoint answers with 415")
+				.isEmpty();
+	}
+
+	private static boolean carriesBinary(JsonNode media) {
+		JsonNode properties = media.at("/schema/properties");
+		if (!properties.isObject()) {
+			return false;
+		}
+		List<String> binary = new ArrayList<>();
+		properties.propertyNames().forEach(property -> {
+			JsonNode format = properties.get(property).get("format");
+			if (format != null && "binary".equals(format.asString())) {
+				binary.add(property);
+			}
+		});
+		return !binary.isEmpty();
 	}
 
 	@Test
