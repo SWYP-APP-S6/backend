@@ -75,6 +75,9 @@ public class SecurityConfig {
 		"/stores/*/products",
 	};
 
+	// 인증 없이 소비자 토큰을 찍어 주면 URL 을 아는 누구나 로그인 없이 남의 자리에 앉는다.
+	// 백오피스에 로그인한 관리자만 부를 수 있게 해서, 남는 위험을 "관리자가 고정된 테스트 계정을
+	// 흉내낼 수 있다"로 줄인다. CORS 로는 못 막는다 -- 브라우저 밖에서는 지켜지지 않는다.
 	private static final String[] DEV_ENDPOINTS = {
 		"/dev/**",
 	};
@@ -123,7 +126,7 @@ public class SecurityConfig {
 					auth.requestMatchers(API_DOCS_ENDPOINTS).permitAll();
 				}
 				if (devTestTokenEnabled) {
-					auth.requestMatchers(DEV_ENDPOINTS).permitAll();
+					auth.requestMatchers(DEV_ENDPOINTS).hasAuthority(TokenRealm.ADMIN.authority());
 				}
 				auth.requestMatchers(HttpMethod.GET, BROWSE_ENDPOINTS).access(AuthorizationManagers.anyOf(
 					AuthorityAuthorizationManager.hasAuthority(TokenRealm.GUEST.authority()),
