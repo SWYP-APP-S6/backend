@@ -46,9 +46,9 @@ public class HoldService {
 
 	private final HoldFunction holdFunction;
 	private final HoldCancelCreditFunction holdCancelCreditFunction;
+	private final NotificationFunction notificationFunction;
 	private final ProductFunction productFunction;
 	private final UserFunction userFunction;
-	private final NotificationFunction notificationFunction;
 	private final HoldProperties holdProperties;
 	private final Clock clock;
 
@@ -81,6 +81,7 @@ public class HoldService {
 				hold -> hold.addQty(request.qty()),
 				() -> holdFunction.save(new Hold(user, product.getStore(), product, request.qty(),
 						slot.groupId(), slot.expiresAt())));
+		askOwnerToReconfirmStock(product, now);
 		holdFunction.flush();
 		if (opensAPickup) {
 			notificationFunction.notify(
@@ -95,6 +96,22 @@ public class HoldService {
 	}
 
 	private record GroupSlot(Long groupId, Instant expiresAt) {}
+
+	// 찜이 최초 등록의 60% 에 닿으면 한 번만 묻는다. 남은 수량이 적어질수록 장부와 매장이
+	// 어긋났을 때의 대가가 커지기 때문이다.
+	private void askOwnerToReconfirmStock(Product product, Instant now) {
+		if (!product.needsStockReconfirm()) {
+			return;
+		}
+		product.markReconfirmSent(now);
+		notificationFunction.notify(
+				product.getStore().getOwner(),
+				NotificationType.STOCK_RECONFIRM_REQUEST,
+				"재고가 맞는지 확인해주세요",
+				product.getName() + " 찜이 등록 수량의 60%에 닿았어요. 지금 남은 수량을 확인해주세요.",
+				null);
+	}
+
 
 	@Transactional
 	public HoldDetailResponse cancel(Long userId, Long holdId) {
