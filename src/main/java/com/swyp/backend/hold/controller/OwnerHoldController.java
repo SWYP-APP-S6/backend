@@ -1,11 +1,10 @@
 package com.swyp.backend.hold.controller;
 
 import com.swyp.backend.common.response.ApiResponse;
-import com.swyp.backend.common.response.PageResponse;
 import com.swyp.backend.common.response.SuccessCode;
 import com.swyp.backend.hold.dto.OwnerHoldDetailResponse;
+import com.swyp.backend.hold.dto.OwnerHoldListResponse;
 import com.swyp.backend.hold.dto.OwnerHoldStatus;
-import com.swyp.backend.hold.dto.OwnerHoldSummaryResponse;
 import com.swyp.backend.hold.service.OwnerHoldService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -28,7 +27,7 @@ public class OwnerHoldController {
 	private final OwnerHoldService ownerHoldService;
 
 	@GetMapping
-	public ApiResponse<PageResponse<OwnerHoldSummaryResponse>> getOwnerHolds(
+	public ApiResponse<OwnerHoldListResponse> getOwnerHolds(
 			@AuthenticationPrincipal Long ownerId,
 			@RequestParam(required = false) OwnerHoldStatus status,
 			@PageableDefault(size = 20) Pageable pageable) {

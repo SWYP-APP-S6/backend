@@ -3,6 +3,7 @@ package com.swyp.backend.hold.function;
 import com.swyp.backend.common.exception.BusinessException;
 import com.swyp.backend.hold.dto.ActiveHoldQty;
 import com.swyp.backend.hold.dto.HoldRef;
+import com.swyp.backend.hold.dto.HoldStatusCount;
 import com.swyp.backend.hold.dto.OverdueHold;
 import com.swyp.backend.hold.dto.OwnerHoldStatus;
 import com.swyp.backend.hold.entity.Hold;
@@ -105,6 +106,14 @@ public class HoldFunction {
 
 	public List<Hold> findHoldingOfStore(Long storeId) {
 		return holdRepository.findStoreHoldsByStatus(storeId, HoldStatus.HOLDING);
+	}
+
+	public Map<OwnerHoldStatus, Long> countStoreHoldsByStatus(Long storeId) {
+		return holdRepository.countStoreHoldsByStatus(storeId).stream()
+				.collect(Collectors.toMap(
+						count -> OwnerHoldStatus.of(count.status(), count.canceledBy()),
+						HoldStatusCount::count,
+						Long::sum));
 	}
 
 	public Page<Hold> findStoreHolds(Long storeId, OwnerHoldStatus filter, Pageable pageable) {

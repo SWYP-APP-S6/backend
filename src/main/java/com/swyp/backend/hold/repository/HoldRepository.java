@@ -2,6 +2,7 @@ package com.swyp.backend.hold.repository;
 
 import com.swyp.backend.hold.dto.ActiveHoldQty;
 import com.swyp.backend.hold.dto.HoldRef;
+import com.swyp.backend.hold.dto.HoldStatusCount;
 import com.swyp.backend.hold.dto.OverdueHold;
 import com.swyp.backend.hold.entity.Hold;
 import com.swyp.backend.hold.entity.HoldCanceledBy;
@@ -161,6 +162,14 @@ public interface HoldRepository extends JpaRepository<Hold, Long> {
 			""")
 	List<Hold> findStoreHoldsByStatus(
 			@Param("storeId") Long storeId, @Param("status") HoldStatus status);
+
+	@Query("""
+			select new com.swyp.backend.hold.dto.HoldStatusCount(h.status, h.canceledBy, count(h))
+			from Hold h
+			where h.store.id = :storeId
+			group by h.status, h.canceledBy
+			""")
+	List<HoldStatusCount> countStoreHoldsByStatus(@Param("storeId") Long storeId);
 
 	@Query(value = """
 			select h from Hold h
