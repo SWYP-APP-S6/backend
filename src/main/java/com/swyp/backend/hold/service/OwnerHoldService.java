@@ -79,11 +79,12 @@ public class OwnerHoldService {
 			throw new BusinessException(HoldErrorCode.HOLD_NOT_FOUND);
 		}
 		// 손님이 한 번에 담은 것은 한 번에 넘겨준다. 점주가 상품마다 완료를 누르게 하지 않는다.
+		List<Long> holdIds = holdFunction.getPickupableHoldIdsOfGroup(holdId);
 		Map<Long, Product> locked = new LinkedHashMap<>();
-		holdFunction.getPickupableProductIdsOfGroup(holdId).stream().distinct().sorted()
+		holdFunction.findProductIdsOfHolds(holdIds).stream().distinct().sorted()
 				.forEach(id -> locked.put(id, productFunction.getByIdForUpdate(id)));
 
-		List<Hold> group = holdFunction.getPickupableHoldIdsOfGroup(holdId).stream()
+		List<Hold> group = holdIds.stream()
 				.map(holdFunction::getByIdForUpdate)
 				.toList();
 		Hold requested = group.stream()
@@ -92,18 +93,22 @@ public class OwnerHoldService {
 				.orElseThrow(() -> new BusinessException(HoldErrorCode.HOLD_ALREADY_RESOLVED));
 
 		Instant now = Instant.now(clock);
-		boolean late = requireCompletable(requested, now);
+		requireCompletable(requested, now);
 
+		boolean chargedAsNoShow = false;
 		for (Hold hold : group) {
 			Product product = locked.get(hold.getProduct().getId());
-			if (late) {
+			if (hold.getStatus() == HoldStatus.EXPIRED) {
 				requireStockLeft(product, hold.getQty());
 				product.takeFromAvailable(hold.getQty());
 			} else {
 				product.completeHold(hold.getQty());
 			}
+			chargedAsNoShow |= hold.wasChargedAsNoShow();
 			hold.complete(now);
-			giveBackNoShowCredit(hold, now);
+		}
+		if (chargedAsNoShow) {
+			giveBackNoShowCredit(requested, now);
 		}
 		notificationFunction.notify(
 				requested.getUser(),
@@ -115,9 +120,6 @@ public class OwnerHoldService {
 	}
 
 	private void giveBackNoShowCredit(Hold hold, Instant now) {
-		if (!hold.wasChargedAsNoShow()) {
-			return;
-		}
 		int given = holdCancelCreditFunction
 				.getOrStart(hold.getUser(), holdProperties.cancelCreditMax(), now)
 				.giveBack(holdProperties.cancelCreditMax());
@@ -127,13 +129,13 @@ public class OwnerHoldService {
 		}
 	}
 
-	private boolean requireCompletable(Hold hold, Instant now) {
+	private void requireCompletable(Hold hold, Instant now) {
 		if (hold.getStatus() == HoldStatus.HOLDING) {
-			return false;
+			return;
 		}
 		if (hold.getStatus() == HoldStatus.EXPIRED
 				&& now.isBefore(hold.getExpiresAt().plus(holdProperties.noShowGrace()))) {
-			return true;
+			return;
 		}
 		throw new BusinessException(HoldErrorCode.HOLD_ALREADY_RESOLVED);
 	}
