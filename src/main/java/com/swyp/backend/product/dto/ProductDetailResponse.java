@@ -37,12 +37,8 @@ public record ProductDetailResponse(
 		int stockQty,
 		Instant createdAt) {
 
-	public static ProductDetailResponse from(Product product, long completedQty) {
-		return from(product, completedQty, product.getHeldQty());
-	}
-
 	public static ProductDetailResponse from(
-			Product product, long completedQty, long activeHoldQty) {
+			Product product, long completedQty, LocalDateTime now) {
 		return new ProductDetailResponse(
 				product.getId(),
 				product.getName(),
@@ -63,8 +59,8 @@ public record ProductDetailResponse(
 				product.getReconfirmAnsweredAt(),
 				product.isStockReconfirmPending(),
 				product.minAdjustableQty(),
-				!product.isStockLocked(),
-				activeHoldQty,
+				product.isStockEditableAt(now),
+				product.getHeldQty(),
 				product.shortfallQty(),
 				product.getStockQty(),
 				product.getCreatedAt());

@@ -197,8 +197,12 @@ public class Product extends BaseTimeEntity {
 		return reconfirmSentAt != null && reconfirmAnsweredAt == null;
 	}
 
-	public boolean isStockLocked() {
-		return stockConfirmedAt != null;
+	public boolean isStockLocked(LocalDateTime now) {
+		return stockConfirmedAt != null && now.isBefore(pickupEndAt);
+	}
+
+	public boolean isStockEditableAt(LocalDateTime now) {
+		return status != ProductStatus.CLOSED && !isStockLocked(now);
 	}
 
 	// 재확인을 묻기 전까지는 최초 등록의 60% 밑으로 내리지 못한다. 팔리지도 않은 상품이

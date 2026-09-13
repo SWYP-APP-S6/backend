@@ -2,6 +2,7 @@ package com.swyp.backend.product.service;
 
 import com.swyp.backend.common.exception.BusinessException;
 import com.swyp.backend.hold.entity.Hold;
+import com.swyp.backend.hold.entity.HoldStatus;
 import com.swyp.backend.hold.function.HoldFunction;
 import com.swyp.backend.notification.entity.NotificationType;
 import com.swyp.backend.notification.function.NotificationFunction;
@@ -48,7 +49,7 @@ public class ProductService {
 	public ProductDetailResponse registerProduct(Long ownerId, ProductRegisterRequest request) {
 		Product product = buildProduct(ownerId, request);
 		productFunction.save(product);
-		return ProductDetailResponse.from(product, 0L);
+		return ProductDetailResponse.from(product, 0L, LocalDateTime.now(clock));
 	}
 
 	public ProductPreviewResponse previewProduct(Long ownerId, ProductRegisterRequest request) {
@@ -91,7 +92,8 @@ public class ProductService {
 	public ProductDetailResponse getMyProduct(Long ownerId, Long productId) {
 		Store store = storeFunction.getByOwnerId(ownerId);
 		Product product = productFunction.getByIdAndStoreId(productId, store.getId());
-		return ProductDetailResponse.from(product, completedQtyOf(productId));
+		return ProductDetailResponse.from(
+				product, completedQtyOf(productId), LocalDateTime.now(clock));
 	}
 
 	@Transactional
@@ -105,7 +107,8 @@ public class ProductService {
 		if (product.getStatus() == ProductStatus.CLOSED) {
 			throw new BusinessException(ProductErrorCode.PRODUCT_CLOSED);
 		}
-		if (product.isStockLocked()) {
+		LocalDateTime now = LocalDateTime.now(clock);
+		if (product.isStockLocked(now)) {
 			throw new BusinessException(ProductErrorCode.STOCK_LOCKED);
 		}
 		if (request.stockQty() < product.minAdjustableQty()) {
@@ -116,7 +119,7 @@ public class ProductService {
 			cancelOverflowHolds(product, request.stockQty());
 		}
 		product.restock(request.stockQty());
-		return ProductDetailResponse.from(product, completedQtyOf(productId));
+		return ProductDetailResponse.from(product, completedQtyOf(productId), now);
 	}
 
 	@Transactional
@@ -127,7 +130,10 @@ public class ProductService {
 		if (!product.getStore().getId().equals(store.getId())) {
 			throw new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND);
 		}
-		if (product.getReconfirmSentAt() == null) {
+		if (product.getStatus() == ProductStatus.CLOSED) {
+			throw new BusinessException(ProductErrorCode.PRODUCT_CLOSED);
+		}
+		if (!product.isStockReconfirmPending()) {
 			throw new BusinessException(ProductErrorCode.RECONFIRM_NOT_REQUESTED);
 		}
 
@@ -137,14 +143,19 @@ public class ProductService {
 		} else {
 			product.denyStockConfirmation(now);
 		}
-		return ProductDetailResponse.from(product, completedQtyOf(productId));
+		return ProductDetailResponse.from(
+				product, completedQtyOf(productId), LocalDateTime.now(clock));
 	}
 
 	// 먼저 찜한 손님부터 재고를 배정하고, 배정받지 못한 찜을 취소한다. 뒤에 찜한 사람이
 	// 앞사람의 몫을 빼앗지 않게 하는 것이 선착순의 뜻이다.
 	private void cancelOverflowHolds(Product product, int stockQty) {
 		int remaining = stockQty;
-		for (Hold hold : holdFunction.findActiveHoldsOfProduct(product.getId())) {
+		for (Long holdId : holdFunction.findActiveHoldIdsOfProduct(product.getId())) {
+			Hold hold = holdFunction.getByIdForUpdate(holdId);
+			if (hold.getStatus() != HoldStatus.HOLDING) {
+				continue;
+			}
 			if (hold.getQty() <= remaining) {
 				remaining -= hold.getQty();
 				continue;
