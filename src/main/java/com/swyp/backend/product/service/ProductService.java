@@ -9,6 +9,7 @@ import com.swyp.backend.notification.function.NotificationFunction;
 import com.swyp.backend.product.dto.HoldDisposition;
 import com.swyp.backend.product.dto.ProductAvailableQtyUpdateRequest;
 import com.swyp.backend.product.dto.ProductDetailResponse;
+import com.swyp.backend.product.dto.ProductPreviewResponse;
 import com.swyp.backend.product.dto.ProductRegisterRequest;
 import com.swyp.backend.product.entity.Product;
 import com.swyp.backend.product.entity.ProductCategory;
@@ -46,6 +47,16 @@ public class ProductService {
 
 	@Transactional
 	public ProductDetailResponse registerProduct(Long ownerId, ProductRegisterRequest request) {
+		Product product = buildProduct(ownerId, request);
+		productFunction.save(product);
+		return ProductDetailResponse.from(product, 0L);
+	}
+
+	public ProductPreviewResponse previewProduct(Long ownerId, ProductRegisterRequest request) {
+		return ProductPreviewResponse.from(buildProduct(ownerId, request));
+	}
+
+	private Product buildProduct(Long ownerId, ProductRegisterRequest request) {
 		Store store = storeFunction.getByOwnerId(ownerId);
 		if (request.salePrice() >= request.originalPrice()) {
 			throw new BusinessException(ProductErrorCode.INVALID_PRICE);
@@ -75,8 +86,7 @@ public class ProductService {
 		if (request.ingredientTags() != null) {
 			product.replaceIngredientIds(request.ingredientTags());
 		}
-		productFunction.save(product);
-		return ProductDetailResponse.from(product, 0L);
+		return product;
 	}
 
 	public ProductDetailResponse getMyProduct(Long ownerId, Long productId) {

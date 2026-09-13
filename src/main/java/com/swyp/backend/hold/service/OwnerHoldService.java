@@ -53,7 +53,7 @@ public class OwnerHoldService {
 				.map(OwnerHoldSummaryResponse::from)
 				.toList();
 		return new OwnerHoldListResponse(
-				OwnerHoldCounts.from(holdFunction.countStoreHoldsByStatus(store.getId())),
+				OwnerHoldCounts.from(holdFunction.countStoreHoldsByOwnerStatus(store.getId())),
 				PageResponse.of(content, holds));
 	}
 

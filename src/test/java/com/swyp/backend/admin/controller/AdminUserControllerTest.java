@@ -11,6 +11,8 @@ import com.swyp.backend.TestcontainersConfiguration;
 import com.swyp.backend.admin.entity.Admin;
 import com.swyp.backend.admin.entity.AdminType;
 import com.swyp.backend.admin.repository.AdminRepository;
+import com.swyp.backend.hold.repository.HoldRepository;
+import com.swyp.backend.product.repository.ProductRepository;
 import com.swyp.backend.store.repository.StoreRepository;
 import com.swyp.backend.user.entity.User;
 import com.swyp.backend.user.entity.UserRole;
@@ -47,6 +49,12 @@ class AdminUserControllerTest {
 	StoreRepository storeRepository;
 
 	@Autowired
+	ProductRepository productRepository;
+
+	@Autowired
+	HoldRepository holdRepository;
+
+	@Autowired
 	PasswordEncoder passwordEncoder;
 
 	@BeforeEach
@@ -56,6 +64,8 @@ class AdminUserControllerTest {
 				new Admin(EMAIL, "User List Admin", AdminType.SUPER, passwordEncoder.encode(PASSWORD)));
 		}
 		// 다른 테스트가 남긴 가게가 유저를 참조하고 있으면 users 부터 지울 수 없다.
+		holdRepository.deleteAll();
+		productRepository.deleteAll();
 		storeRepository.deleteAll();
 		userRepository.deleteAll();
 		userRepository.save(new User(UserRole.CONSUMER, "소비자하나", "01011112222", true, Instant.now()));

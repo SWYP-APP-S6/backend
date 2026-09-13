@@ -38,6 +38,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -160,17 +162,27 @@ class OwnerHoldControllerTest {
 		expired.expire();
 		Hold byOwner = holding(product, 1, Duration.ofMinutes(8));
 		byOwner.cancelByOwner(Instant.now(), "재고가 모자라요");
-		holdRepository.saveAllAndFlush(List.of(completed, expired, byOwner));
+		Hold byUser = holding(product, 1, Duration.ofMinutes(9));
+		byUser.cancelByUser(Instant.now());
+		holdRepository.saveAllAndFlush(List.of(completed, expired, byOwner, byUser));
 
-		mockMvc.perform(get("/owner/holds?status=HOLDING").header("Authorization", "Bearer " + token))
+		expectTheFiveBuckets(get("/owner/holds"))
+			.andExpect(jsonPath("$.data.holds.totalElements").value(5));
+		expectTheFiveBuckets(get("/owner/holds?status=HOLDING"))
+			.andExpect(jsonPath("$.data.holds.totalElements").value(1));
+		expectTheFiveBuckets(get("/owner/holds?status=CANCELED_BY_USER"))
+			.andExpect(jsonPath("$.data.holds.totalElements").value(1));
+	}
+
+	private ResultActions expectTheFiveBuckets(MockHttpServletRequestBuilder request) throws Exception {
+		return mockMvc.perform(request.header("Authorization", "Bearer " + token))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.holds.totalElements").value(1))
-			.andExpect(jsonPath("$.data.counts.all").value(4))
+			.andExpect(jsonPath("$.data.counts.all").value(5))
 			.andExpect(jsonPath("$.data.counts.holding").value(1))
 			.andExpect(jsonPath("$.data.counts.completed").value(1))
 			.andExpect(jsonPath("$.data.counts.expired").value(1))
 			.andExpect(jsonPath("$.data.counts.canceledByOwner").value(1))
-			.andExpect(jsonPath("$.data.counts.canceledByUser").value(0));
+			.andExpect(jsonPath("$.data.counts.canceledByUser").value(1));
 	}
 
 	@Test

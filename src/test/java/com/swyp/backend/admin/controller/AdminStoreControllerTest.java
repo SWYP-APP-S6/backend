@@ -13,6 +13,8 @@ import com.swyp.backend.TestcontainersConfiguration;
 import com.swyp.backend.admin.entity.Admin;
 import com.swyp.backend.admin.entity.AdminType;
 import com.swyp.backend.admin.repository.AdminRepository;
+import com.swyp.backend.hold.repository.HoldRepository;
+import com.swyp.backend.product.repository.ProductRepository;
 import com.swyp.backend.store.entity.Store;
 import com.swyp.backend.store.entity.StoreStatus;
 import com.swyp.backend.store.repository.StoreRepository;
@@ -53,6 +55,12 @@ class AdminStoreControllerTest {
 	StoreRepository storeRepository;
 
 	@Autowired
+	ProductRepository productRepository;
+
+	@Autowired
+	HoldRepository holdRepository;
+
+	@Autowired
 	PasswordEncoder passwordEncoder;
 
 	private Long pendingStoreId;
@@ -63,6 +71,8 @@ class AdminStoreControllerTest {
 			adminRepository.save(
 				new Admin(EMAIL, "Store Admin", AdminType.SUPER, passwordEncoder.encode(PASSWORD)));
 		}
+		holdRepository.deleteAll();
+		productRepository.deleteAll();
 		storeRepository.deleteAll();
 		userRepository.deleteAll();
 
