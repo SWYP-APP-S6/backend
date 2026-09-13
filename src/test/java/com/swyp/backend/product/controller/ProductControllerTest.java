@@ -118,8 +118,14 @@ class ProductControllerTest {
 
 	private Product product(
 			Store store, String name, ProductCategory category, LocalDateTime pickupEndAt) {
+		return product(store, name, category, pickupEndAt, 10_000, 4_000);
+	}
+
+	private Product product(Store store, String name, ProductCategory category,
+			LocalDateTime pickupEndAt, int originalPrice, int salePrice) {
 		return productRepository.saveAndFlush(new Product(
-				store, name, category, 3, 10_000, 4_000, pickupEndAt.minusHours(1), pickupEndAt,
+				store, name, category, 3, originalPrice, salePrice,
+				pickupEndAt.minusHours(1), pickupEndAt,
 				"https://cdn.example.com/" + name + ".jpg"));
 	}
 
@@ -136,6 +142,36 @@ class ProductControllerTest {
 		return mockMvc.perform(get("/products/nearby?lat=" + ORIGIN_LATITUDE
 						+ "&lng=" + ORIGIN_LONGITUDE + query)
 				.header("Authorization", bearer(TokenRealm.GUEST, "GUEST")));
+	}
+
+	@Test
+	void discountSortPutsTheDeepestCutFirstInsideTheStoreAndAcrossThem() throws Exception {
+		Store cheap = approvedStore("반값가게", "37.556200", "126.901000");
+		product(cheap, "떨이 사과", ProductCategory.FRUIT, now.plusHours(2), 10_000, 2_000);
+		Store mild = approvedStore("조금가게", "37.556400", "126.901000");
+		product(mild, "살짝 배", ProductCategory.FRUIT, now.plusHours(1), 10_000, 9_000);
+		product(mild, "많이 감", ProductCategory.FRUIT, now.plusHours(5), 10_000, 6_000);
+
+		browse("&sort=DISCOUNT_RATE")
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.stores.content[0].storeName").value("반값가게"))
+			.andExpect(jsonPath("$.data.stores.content[1].storeName").value("조금가게"))
+			.andExpect(jsonPath("$.data.stores.content[1].products[0].name").value("많이 감"));
+	}
+
+	@Test
+	void aProductCanBeFiledUnderTheCategoriesTheChipsOffer() throws Exception {
+		Store store = approvedStore("유제품가게", "37.556200", "126.901000");
+		product(store, "우유 1L", ProductCategory.DAIRY_EGG, now.plusHours(3));
+		product(store, "식빵 1봉", ProductCategory.BAKERY, now.plusHours(3));
+
+		browse("&category=DAIRY_EGG")
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.totalProductCount").value(1))
+			.andExpect(jsonPath("$.data.stores.content[0].products[0].name").value("우유 1L"));
+		browse("&category=BAKERY")
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.stores.content[0].products[0].name").value("식빵 1봉"));
 	}
 
 	@Test
