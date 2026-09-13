@@ -108,7 +108,7 @@ public class HoldFunction {
 		return holdRepository.findStoreHoldsByStatus(storeId, HoldStatus.HOLDING);
 	}
 
-	public Map<OwnerHoldStatus, Long> countStoreHoldsByStatus(Long storeId) {
+	public Map<OwnerHoldStatus, Long> countStoreHoldsByOwnerStatus(Long storeId) {
 		return holdRepository.countStoreHoldsByStatus(storeId).stream()
 				.collect(Collectors.toMap(
 						count -> OwnerHoldStatus.of(count.status(), count.canceledBy()),
