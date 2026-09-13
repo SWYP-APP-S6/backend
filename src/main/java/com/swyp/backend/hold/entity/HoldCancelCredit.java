@@ -44,7 +44,10 @@ public class HoldCancelCredit extends BaseTimeEntity {
 		this.refilledAt = refilledAt;
 	}
 
-	public void refill(Instant now, Duration interval, int max) {
+	// 세 메서드가 **실제로 움직인 양**을 돌려준다. 상한과 0 에서 잘리므로 부탁한 양과 다를 수
+	// 있고, 이력에는 잘린 뒤의 값이 적혀야 한다.
+	public int refill(Instant now, Duration interval, int max) {
+		int before = credits;
 		long earned = Duration.between(refilledAt, now).dividedBy(interval);
 		if (earned > 0) {
 			credits = (int) Math.min(max, credits + earned);
@@ -53,14 +56,19 @@ public class HoldCancelCredit extends BaseTimeEntity {
 		if (credits >= max) {
 			refilledAt = now;
 		}
+		return credits - before;
 	}
 
-	public void spend(int count) {
+	public int spend(int count) {
+		int before = credits;
 		credits = Math.max(0, credits - count);
+		return before - credits;
 	}
 
-	public void giveBack(int max) {
+	public int giveBack(int max) {
+		int before = credits;
 		credits = Math.min(max, credits + 1);
+		return credits - before;
 	}
 
 	public boolean isEmpty() {
