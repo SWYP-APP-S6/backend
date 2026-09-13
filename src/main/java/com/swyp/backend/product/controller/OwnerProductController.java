@@ -3,6 +3,7 @@ package com.swyp.backend.product.controller;
 import com.swyp.backend.common.response.ApiResponse;
 import com.swyp.backend.common.response.SuccessCode;
 import com.swyp.backend.product.dto.ProductDetailResponse;
+import com.swyp.backend.product.dto.ProductPhotoResponse;
 import com.swyp.backend.product.dto.ProductPreviewResponse;
 import com.swyp.backend.product.dto.ProductRegisterRequest;
 import com.swyp.backend.product.dto.StockReconfirmRequest;
@@ -20,7 +21,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @Tag(name = "OwnerProduct", description = "점주 상품")
 @RestController
@@ -35,6 +38,12 @@ public class OwnerProductController {
 			@AuthenticationPrincipal Long ownerId, @Valid @RequestBody ProductRegisterRequest request) {
 		ProductDetailResponse response = productService.registerProduct(ownerId, request);
 		return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.of(SuccessCode.CREATED, response));
+	}
+
+	@PostMapping("/photos")
+	public ApiResponse<ProductPhotoResponse> uploadProductPhoto(
+			@AuthenticationPrincipal Long ownerId, @RequestPart("file") MultipartFile file) {
+		return ApiResponse.of(SuccessCode.OK, productService.uploadPhoto(ownerId, file));
 	}
 
 	@PostMapping("/preview")

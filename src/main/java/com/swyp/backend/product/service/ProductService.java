@@ -1,12 +1,14 @@
 package com.swyp.backend.product.service;
 
 import com.swyp.backend.common.exception.BusinessException;
+import com.swyp.backend.common.storage.ImageStorage;
 import com.swyp.backend.hold.entity.Hold;
 import com.swyp.backend.hold.entity.HoldStatus;
 import com.swyp.backend.hold.function.HoldFunction;
 import com.swyp.backend.notification.entity.NotificationType;
 import com.swyp.backend.notification.function.NotificationFunction;
 import com.swyp.backend.product.dto.ProductDetailResponse;
+import com.swyp.backend.product.dto.ProductPhotoResponse;
 import com.swyp.backend.product.dto.ProductPreviewResponse;
 import com.swyp.backend.product.dto.ProductRegisterRequest;
 import com.swyp.backend.product.dto.StockReconfirmRequest;
@@ -29,6 +31,7 @@ import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
@@ -37,12 +40,14 @@ public class ProductService {
 
 	private static final String OWNER_SHORTAGE_REASON = "매장 재고가 모자라 찜이 취소됐어요.";
 	private static final int MAX_PICKUP_WINDOW_HOURS = 24;
+	private static final String PHOTO_CATEGORY = "products";
 
 	private final ProductFunction productFunction;
 	private final HoldFunction holdFunction;
 	private final StoreFunction storeFunction;
 	private final NotificationFunction notificationFunction;
 	private final RecipeFunction recipeFunction;
+	private final ImageStorage imageStorage;
 	private final Clock clock;
 
 	@Transactional
@@ -56,10 +61,18 @@ public class ProductService {
 		return ProductPreviewResponse.from(buildProduct(ownerId, request));
 	}
 
+	public ProductPhotoResponse uploadPhoto(Long ownerId, MultipartFile file) {
+		storeFunction.getByOwnerId(ownerId);
+		return new ProductPhotoResponse(imageStorage.store(file, PHOTO_CATEGORY));
+	}
+
 	private Product buildProduct(Long ownerId, ProductRegisterRequest request) {
 		Store store = storeFunction.getByOwnerId(ownerId);
 		if (request.salePrice() >= request.originalPrice()) {
 			throw new BusinessException(ProductErrorCode.INVALID_PRICE);
+		}
+		if (!imageStorage.holds(request.photoUrl())) {
+			throw new BusinessException(ProductErrorCode.INVALID_PHOTO_URL);
 		}
 
 		LocalDateTime now = LocalDateTime.now(clock);

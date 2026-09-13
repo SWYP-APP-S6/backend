@@ -3,6 +3,7 @@ package com.swyp.backend.common.exception;
 import com.swyp.backend.common.response.ApiCode;
 import com.swyp.backend.common.response.ErrorCode;
 import com.swyp.backend.common.response.ErrorResponse;
+import com.swyp.backend.common.storage.StorageErrorCode;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
@@ -13,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
@@ -42,6 +44,17 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 				.forEach(fe -> fieldErrors.putIfAbsent(fe.getField(), fe.getDefaultMessage()));
 		return createResponseEntity(
 				ErrorResponse.of(ErrorCode.VALIDATION_FAILED, fieldErrors), headers, status, request);
+	}
+
+	@Override
+	protected ResponseEntity<Object> handleMaxUploadSizeExceededException(
+			MaxUploadSizeExceededException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+		log.warn("Rejected an upload over the configured limit");
+		return createResponseEntity(
+				ErrorResponse.of(StorageErrorCode.IMAGE_TOO_LARGE),
+				headers,
+				StorageErrorCode.IMAGE_TOO_LARGE.getStatus(),
+				request);
 	}
 
 	@Override

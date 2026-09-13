@@ -71,6 +71,9 @@ src/main/resources/db/data/*.tsv
 ### 샘플 데이터(test_data_1.sql)는 가짜라 추적한다.
 src/main/resources/db/data/init_data_1.sql
 
+### 업로드된 상품 사진 — 로컬 개발에서 생기는 런타임 산출물이다(운영은 서버의 UPLOAD_DIR).
+uploads/
+
 ### Personal handoff note (local only)
 HANDOFF.md
 /docs
