@@ -28,13 +28,15 @@ SWYP 앱의 백엔드 REST API 서버. (관리자 백오피스 + 소비자·판�
 - 헬스: <http://localhost:8080/ping> → `{"data":{"message":"pong"}}`
 - **API 문서(Swagger UI)**: <http://localhost:8080/swagger-ui/index.html>
 
-로그인 흐름 확인. dev 관리자는 스키마에 없으므로(V0012가 제거) 로컬에서 한 번 넣어야 한다 —
-`psql "postgresql://swyp:swyp@localhost:5432/swyp" -f src/main/resources/db/data/dev_seed_admin.sql`:
+로그인 흐름 확인. 관리자는 스키마에 없으므로(V0012가 제거) 로컬에도 한 번 넣어야 한다 —
+`init_data_1.sql` 에 팀 계정 블록이 들어 있고, 명단만 있으면 언제든 다시 만든다
+(`./scripts/create_admins.sh < src/main/resources/db/data/team_admins.tsv | psql "$DB"`).
+초기 비밀번호는 전화번호에서 숫자만 남긴 값이다:
 
 ```bash
 curl -X POST localhost:8080/admin/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"email":"admin@swyp.com","password":"swyp-admin-1234"}'
+  -d '{"email":"you@example.com","password":"01012345678"}'
 # → { "data": { "accessToken": "...", "refreshToken": "..." } }
 ```
 

@@ -20,7 +20,6 @@ Flyway 경로(`db/migration`) **밖**이다. 자동 실행되지 않으며, 필�
 | `mfds_cookrcp01.sql` | ✗ | 식약처 조리식품 레시피 DB 1,156건 → `recipes` / `recipe_steps` / `recipe_ingredients` / `ingredients` / `recipe_nutrition` / `recipe_tags`. `init_data_1.sql` 이 이 파일을 읽는다 |
 | `mfds_cookrcp01_raw.sql` | ✗ | 원본 API 응답 → `recipe_raw`. 선택 사항이며, 재수집 없이 파서만 고쳐 다시 만들 때 쓴다. 본체를 먼저 넣어야 한다 |
 | `team_admins.tsv` | ✗ | 관리자 계정 명단(이메일·이름·타입·전화번호). 개인정보이고 이 저장소는 public 이라 `.gitignore` 한다 |
-| `dev_seed_admin.sql` | ✓ | 로컬 개발용 SUPER 관리자(`admin@swyp.com`). **운영 금지** — `init_data_1.sql` 에 일부러 넣지 않았다 |
 
 ## 투입 (권장 순서)
 
@@ -76,11 +75,13 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f src/main/resources/db/data/mfds_cookr
 V0001 이 심던 SUPER 관리자는 비밀번호가 공개 저장소에 적혀 있어 **V0012 가 제거**했다.
 스키마에 백도어를 두지 않기 위해서다.
 
-**로컬**: `psql "postgresql://swyp:swyp@localhost:5432/swyp" -f dev_seed_admin.sql`
-(`admin@swyp.com` / `swyp-admin-1234`)
+비밀번호가 저장소에 적힌 계정을 대신 두지도 않는다 — 한때 `dev_seed_admin.sql`
+(`admin@swyp.com`)이 그 자리에 있었지만, 파일만 Flyway 밖으로 옮겼을 뿐 비밀번호가 public
+저장소에 적혀 있는 것은 그대로여서 지웠다. 로컬도 운영과 같은 경로로 자기 계정을 넣는다.
 
-**운영 관리자**: 관리자 생성 자체가 관리자 권한을 요구하므로 최초 계정들은 직접 넣는다.
-`scripts/create_admins.sh` 가 명단(TSV)을 받아 INSERT 문을 만든다.
+**관리자 만들기**: 관리자 생성 자체가 관리자 권한을 요구하므로 최초 계정들은 직접 넣는다.
+`scripts/create_admins.sh` 가 명단(TSV)을 받아 INSERT 문을 만든다. 로컬은 `init_data_1.sql`
+안에 이미 이 블록이 들어 있어 따로 돌리지 않아도 된다.
 
 ```sh
 # 로컬
@@ -98,8 +99,6 @@ V0001 이 심던 SUPER 관리자는 비밀번호가 공개 저장소에 적혀 �
 로그인할 수 있으므로, 각자 첫 로그인 후 `PUT /admin/auth/password` 로 반드시 바꿔야 한다.
 재실행해도 기존 행은 건드리지 않는다(`--reset-passwords` 를 줄 때만 갱신) — 이미 바꾼 사람이
 조용히 전화번호로 되돌아가면 본인만 모르는 채 계정이 열린다.
-
-`dev_seed_admin.sql` 은 비밀번호가 저장소에 적혀 있으므로 **운영에 쓰지 않는다.**
 
 ```sql
 insert into admins (email, name, type, password, created_at, updated_at)

@@ -7,9 +7,10 @@
 -- 재실행 = 교체다. 이 파일이 만든 행만 지우고 다시 넣으므로, 동료들이 관리자 페이지에서
 -- 만든 데이터는 남는다. 표시는 users.oauth_provider = 'seed' 하나로 한다.
 --
--- **픽업 시각이 now() 기준 상대값**이라 언제 넣어도 판매중이다. 시간이 지나 목록이 비면
--- 이 파일을 다시 돌리면 된다 -- 마감이 지난 채로 굳는 시드가 "필터가 고장 났나" 하는
--- 오해를 만든다.
+-- **영업시간도 픽업 시각도 now() 기준 상대값**이라 언제 넣어도 "지금 영업 중, 지금 판매중"이다.
+-- 마감이 지난 채로 굳는 시드가 "필터가 고장 났나" 하는 오해를 만든다 -- 실제로 시드를 낮에
+-- 넣고 밤에 열어 보면 픽업 마감(pickup_end_at)이 전부 지나 탐색 목록이 통째로 비었고,
+-- 가게도 영업 종료로 보였다. 시간이 지나 목록이 비면 이 파일을 다시 돌리면 된다.
 --
 -- ============================================================
 -- 위치 -- 기준점에서 거리 구간이 갈리게 배치했다
@@ -42,17 +43,31 @@ select id from users where oauth_provider = 'seed';
 create temp table seed_stores on commit drop as
 select id from stores where owner_user_id in (select id from seed_users);
 
+create temp table seed_products on commit drop as
+select id from products where store_id in (select id from seed_stores);
+
 -- 샘플 가게에 찜한 실제 테스트 계정의 찜도 함께 지운다 -- 상품을 지우려면 먼저 사라져야 한다.
+-- 찜은 V0027 부터 상품 1건짜리 행이라 product_id 로도 걸린다(hold_items 는 그때 사라졌다).
 create temp table seed_holds on commit drop as
 select id from holds
 where store_id in (select id from seed_stores)
+   or product_id in (select id from seed_products)
    or user_id in (select id from seed_users);
 
-delete from hold_items where hold_id in (select id from seed_holds);
+delete from domain_events
+where hold_id in (select id from seed_holds)
+   or product_id in (select id from seed_products)
+   or store_id in (select id from seed_stores)
+   or user_id in (select id from seed_users);
+delete from hold_cancel_credit_events
+where hold_id in (select id from seed_holds)
+   or user_id in (select id from seed_users);
 delete from holds where id in (select id from seed_holds);
 delete from hold_cancel_credits where user_id in (select id from seed_users);
 delete from notifications where user_id in (select id from seed_users);
-delete from products where store_id in (select id from seed_stores);
+delete from user_device_tokens where user_id in (select id from seed_users);
+delete from recipe_feedback where user_id in (select id from seed_users);
+delete from products where id in (select id from seed_products);
 delete from stores where id in (select id from seed_stores);
 delete from user_locations where user_id in (select id from seed_users);
 delete from users where id in (select id from seed_users);
@@ -90,37 +105,45 @@ join users u on u.oauth_provider = 'seed' and u.oauth_provider_id = v.oauth_id;
 -- ------------------------------------------------------------
 -- 가게
 -- ------------------------------------------------------------
+-- 영업시간은 고정 시각이 아니라 **시드를 넣는 순간 기준**으로 만든다. opened_min 은 "몇 분 전에
+-- 열었나", closes_in_min 은 "몇 분 뒤에 닫나"다. 새벽이나 밤에 넣어도 창이 자정을 넘지 않도록
+-- 분 단위로 0..1439 에 가둔다 -- time 타입은 더하면 감기기만 할 뿐 잘리지 않아서, 감긴 값이
+-- 그대로 들어가면 열린 시각이 닫는 시각보다 뒤가 되어 종일 영업 종료로 보인다.
 insert into stores (owner_user_id, name, postal_code, address, address_detail, phone,
                     latitude, longitude, business_open_time, business_close_time, status,
                     business_registration_number, application_note, created_at, updated_at)
 select u.id, v.name, v.postal_code, v.address, v.address_detail, v.phone,
-       v.latitude, v.longitude, v.open_time, v.close_time, v.status,
-       v.brn, v.note, now() - v.age, now()
+       v.latitude, v.longitude,
+       time '00:00' + greatest(0, local_now.minute_of_day - v.opened_min) * interval '1 minute',
+       time '00:00' + least(1439, local_now.minute_of_day + v.closes_in_min) * interval '1 minute',
+       v.status, v.brn, v.note, now() - v.age, now()
 from (values
   ('seed-o1', '수경야채', '06236', '서울특별시 강남구 테헤란로 152', '1층', '0212340001',
-   37.506900, 127.036500, time '09:00', time '21:00', 'APPROVED', '111-11-11111',
+   37.506900, 127.036500, 180, 240, 'APPROVED', '111-11-11111',
    '역삼동에서 수경재배 채소를 팝니다. 당일 수확분만 취급해서 저녁이면 늘 물량이 남습니다.', interval '40 days'),
   ('seed-o2', '역삼 정육', '06232', '서울특별시 강남구 역삼로 180', null, '0212340002',
-   37.513200, 127.036500, time '10:00', time '20:00', 'APPROVED', '222-22-22222',
+   37.513200, 127.036500, 120, 180, 'APPROVED', '222-22-22222',
    '국내산 돼지고기와 소고기를 다룹니다. 당일 소분한 고기는 다음 날 팔지 않는 것이 원칙입니다.', interval '35 days'),
   ('seed-o3', '역삼 청과', '06224', '서울특별시 강남구 역삼로 92', '지하1층', '0212340003',
-   37.500600, 127.036500, time '08:00', time '21:00', 'APPROVED', '333-33-33333',
+   37.500600, 127.036500, 300, 300, 'APPROVED', '333-33-33333',
    '새벽 가락시장에서 직접 떼어 옵니다. 그날 못 판 과일은 다음 날이면 상품성이 떨어집니다.', interval '32 days'),
   ('seed-o4', '도곡 반찬', '06253', '서울특별시 강남구 도곡로 233', null, '0212340004',
-   37.520400, 127.036500, time '08:30', time '19:30', 'APPROVED', '444-44-44444',
+   37.520400, 127.036500, 240, 120, 'APPROVED', '444-44-44444',
    '매일 아침 조리해 당일에만 판매합니다. 저녁 7시가 지나면 남은 반찬을 전부 폐기해 왔습니다.', interval '21 days'),
   ('seed-o5', '한강 수산', '04788', '서울특별시 성동구 왕십리로 315', '2층', '0212340005',
-   37.533900, 127.036500, time '07:00', time '20:00', 'APPROVED', '555-55-55555',
+   37.533900, 127.036500, 360, 210, 'APPROVED', '555-55-55555',
    '노량진에서 새벽에 받아 옵니다. 손질해 둔 생선은 당일을 넘기지 않습니다.', interval '14 days'),
   ('seed-o6', '성수 베이커리', '04778', '서울특별시 성동구 아차산로 100', null, '0212340006',
-   37.560800, 127.036500, time '07:30', time '22:00', 'APPROVED', '666-66-66666',
+   37.560800, 127.036500, 150, 330, 'APPROVED', '666-66-66666',
    '매장에서 직접 굽습니다. 마감 두 시간 전부터 남은 빵이 나옵니다.', interval '9 days'),
   ('seed-o7', '신사 반찬', '06022', '서울특별시 강남구 강남대로 618', '1층', '0212340007',
-   37.509000, 127.036500, time '09:00', time '20:00', 'PENDING', '777-77-77777',
+   37.509000, 127.036500, 90, 150, 'PENDING', '777-77-77777',
    '이번 주에 문을 열었습니다. 반찬 20여 가지를 매일 만들고 저녁에 남는 양이 적지 않습니다.', interval '2 days')
 ) as v(oauth_id, name, postal_code, address, address_detail, phone,
-       latitude, longitude, open_time, close_time, status, brn, note, age)
-join users u on u.oauth_provider = 'seed' and u.oauth_provider_id = v.oauth_id;
+       latitude, longitude, opened_min, closes_in_min, status, brn, note, age)
+join users u on u.oauth_provider = 'seed' and u.oauth_provider_id = v.oauth_id
+cross join (select extract(epoch from (now() at time zone 'Asia/Seoul')::time)::int / 60
+              as minute_of_day) local_now;
 
 -- 가게 종류(화면은 최대 3개까지 고르게 한다)
 insert into store_categories (store_id, category)
@@ -157,54 +180,60 @@ where v.closed_on is null or d.day_of_week <> v.closed_on;
 -- 픽업 시각은 지금 기준 상대값이다. 할인율은 엔티티(Product.discountRateOf)와 같은 식으로
 -- 계산해 넣는다 -- 컬럼이 not null 이라 비워 둘 수 없고, 손으로 적으면 가격과 어긋난다.
 --
+-- 마감까지 6~9시간을 준다. 탐색은 pickup_end_at > now 인 상품만 내주므로(ProductRepository
+-- WHERE_SELLABLE_AS_OF_NOW) 창이 짧으면 시드를 넣고 반나절 만에 목록이 빈다.
+--
 -- 상태를 섞어 둔다: 마감 임박(40분) · 품절(SOLD_OUT) · 판매 종료(CLOSED) · 재고 2개 이하.
 -- 카테고리도 홈의 칩 여덟을 모두 덮는다(V0022) -- 칩 하나가 늘 빈 화면이면 필터를 못 눌러 본다.
-insert into products (store_id, name, category, initial_qty, available_qty, held_qty,
+--
+-- stock_qty 는 찜까지 포함한 매장 실제 수량이다(V0029). 시드에는 찜이 없으니 available_qty 와
+-- 같게 넣는다 -- 여기가 어긋나면 점주 홈의 "재고가 N개 부족해요"가 거짓말을 한다.
+insert into products (store_id, name, category, initial_qty, available_qty, held_qty, stock_qty,
                       original_price, sale_price, discount_rate,
                       pickup_start_at, pickup_end_at, photo_url, status, created_at, updated_at)
-select s.id, v.name, v.category, v.initial_qty, v.available_qty, 0,
+select s.id, v.name, v.category, v.initial_qty, v.available_qty, 0, v.available_qty,
        v.original_price, v.sale_price,
        round((v.original_price - v.sale_price) * 100.0 / v.original_price)::smallint,
        local_now.ts + v.starts_in, local_now.ts + v.ends_in,
        'https://picsum.photos/seed/' || v.photo || '/400/300', v.status, now(), now()
 from (values
   -- 수경야채 (0 m)
-  ('seed-o1', '상추 300g',        'VEGETABLE', 5, 5,  4000,  2000, interval '-1 hour', interval '4 hours',  'lettuce',   'ON_SALE'),
-  ('seed-o1', '양파 1.5kg',       'VEGETABLE', 4, 4,  8000,  4000, interval '-1 hour', interval '4 hours',  'onion',     'ON_SALE'),
-  ('seed-o1', '감자 1kg',         'VEGETABLE', 5, 5,  6000,  3000, interval '-1 hour', interval '4 hours',  'potato',    'ON_SALE'),
+  ('seed-o1', '상추 300g',        'VEGETABLE', 5, 5,  4000,  2000, interval '-1 hour', interval '8 hours',  'lettuce',   'ON_SALE'),
+  ('seed-o1', '양파 1.5kg',       'VEGETABLE', 4, 4,  8000,  4000, interval '-1 hour', interval '8 hours',  'onion',     'ON_SALE'),
+  ('seed-o1', '감자 1kg',         'VEGETABLE', 5, 5,  6000,  3000, interval '-1 hour', interval '8 hours',  'potato',    'ON_SALE'),
   ('seed-o1', '애호박 2개',       'VEGETABLE', 2, 2,  3000,  1500, interval '-2 hours', interval '40 minutes', 'zucchini', 'ON_SALE'),
-  ('seed-o1', '오이 5입',         'VEGETABLE', 3, 0,  5000,  2500, interval '-1 hour', interval '4 hours',  'cucumber',  'SOLD_OUT'),
+  ('seed-o1', '오이 5입',         'VEGETABLE', 3, 0,  5000,  2500, interval '-1 hour', interval '8 hours',  'cucumber',  'SOLD_OUT'),
   -- 동네 채소가게가 계란·빵·생수를 함께 파는 건 흔하다. 기준점에서 0m 이고 매일 여는 가게라,
   -- 유제품·베이커리·기타 칩이 요일이나 반경에 걸려 빈 화면이 되지 않는다.
-  ('seed-o1', '계란 10구',        'DAIRY_EGG', 5, 5,  4000,  2400, interval '-1 hour', interval '4 hours',  'eggbox',    'ON_SALE'),
-  ('seed-o1', '모닝빵 6개',       'BAKERY',    3, 3,  4000,  2000, interval '-1 hour', interval '4 hours',  'bun',       'ON_SALE'),
-  ('seed-o1', '생수 2L 6입',      'ETC',       4, 4,  6000,  3600, interval '-1 hour', interval '4 hours',  'water',     'ON_SALE'),
+  ('seed-o1', '계란 10구',        'DAIRY_EGG', 5, 5,  4000,  2400, interval '-1 hour', interval '8 hours',  'eggbox',    'ON_SALE'),
+  ('seed-o1', '모닝빵 6개',       'BAKERY',    3, 3,  4000,  2000, interval '-1 hour', interval '8 hours',  'bun',       'ON_SALE'),
+  ('seed-o1', '생수 2L 6입',      'ETC',       4, 4,  6000,  3600, interval '-1 hour', interval '8 hours',  'water',     'ON_SALE'),
   -- 역삼 정육 (701 m, 일요일 휴무)
-  ('seed-o2', '삼겹살 500g',      'MEAT',      2, 2, 18000, 12000, interval '-1 hour', interval '3 hours',  'pork',      'ON_SALE'),
-  ('seed-o2', '닭다리살 800g',    'MEAT',      3, 3, 14000,  8400, interval '-1 hour', interval '3 hours',  'chicken',   'ON_SALE'),
-  ('seed-o2', '계란 한판',        'DAIRY_EGG',       7, 7,  9000,  5400, interval '-1 hour', interval '6 hours',  'egg',       'ON_SALE'),
-  ('seed-o2', '수제 떡갈비 6쪽',  'SIDE_DISH', 4, 4, 12000,  6000, interval '-1 hour', interval '2 hours',  'patty',     'ON_SALE'),
+  ('seed-o2', '삼겹살 500g',      'MEAT',      2, 2, 18000, 12000, interval '-1 hour', interval '7 hours',  'pork',      'ON_SALE'),
+  ('seed-o2', '닭다리살 800g',    'MEAT',      3, 3, 14000,  8400, interval '-1 hour', interval '7 hours',  'chicken',   'ON_SALE'),
+  ('seed-o2', '계란 한판',        'DAIRY_EGG', 7, 7,  9000,  5400, interval '-1 hour', interval '9 hours',  'egg',       'ON_SALE'),
+  ('seed-o2', '수제 떡갈비 6쪽',  'SIDE_DISH', 4, 4, 12000,  6000, interval '-1 hour', interval '6 hours',  'patty',     'ON_SALE'),
   -- 역삼 청과 (701 m)
-  ('seed-o3', '복숭아 4입',       'FRUIT',     3, 3, 10000,  4000, interval '-2 hours', interval '5 hours', 'peach',     'ON_SALE'),
-  ('seed-o3', '방울토마토 500g',  'FRUIT',     4, 4,  8000,  4400, interval '-2 hours', interval '5 hours', 'tomato',    'ON_SALE'),
-  ('seed-o3', '대파 1단',         'VEGETABLE', 2, 2,  5000,  3500, interval '-2 hours', interval '5 hours', 'leek',      'ON_SALE'),
-  ('seed-o3', '알배기 배추 2통',  'VEGETABLE', 4, 4,  6000,  3000, interval '-2 hours', interval '5 hours', 'cabbage',   'ON_SALE'),
-  ('seed-o3', '고구마 1.5kg',     'VEGETABLE', 6, 6, 12000,  7200, interval '-2 hours', interval '5 hours', 'sweetpotato','ON_SALE'),
+  ('seed-o3', '복숭아 4입',       'FRUIT',     3, 3, 10000,  4000, interval '-2 hours', interval '9 hours', 'peach',     'ON_SALE'),
+  ('seed-o3', '방울토마토 500g',  'FRUIT',     4, 4,  8000,  4400, interval '-2 hours', interval '9 hours', 'tomato',    'ON_SALE'),
+  ('seed-o3', '대파 1단',         'VEGETABLE', 2, 2,  5000,  3500, interval '-2 hours', interval '9 hours', 'leek',      'ON_SALE'),
+  ('seed-o3', '알배기 배추 2통',  'VEGETABLE', 4, 4,  6000,  3000, interval '-2 hours', interval '9 hours', 'cabbage',   'ON_SALE'),
+  ('seed-o3', '고구마 1.5kg',     'VEGETABLE', 6, 6, 12000,  7200, interval '-2 hours', interval '9 hours', 'sweetpotato','ON_SALE'),
   -- 도곡 반찬 (1.5 km, 월요일 휴무)
-  ('seed-o4', '모둠 나물 3종',    'SIDE_DISH', 5, 5,  9000,  4500, interval '-3 hours', interval '2 hours', 'namul',     'ON_SALE'),
-  ('seed-o4', '두부 조림 2인분',  'SIDE_DISH', 3, 3,  6000,  3000, interval '-3 hours', interval '2 hours', 'tofu',      'ON_SALE'),
-  ('seed-o4', '간장 불고기 500g', 'MEAT',      2, 2, 15000,  9000, interval '-3 hours', interval '2 hours', 'bulgogi',   'ON_SALE'),
+  ('seed-o4', '모둠 나물 3종',    'SIDE_DISH', 5, 5,  9000,  4500, interval '-3 hours', interval '6 hours', 'namul',     'ON_SALE'),
+  ('seed-o4', '두부 조림 2인분',  'SIDE_DISH', 3, 3,  6000,  3000, interval '-3 hours', interval '6 hours', 'tofu',      'ON_SALE'),
+  ('seed-o4', '간장 불고기 500g', 'MEAT',      2, 2, 15000,  9000, interval '-3 hours', interval '6 hours', 'bulgogi',   'ON_SALE'),
   -- 한강 수산 (3 km)
-  ('seed-o5', '손질 새우 300g',   'SEAFOOD',   3, 3, 16000,  9600, interval '-1 hour', interval '4 hours',  'shrimp',    'ON_SALE'),
-  ('seed-o5', '고등어 2손',       'SEAFOOD',   4, 4, 12000,  7200, interval '-1 hour', interval '4 hours',  'mackerel',  'ON_SALE'),
+  ('seed-o5', '손질 새우 300g',   'SEAFOOD',   3, 3, 16000,  9600, interval '-1 hour', interval '8 hours',  'shrimp',    'ON_SALE'),
+  ('seed-o5', '고등어 2손',       'SEAFOOD',   4, 4, 12000,  7200, interval '-1 hour', interval '8 hours',  'mackerel',  'ON_SALE'),
   ('seed-o5', '오징어 2마리',     'SEAFOOD',   2, 2, 10000,  5000, interval '-2 hours', interval '40 minutes', 'squid',  'ON_SALE'),
   -- 성수 베이커리 (6 km, 화요일 휴무)
-  ('seed-o6', '식빵 1봉',         'BAKERY',       6, 6,  5000,  2500, interval '-1 hour', interval '3 hours',  'bread',     'ON_SALE'),
-  ('seed-o6', '크루아상 4개',     'BAKERY',       3, 3, 12000,  6000, interval '-1 hour', interval '3 hours',  'croissant', 'ON_SALE'),
-  ('seed-o6', '우유 1L',          'DAIRY_EGG',       5, 5,  3000,  1800, interval '-6 hours', interval '-1 hour', 'milk',     'CLOSED'),
+  ('seed-o6', '식빵 1봉',         'BAKERY',    6, 6,  5000,  2500, interval '-1 hour', interval '7 hours',  'bread',     'ON_SALE'),
+  ('seed-o6', '크루아상 4개',     'BAKERY',    3, 3, 12000,  6000, interval '-1 hour', interval '7 hours',  'croissant', 'ON_SALE'),
+  ('seed-o6', '우유 1L',          'DAIRY_EGG', 5, 5,  3000,  1800, interval '-6 hours', interval '-1 hour', 'milk',     'CLOSED'),
   -- 신사 반찬 (234 m, 승인 대기 -- 탐색에 뜨지 않는다)
-  ('seed-o7', '모둠전 4종',       'SIDE_DISH', 3, 3, 14000,  7000, interval '-1 hour', interval '3 hours',  'jeon',      'ON_SALE'),
-  ('seed-o7', '잡채 500g',        'SIDE_DISH', 2, 2, 10000,  5000, interval '-1 hour', interval '3 hours',  'japchae',   'ON_SALE')
+  ('seed-o7', '모둠전 4종',       'SIDE_DISH', 3, 3, 14000,  7000, interval '-1 hour', interval '7 hours',  'jeon',      'ON_SALE'),
+  ('seed-o7', '잡채 500g',        'SIDE_DISH', 2, 2, 10000,  5000, interval '-1 hour', interval '7 hours',  'japchae',   'ON_SALE')
 ) as v(oauth_id, name, category, initial_qty, available_qty, original_price, sale_price,
        starts_in, ends_in, photo, status)
 join users u on u.oauth_provider = 'seed' and u.oauth_provider_id = v.oauth_id
