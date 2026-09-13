@@ -24,7 +24,8 @@ class OpenApiContractTest {
 
 	private static final List<String> SPRING_OWNED_SCHEMAS = List.of("Pageable", "PageableObject");
 
-	private static final List<String> WRAPPERS_OF_ONE_OPTIONAL_VALUE = List.of("ActiveHoldResponse");
+	private static final List<String> WRAPPERS_OF_ONE_OPTIONAL_VALUE =
+			List.of("ActiveHoldResponse", "MyLocationResponse");
 
 	private static final List<String> ERROR_STATUSES = List.of("400", "401", "403", "429", "500");
 
