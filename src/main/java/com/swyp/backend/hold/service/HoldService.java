@@ -65,7 +65,7 @@ public class HoldService {
 							holdProperties.cancelCreditRefill(), holdProperties.cancelCreditMax()));
 		}
 		Optional<HoldRef> current = holdFunction.findHoldingRefOf(userId);
-		Map<Long, Product> locked = lockProducts(productIdsToLock(current, request.productId(), now));
+		Map<Long, Product> locked = lockProducts(productIdsToLock(current, request.productId()));
 		Product product = locked.get(request.productId());
 
 		GroupSlot slot = resolveGroup(current, product, now, locked);
@@ -201,8 +201,7 @@ public class HoldService {
 		}
 		Instant pickupBound = pickupBound(product);
 		if (pickupBound.isBefore(ref.expiresAt())) {
-			holdFunction.findHoldingOfGroup(ref.groupId())
-					.forEach(sibling -> sibling.restrictExpiryTo(pickupBound));
+			lockHoldingOf(ref.groupId()).forEach(sibling -> sibling.restrictExpiryTo(pickupBound));
 			return new GroupSlot(ref.groupId(), pickupBound);
 		}
 		return new GroupSlot(ref.groupId(), ref.expiresAt());
@@ -212,20 +211,24 @@ public class HoldService {
 		return new GroupSlot(holdFunction.nextGroupId(), expiresAt(product, now));
 	}
 
+	private List<Hold> lockHoldingOf(Long groupId) {
+		return holdFunction.findHoldingIdsOfGroup(groupId).stream()
+				.map(holdFunction::getByIdForUpdate)
+				.toList();
+	}
+
 	private void expireGroup(Long groupId, Map<Long, Product> locked) {
-		for (Hold hold : holdFunction.findHoldingOfGroup(groupId)) {
+		for (Hold hold : lockHoldingOf(groupId)) {
 			locked.get(hold.getProduct().getId()).releaseHold(hold.getQty());
 			hold.expire();
 		}
 		holdFunction.flush();
 	}
 
-	private List<Long> productIdsToLock(
-			Optional<HoldRef> current, Long productId, Instant now) {
+	private List<Long> productIdsToLock(Optional<HoldRef> current, Long productId) {
 		List<Long> ids = new ArrayList<>();
 		ids.add(productId);
-		current.filter(ref -> !ref.expiresAt().isAfter(now))
-				.ifPresent(ref -> ids.addAll(holdFunction.findProductIdsOfGroup(ref.groupId())));
+		current.ifPresent(ref -> ids.addAll(holdFunction.findProductIdsOfGroup(ref.groupId())));
 		return ids;
 	}
 

@@ -152,6 +152,14 @@ public interface HoldRepository extends JpaRepository<Hold, Long> {
 			@Param("productId") Long productId, @Param("status") HoldStatus status);
 
 	@Query("""
+			select h.id from Hold h
+			where h.product.id = :productId and h.status = :status
+			order by h.createdAt asc, h.id asc
+			""")
+	List<Long> findIdsByProductIdAndStatus(
+			@Param("productId") Long productId, @Param("status") HoldStatus status);
+
+	@Query("""
 			select distinct sibling.product.id from Hold sibling
 			where sibling.status = com.swyp.backend.hold.entity.HoldStatus.HOLDING
 				and sibling.groupId in (select h.groupId from Hold h
@@ -244,6 +252,21 @@ public interface HoldRepository extends JpaRepository<Hold, Long> {
 
 	@Query(value = "select nextval('holds_group_id_seq')", nativeQuery = true)
 	long nextGroupId();
+
+	@Query("""
+			select h.id from Hold h
+			where h.groupId = :groupId
+				and h.status = com.swyp.backend.hold.entity.HoldStatus.HOLDING
+			order by h.id
+			""")
+	List<Long> findHoldingIdsOfGroup(@Param("groupId") Long groupId);
+
+	@Query("""
+			select distinct h.product.id from Hold h
+			where h.id in :holdIds
+			order by h.product.id
+			""")
+	List<Long> findProductIdsOfHolds(@Param("holdIds") List<Long> holdIds);
 
 	@Query("""
 			select h.id from Hold h

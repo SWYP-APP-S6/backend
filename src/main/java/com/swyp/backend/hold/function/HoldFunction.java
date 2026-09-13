@@ -75,6 +75,14 @@ public class HoldFunction {
 		return holdRepository.findGroupByStatus(groupId, HoldStatus.HOLDING);
 	}
 
+	public List<Long> findHoldingIdsOfGroup(Long groupId) {
+		return holdRepository.findHoldingIdsOfGroup(groupId);
+	}
+
+	public List<Long> findProductIdsOfHolds(List<Long> holdIds) {
+		return holdIds.isEmpty() ? List.of() : holdRepository.findProductIdsOfHolds(holdIds);
+	}
+
 	public long nextGroupId() {
 		return holdRepository.nextGroupId();
 	}
@@ -135,6 +143,10 @@ public class HoldFunction {
 
 	public List<Hold> findActiveHoldsOfProduct(Long productId) {
 		return holdRepository.findByProductIdAndStatus(productId, HoldStatus.HOLDING);
+	}
+
+	public List<Long> findActiveHoldIdsOfProduct(Long productId) {
+		return holdRepository.findIdsByProductIdAndStatus(productId, HoldStatus.HOLDING);
 	}
 
 	public List<Hold> findHoldingOfStore(Long storeId) {
