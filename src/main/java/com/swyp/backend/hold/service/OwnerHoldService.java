@@ -10,6 +10,7 @@ import com.swyp.backend.hold.dto.OwnerHoldSummaryResponse;
 import com.swyp.backend.hold.HoldProperties;
 import com.swyp.backend.hold.entity.Hold;
 import com.swyp.backend.hold.entity.HoldItem;
+import com.swyp.backend.hold.entity.HoldCancelCreditReason;
 import com.swyp.backend.hold.entity.HoldStatus;
 import com.swyp.backend.hold.exception.HoldErrorCode;
 import com.swyp.backend.hold.function.HoldCancelCreditFunction;
@@ -94,9 +95,13 @@ public class OwnerHoldService {
 		}
 		hold.complete(now);
 		if (hold.wasChargedAsNoShow()) {
-			holdCancelCreditFunction
+			int given = holdCancelCreditFunction
 					.getOrStart(hold.getUser(), holdProperties.cancelCreditMax(), now)
 					.giveBack(holdProperties.cancelCreditMax());
+			if (given > 0) {
+				holdCancelCreditFunction.record(
+						hold.getUser(), hold, HoldCancelCreditReason.GIVE_BACK, given, now);
+			}
 		}
 		notificationFunction.notify(
 				hold.getUser(),
