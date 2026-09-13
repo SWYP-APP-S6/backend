@@ -41,9 +41,28 @@ class DevTokenControllerTest {
 	ObjectMapper objectMapper;
 
 	@Test
-	void issuesAnAppUserTokenWithoutAuthentication() throws Exception {
+	void refusesToMintATokenForAnyoneWhoIsNotASignedInAdmin() throws Exception {
+		mockMvc.perform(post("/dev/test-token").param("role", "CONSUMER"))
+			.andExpect(status().isUnauthorized());
+		mockMvc.perform(post("/dev/test-token").param("role", "CONSUMER")
+				.header("Authorization",
+						"Bearer " + tokenProvider.createAccessToken(TokenRealm.USER, 1L, "CONSUMER")))
+			.andExpect(status().isForbidden());
+		mockMvc.perform(post("/dev/test-token").param("role", "CONSUMER")
+				.header("Authorization",
+						"Bearer " + tokenProvider.createAccessToken(TokenRealm.GUEST, 1L, "GUEST")))
+			.andExpect(status().isForbidden());
+	}
+
+	private String adminBearer() {
+		return "Bearer " + tokenProvider.createAccessToken(TokenRealm.ADMIN, 1L, "SUPER");
+	}
+
+	@Test
+	void issuesAnAppUserTokenToASignedInAdmin() throws Exception {
 		MvcResult result = mockMvc
-				.perform(post("/dev/test-token").param("role", "CONSUMER"))
+				.perform(post("/dev/test-token").param("role", "CONSUMER")
+						.header("Authorization", adminBearer()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data.role").value("CONSUMER"))
 				.andReturn();
@@ -72,13 +91,15 @@ class DevTokenControllerTest {
 	@Test
 	void rejectsAnUnknownRole() throws Exception {
 		mockMvc
-				.perform(post("/dev/test-token").param("role", "ADMIN"))
+				.perform(post("/dev/test-token").param("role", "ADMIN")
+						.header("Authorization", adminBearer()))
 				.andExpect(status().isBadRequest());
 	}
 
 	private long issueUserId() throws Exception {
 		MvcResult result = mockMvc
-				.perform(post("/dev/test-token").param("role", "OWNER"))
+				.perform(post("/dev/test-token").param("role", "OWNER")
+						.header("Authorization", adminBearer()))
 				.andExpect(status().isOk())
 				.andReturn();
 		return objectMapper
