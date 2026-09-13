@@ -124,8 +124,27 @@ class HoldExpiryServiceTest {
 		assertThat(productRepository.findById(onion.getId()).orElseThrow().getAvailableQty())
 			.isEqualTo(5);
 		assertThat(notificationRepository.count())
-			.as("the owner may have handed the goods over already and simply not tapped yet")
-			.isEqualTo(notificationsBefore + 1);
+			.as("both sides learn: the consumer that the time ran out, the owner that they may "
+					+ "have handed the goods over already and simply not tapped yet")
+			.isEqualTo(notificationsBefore + 2);
+	}
+
+	@Test
+	void anExpiredHoldTellsTheConsumerAndTheOwnerSeparately() {
+		Hold overdue = hold("만료될소비자", 2, Instant.now().minusSeconds(60));
+		Long consumerId = overdue.getUser().getId();
+		Long ownerId = product.getStore().getOwner().getId();
+
+		holdExpiryService.expireOverdueHolds();
+
+		assertThat(notificationRepository.findByUserIdAndReadAtIsNull(consumerId))
+			.singleElement()
+			.satisfies(notification -> assertThat(notification.getType())
+					.isEqualTo(com.swyp.backend.notification.entity.NotificationType.HOLD_EXPIRED));
+		assertThat(notificationRepository.findByUserIdAndReadAtIsNull(ownerId))
+			.singleElement()
+			.satisfies(notification -> assertThat(notification.getType())
+					.isEqualTo(com.swyp.backend.notification.entity.NotificationType.HOLD_UNCONFIRMED));
 	}
 
 	@Test

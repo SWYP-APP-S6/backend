@@ -62,6 +62,7 @@ public class SecurityConfig {
 		"/users/me",
 		"/users/me/location",
 		"/notifications",
+		"/notifications/device-tokens",
 		"/notifications/read-all",
 		"/notifications/*/read",
 	};

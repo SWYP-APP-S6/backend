@@ -38,6 +38,12 @@ public class HoldExpirer {
 			locked.get(item.getProduct().getId()).releaseHold(item.getQty());
 		}
 		notificationFunction.notify(
+				hold.getUser(),
+				NotificationType.HOLD_EXPIRED,
+				"찜 시간이 끝났어요",
+				hold.getStore().getName() + "에서 찜한 상품의 픽업 시간이 지났어요.",
+				null);
+		notificationFunction.notify(
 				hold.getStore().getOwner(),
 				NotificationType.HOLD_UNCONFIRMED,
 				"수령 확인이 안 된 찜이 있어요",

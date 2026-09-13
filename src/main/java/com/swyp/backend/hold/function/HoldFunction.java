@@ -11,6 +11,7 @@ import com.swyp.backend.hold.entity.HoldStatus;
 import com.swyp.backend.hold.exception.HoldErrorCode;
 import com.swyp.backend.hold.repository.HoldRepository;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -77,6 +78,14 @@ public class HoldFunction {
 
 	public List<OverdueHold> findOverdue(Instant now) {
 		return holdRepository.findOverdueByStatus(HoldStatus.HOLDING, now);
+	}
+
+	public List<Hold> findExpiringSoon(Instant now, Duration reminderLead) {
+		return holdRepository.findExpiringSoon(HoldStatus.HOLDING, now, now.plus(reminderLead));
+	}
+
+	public boolean markExpiryReminded(Long holdId, Instant now) {
+		return holdRepository.markExpiryReminded(holdId, now) == 1;
 	}
 
 	public List<Hold> findUnchargedNoShows(Long userId, Instant decidedBefore) {

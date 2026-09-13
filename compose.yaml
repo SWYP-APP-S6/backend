@@ -101,6 +101,15 @@ services:
       MFDS_API_KEY: ${MFDS_API_KEY:-}
       # 기본값이 없다. 비어 있으면 JwtProperties 가 기동을 막고 이유를 알려준다.
       JWT_SECRET: ${JWT_SECRET:-}
+      # FCM 푸시. 서비스 계정 JSON 을 파일로 마운트하지 않고 base64 한 줄로 넘긴다 — 호스트에
+      # 파일이 없으면 도커가 마운트 지점에 빈 디렉터리를 만들어 로컬에서 조용히 깨지고, 이
+      # 프로젝트의 비밀값은 전부 `.env` 한 곳에서 온다. 비어 있으면 발송만 꺼진다(앱은 뜨고
+      # 알림은 인앱 알림함까지 간다).
+      FCM_PROJECT_ID: ${FCM_PROJECT_ID:-}
+      FCM_CREDENTIALS_BASE64: ${FCM_CREDENTIALS_BASE64:-}
+      # 앱이 만드는 알림 채널 id. Android 8+ 는 채널이 필수라 값이 어긋나면 푸시가 도착해도
+      # 트레이에 뜨지 않는다 — 앱 개발자와 맞춘 값을 넣는다.
+      FCM_ANDROID_CHANNEL_ID: ${FCM_ANDROID_CHANNEL_ID:-}
       # mem_limit 만 걸면 JVM 은 컨테이너 메모리의 기본 25% 만 힙으로 잡는다(1300m 기준 325MB).
       # 힙 ~975MB + 메타스페이스/스레드/JIT ~325MB 로 명시 배분한다.
       JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=75.0
