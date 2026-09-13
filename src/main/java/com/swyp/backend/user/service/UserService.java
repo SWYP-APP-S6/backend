@@ -2,6 +2,8 @@ package com.swyp.backend.user.service;
 
 import com.swyp.backend.common.response.PageResponse;
 import com.swyp.backend.user.dto.MeResponse;
+import com.swyp.backend.user.dto.MyLocationResponse;
+import com.swyp.backend.user.dto.MyLocationUpdateRequest;
 import com.swyp.backend.user.dto.UserSummaryResponse;
 import com.swyp.backend.user.entity.User;
 import com.swyp.backend.user.entity.UserRole;
@@ -25,6 +27,19 @@ public class UserService {
 
 	public MeResponse getMe(Long userId) {
 		return MeResponse.from(userFunction.getById(userId));
+	}
+
+	public MyLocationResponse getMyLocation(Long userId) {
+		return MyLocationResponse.of(userLocationFunction.findOf(userId).orElse(null));
+	}
+
+	@Transactional
+	public MyLocationResponse setMyLocation(Long userId, MyLocationUpdateRequest request) {
+		return MyLocationResponse.of(userLocationFunction.setRegion(
+				userFunction.getById(userId),
+				request.regionName(),
+				request.latitude(),
+				request.longitude()));
 	}
 
 	public PageResponse<UserSummaryResponse> getUsers(UserRole role, Pageable pageable) {
