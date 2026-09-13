@@ -221,7 +221,7 @@ class HoldControllerTest {
 			.andExpect(status().isCreated());
 
 		Hold hold = holdRepository.findAll().stream()
-			.filter(h -> h.itemOf(closingSoon.getId()).isPresent())
+			.filter(h -> h.getProduct().getId().equals(closingSoon.getId()))
 			.findFirst().orElseThrow();
 		assertThat(hold.getExpiresAt())
 			.as("a hold that outlives the pickup window walks the user to a closed shop, and one "
@@ -542,8 +542,7 @@ class HoldControllerTest {
 	void theActiveHoldIsTheGroupInProgressWithEveryItemInIt() throws Exception {
 		Product other = sellableProduct(5, LocalDateTime.now().plusHours(6));
 		Hold hold = holding(consumer, product, 1, Instant.now().plusSeconds(900));
-		hold.addItem(other, 2);
-		holdRepository.saveAndFlush(hold);
+		joinGroup(hold, other, 2);
 
 		mockMvc.perform(get("/holds/active").header("Authorization", bearer(consumer)))
 			.andExpect(status().isOk())
@@ -600,7 +599,11 @@ class HoldControllerTest {
 			.andExpect(jsonPath("$.data.totalQty").value(3))
 			.andExpect(jsonPath("$.data.totalPrice").value(4_000 + 2 * 2_500));
 
-		assertThat(holdRepository.count()).isEqualTo(1);
+		assertThat(holdRepository.findAll())
+			.as("each product is its own hold, and both sit in one group")
+			.hasSize(2)
+			.extracting(hold -> hold.getGroupId())
+			.containsOnly(holdRepository.findAll().getFirst().getGroupId());
 	}
 
 	@Test
@@ -626,13 +629,10 @@ class HoldControllerTest {
 	}
 
 	@Test
-	void cancelingGivesBackEveryItemInTheGroup() throws Exception {
+	void cancelingGivesBackOnlyTheProductCanceled() throws Exception {
 		Product sibling = siblingProduct(product, "당근 1kg", 5);
 		Hold hold = holding(consumer, product, 1, Instant.now().plusSeconds(600));
-		hold.addItem(sibling, 2);
-		sibling.hold(2);
-		productRepository.saveAndFlush(sibling);
-		holdRepository.saveAndFlush(hold);
+		Hold siblingHold = joinGroup(hold, sibling, 2);
 
 		mockMvc.perform(post("/holds/{holdId}/cancel", hold.getId())
 				.header("Authorization", bearer(consumer)))
@@ -642,8 +642,12 @@ class HoldControllerTest {
 		assertThat(productRepository.findById(product.getId()).orElseThrow().getAvailableQty())
 			.isEqualTo(3);
 		assertThat(productRepository.findById(sibling.getId()).orElseThrow().getAvailableQty())
-			.isEqualTo(5);
-		assertThat(productRepository.findById(sibling.getId()).orElseThrow().getHeldQty()).isZero();
+			.as("the rest of the basket keeps its stock -- only the canceled product comes back")
+			.isEqualTo(3);
+		assertThat(productRepository.findById(sibling.getId()).orElseThrow().getHeldQty())
+			.isEqualTo(2);
+		assertThat(holdRepository.findById(siblingHold.getId()).orElseThrow().getStatus())
+			.isEqualTo(HoldStatus.HOLDING);
 	}
 
 	@Test
@@ -760,6 +764,15 @@ class HoldControllerTest {
 
 	private Hold holding(User user, int qty, Instant expiresAt) {
 		return holding(user, product, qty, expiresAt);
+	}
+
+	// 이어 담은 찜은 같은 묶음에 붙고 처음 찜의 만료 시각을 물려받는다.
+	private Hold joinGroup(Hold first, Product target, int qty) {
+		target.hold(qty);
+		productRepository.saveAndFlush(target);
+		return holdRepository.saveAndFlush(new Hold(
+			first.getUser(), target.getStore(), target, qty,
+			first.getGroupId(), first.getExpiresAt()));
 	}
 
 	private Hold holding(User user, Product target, int qty, Instant expiresAt) {

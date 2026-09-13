@@ -95,11 +95,11 @@ class OwnerHoldControllerTest {
 		mockMvc.perform(get("/owner/holds?status=HOLDING").header("Authorization", "Bearer " + token))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.holds.totalElements").value(2))
-			.andExpect(jsonPath("$.data.holds.content[0].totalQty").value(2))
+			.andExpect(jsonPath("$.data.holds.content[0].qty").value(2))
 			.andExpect(jsonPath("$.data.holds.content[0].status").value("HOLDING"))
 			.andExpect(jsonPath("$.data.holds.content[0].nickname").value("윤지현"))
-			.andExpect(jsonPath("$.data.holds.content[0].items[0].productName").value("시금치 한 단"))
-			.andExpect(jsonPath("$.data.holds.content[1].totalQty").value(1));
+			.andExpect(jsonPath("$.data.holds.content[0].productName").value("시금치 한 단"))
+			.andExpect(jsonPath("$.data.holds.content[1].qty").value(1));
 	}
 
 	@Test
@@ -114,13 +114,13 @@ class OwnerHoldControllerTest {
 		mockMvc.perform(get("/owner/holds?status=CANCELED_BY_OWNER").header("Authorization", "Bearer " + token))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.holds.totalElements").value(1))
-			.andExpect(jsonPath("$.data.holds.content[0].totalQty").value(1))
+			.andExpect(jsonPath("$.data.holds.content[0].qty").value(1))
 			.andExpect(jsonPath("$.data.holds.content[0].status").value("CANCELED_BY_OWNER"));
 
 		mockMvc.perform(get("/owner/holds?status=CANCELED_BY_USER").header("Authorization", "Bearer " + token))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.holds.totalElements").value(1))
-			.andExpect(jsonPath("$.data.holds.content[0].totalQty").value(2));
+			.andExpect(jsonPath("$.data.holds.content[0].qty").value(2));
 	}
 
 	@Test
@@ -294,7 +294,7 @@ class OwnerHoldControllerTest {
 
 	private void expireWithStockBack(Hold hold, Product product) {
 		hold.expire();
-		product.releaseHold(hold.getItems().getFirst().getQty());
+		product.releaseHold(hold.getQty());
 		holdRepository.saveAndFlush(hold);
 		productRepository.saveAndFlush(product);
 	}

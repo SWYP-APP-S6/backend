@@ -110,13 +110,12 @@ class HoldCancelConcurrencyTest {
 			() -> holdService.create(consumer.getId(), new HoldCreateRequest(onion.getId(), 2)));
 
 		assertThat(failures).isEmpty();
-		assertThat(holdRepository.count())
-			.as("a user has one hold in progress, so the second tap has to join the first")
-			.isEqualTo(1);
-		Hold hold = holdRepository
-			.findDetailById(holdRepository.findAll().getFirst().getId())
-			.orElseThrow();
-		assertThat(hold.getItems()).hasSize(2);
+		List<Hold> holds = holdRepository.findAll();
+		assertThat(holds)
+			.as("each product is its own hold now, but the second tap joins the first group")
+			.hasSize(2)
+			.extracting(Hold::getGroupId)
+			.containsOnly(holds.getFirst().getGroupId());
 		assertThat(reload(carrot).getAvailableQty()).isEqualTo(9);
 		assertThat(reload(onion).getAvailableQty()).isEqualTo(8);
 	}

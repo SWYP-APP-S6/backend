@@ -25,6 +25,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -86,29 +87,29 @@ class HoldHistoryControllerTest {
 	}
 
 	@Test
-	void itListsEveryHoldOfTheCallerNewestFirstAsAStoreGroup() throws Exception {
+	void itListsEveryHoldOfTheCallerNewestFirst() throws Exception {
 		Hold oldest = completed(peach, 1);
 		Hold middle = canceled(tomato, 2);
-		Hold newest = holding(peach, 2, tomato, 1);
+		List<Hold> newest = holding(peach, 2, tomato, 1);
 
 		mockMvc.perform(get("/holds").header("Authorization", bearer(consumer)))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.serverTime").isNotEmpty())
-			.andExpect(jsonPath("$.data.holds.totalElements").value(3))
-			.andExpect(jsonPath("$.data.holds.content[0].id").value(newest.getId()))
+			.andExpect(jsonPath("$.data.holds.totalElements").value(4))
+			.andExpect(jsonPath("$.data.holds.content[0].id").value(newest.get(1).getId()))
 			.andExpect(jsonPath("$.data.holds.content[0].status").value("HOLDING"))
 			.andExpect(jsonPath("$.data.holds.content[0].storeName").value("청과마을"))
-			.andExpect(jsonPath("$.data.holds.content[0].totalQty").value(3))
-			.andExpect(jsonPath("$.data.holds.content[0].totalPrice").value(11_000))
-			.andExpect(jsonPath("$.data.holds.content[0].items.length()").value(2))
-			.andExpect(jsonPath("$.data.holds.content[0].items[0].name").value("복숭아 4입"))
-			.andExpect(jsonPath("$.data.holds.content[0].items[0].lineTotal").value(8_000))
-			.andExpect(jsonPath("$.data.holds.content[1].id").value(middle.getId()))
-			.andExpect(jsonPath("$.data.holds.content[1].status").value("CANCELED"))
-			.andExpect(jsonPath("$.data.holds.content[1].canceledBy").value("USER"))
-			.andExpect(jsonPath("$.data.holds.content[2].id").value(oldest.getId()))
-			.andExpect(jsonPath("$.data.holds.content[2].status").value("COMPLETED"))
-			.andExpect(jsonPath("$.data.holds.content[2].completedAt").isNotEmpty());
+			.andExpect(jsonPath("$.data.holds.content[0].qty").value(1))
+			.andExpect(jsonPath("$.data.holds.content[1].id").value(newest.get(0).getId()))
+			.andExpect(jsonPath("$.data.holds.content[1].productName").value("복숭아 4입"))
+			.andExpect(jsonPath("$.data.holds.content[1].qty").value(2))
+			.andExpect(jsonPath("$.data.holds.content[1].totalPrice").value(8_000))
+			.andExpect(jsonPath("$.data.holds.content[2].id").value(middle.getId()))
+			.andExpect(jsonPath("$.data.holds.content[2].status").value("CANCELED"))
+			.andExpect(jsonPath("$.data.holds.content[2].canceledBy").value("USER"))
+			.andExpect(jsonPath("$.data.holds.content[3].id").value(oldest.getId()))
+			.andExpect(jsonPath("$.data.holds.content[3].status").value("COMPLETED"))
+			.andExpect(jsonPath("$.data.holds.content[3].completedAt").isNotEmpty());
 	}
 
 	@Test
@@ -135,7 +136,7 @@ class HoldHistoryControllerTest {
 	}
 
 	@Test
-	void aPageCountsHoldsRatherThanItemRows() throws Exception {
+	void aPageCountsOneRowPerProductHeld() throws Exception {
 		completed(peach, 1, tomato, 1);
 		completed(peach, 1, tomato, 1);
 		completed(peach, 1, tomato, 1);
@@ -143,10 +144,8 @@ class HoldHistoryControllerTest {
 		mockMvc.perform(get("/holds?size=2").header("Authorization", bearer(consumer)))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.holds.content.length()").value(2))
-			.andExpect(jsonPath("$.data.holds.content[0].items.length()").value(2))
-			.andExpect(jsonPath("$.data.holds.content[1].items.length()").value(2))
-			.andExpect(jsonPath("$.data.holds.totalElements").value(3))
-			.andExpect(jsonPath("$.data.holds.totalPages").value(2))
+			.andExpect(jsonPath("$.data.holds.totalElements").value(6))
+			.andExpect(jsonPath("$.data.holds.totalPages").value(3))
 			.andExpect(jsonPath("$.data.holds.last").value(false));
 	}
 
@@ -203,8 +202,8 @@ class HoldHistoryControllerTest {
 			LocalDateTime.now(), LocalDateTime.now().plusHours(3), "https://example.com/a.jpg"));
 	}
 
-	private Hold holding(Product first, int firstQty, Product second, int secondQty) {
-		return holdRepository.saveAndFlush(HoldFixture.hold(
+	private List<Hold> holding(Product first, int firstQty, Product second, int secondQty) {
+		return holdRepository.saveAllAndFlush(HoldFixture.group(
 			consumer, Instant.now().plus(Duration.ofMinutes(10)), first, firstQty, second, secondQty));
 	}
 
@@ -214,11 +213,11 @@ class HoldHistoryControllerTest {
 		return holdRepository.saveAndFlush(hold);
 	}
 
-	private Hold completed(Product first, int firstQty, Product second, int secondQty) {
-		Hold hold = HoldFixture.hold(
+	private List<Hold> completed(Product first, int firstQty, Product second, int secondQty) {
+		List<Hold> group = HoldFixture.group(
 			consumer, Instant.now().plus(Duration.ofMinutes(10)), first, firstQty, second, secondQty);
-		hold.complete(Instant.now());
-		return holdRepository.saveAndFlush(hold);
+		group.forEach(hold -> hold.complete(Instant.now()));
+		return holdRepository.saveAllAndFlush(group);
 	}
 
 	private Hold canceled(Product product, int qty) {
