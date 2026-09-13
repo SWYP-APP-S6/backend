@@ -292,6 +292,36 @@ class OwnerHoldControllerTest {
 			.andExpect(jsonPath("$.code").value("HOLD_ALREADY_RESOLVED"));
 	}
 
+	@Test
+	void completePickup_whenTheBatchAlreadyExpiredOneOfTheGroup_settlesEachHoldOnItsOwnState()
+			throws Exception {
+		Product spinach = createProduct("시금치 한 단", 10);
+		Product zucchini = createProduct("애호박", 10);
+		List<Hold> group = holdRepository.saveAllAndFlush(HoldFixture.group(
+			newConsumer(), Instant.now().minus(Duration.ofMinutes(1)), spinach, 2, zucchini, 3));
+		spinach.hold(2);
+		zucchini.hold(3);
+		productRepository.saveAllAndFlush(List.of(spinach, zucchini));
+		expireWithStockBack(group.get(0), spinach);
+
+		mockMvc.perform(post("/owner/holds/" + group.get(1).getId() + "/complete")
+				.header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk());
+
+		Product soldExpired = productRepository.findById(spinach.getId()).orElseThrow();
+		assertThat(soldExpired.getHeldQty())
+			.as("the batch had already given this reservation back")
+			.isZero();
+		assertThat(soldExpired.getAvailableQty()).isEqualTo(8);
+		Product soldHolding = productRepository.findById(zucchini.getId()).orElseThrow();
+		assertThat(soldHolding.getHeldQty())
+			.as("a sibling still holding must not keep its reservation after the visit is done")
+			.isZero();
+		assertThat(soldHolding.getAvailableQty()).isEqualTo(7);
+		assertThat(holdRepository.findAllById(List.of(group.get(0).getId(), group.get(1).getId())))
+			.allSatisfy(hold -> assertThat(hold.getStatus()).isEqualTo(HoldStatus.COMPLETED));
+	}
+
 	private void expireWithStockBack(Hold hold, Product product) {
 		hold.expire();
 		product.releaseHold(hold.getQty());

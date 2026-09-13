@@ -267,6 +267,68 @@ class OwnerProductControllerTest {
 			.isEqualTo(10);
 	}
 
+	@Test
+	void stockReconfirm_answeredTwice_isRejected() throws Exception {
+		Product product = askedToReconfirm("당근", 10);
+
+		mockMvc.perform(post("/owner/products/" + product.getId() + "/stock-reconfirm")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"confirmed":false}"""))
+			.andExpect(status().isOk());
+
+		mockMvc.perform(post("/owner/products/" + product.getId() + "/stock-reconfirm")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"confirmed":true}"""))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("RECONFIRM_NOT_REQUESTED"));
+
+		mockMvc.perform(get("/owner/products/" + product.getId())
+				.header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.stockEditable").value(true));
+	}
+
+	@Test
+	void stockReconfirm_confirmingIt_stopsLockingOncePickupHasClosed() throws Exception {
+		Product product = productRepository.saveAndFlush(new Product(
+			store, "지난 당근", ProductCategory.VEGETABLE, 10, 1000, 800,
+			LocalDateTime.now().minusHours(2), LocalDateTime.now().minusMinutes(1),
+			"https://example.com/a.jpg"));
+		product.markReconfirmSent(Instant.now());
+		product.confirmStock(Instant.now());
+		productRepository.saveAndFlush(product);
+
+		mockMvc.perform(get("/owner/products/" + product.getId())
+				.header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.stockEditable").value(true));
+
+		mockMvc.perform(patch("/owner/products/" + product.getId() + "/stock")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"stockQty":4,"cancelOverflow":false}"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.stockQty").value(4));
+	}
+
+	@Test
+	void updateStock_beyondTheCap_isRejected() throws Exception {
+		Product product = askedToReconfirm("당근", 10);
+
+		mockMvc.perform(patch("/owner/products/" + product.getId() + "/stock")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"stockQty":2147483647,"cancelOverflow":false}"""))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+	}
+
 	private Product askedToReconfirm(String name, int initialQty) {
 		Product product = createProduct(name, initialQty);
 		product.markReconfirmSent(Instant.now());
