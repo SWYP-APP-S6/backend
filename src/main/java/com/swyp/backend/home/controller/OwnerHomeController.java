@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "점주 홈")
+@Tag(name = "OwnerHome", description = "점주 홈")
 @RestController
 @RequestMapping("/owner/home")
 @RequiredArgsConstructor

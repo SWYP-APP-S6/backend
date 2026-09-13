@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "관리자 가게 심사")
+@Tag(name = "AdminStore", description = "관리자 가게 심사")
 @RestController
 @RequestMapping("/admin/stores")
 @RequiredArgsConstructor

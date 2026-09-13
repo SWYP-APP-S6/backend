@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "상품 탐색")
+@Tag(name = "ProductBrowse", description = "상품 탐색")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/products")

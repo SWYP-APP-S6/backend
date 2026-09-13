@@ -17,7 +17,10 @@
   스펙은 그룹으로 갈라져 있다 — **`/v3/api-docs/app`(앱)**, `/v3/api-docs/admin`(백오피스). 앱이 이
   스펙으로 Retrofit 클라이언트를 생성하므로 명세가 곧 계약이고, 규약은 `common/openapi`가 강제한다:
   응답 record 컴포넌트는 `required`로 올라가고(실제 null 가능 필드에만 `@Nullable`), 모든 오퍼레이션에
-  `ErrorResponse` 기반 4xx·5xx가 붙으며, 컨트롤러는 `@Tag`를 단다. 회귀는 `OpenApiContractTest`가 잡는다.
+  `ErrorResponse` 기반 4xx·5xx가 붙으며, 컨트롤러는 `@Tag`를 단다 — **태그 `name`은 ASCII**로,
+  한글은 `description`에 둔다(생성기가 태그를 클라이언트 클래스명으로 깎아 쓰므로 한글이면 아무것도
+  남지 않아 전 오퍼레이션이 `DefaultApi` 하나로 뭉친다 — Swagger UI는 원본 태그로 그룹을 나눠
+  보여주므로 화면으론 드러나지 않는다). 회귀는 `OpenApiContractTest`가 잡는다.
   인증은 `bearerAuth` 스킴.
 - **Package-by-feature + 레이어 서브패키지**: `com.swyp.backend.<feature>`(예: `.admin`, `.ping`) 아래
   `controller` / `service` / `function` / `repository` / `entity` / `dto`. `com.swyp.backend.common`에는
