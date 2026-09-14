@@ -6,14 +6,17 @@ import com.swyp.backend.home.dto.OwnerHomeResponse;
 import com.swyp.backend.home.dto.OwnerHomeStore;
 import com.swyp.backend.home.dto.OwnerHomeSummary;
 import com.swyp.backend.home.dto.OwnerHomeVisit;
+import com.swyp.backend.hold.entity.Hold;
 import com.swyp.backend.hold.function.HoldFunction;
 import com.swyp.backend.notification.function.NotificationFunction;
 import com.swyp.backend.product.entity.Product;
 import com.swyp.backend.product.function.ProductFunction;
 import com.swyp.backend.store.entity.Store;
 import com.swyp.backend.store.function.StoreFunction;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +43,8 @@ public class OwnerHomeService {
 				.toList();
 
 		List<OwnerHomeVisit> upcomingVisits = holdFunction.findHoldingOfStore(storeId).stream()
+				.collect(Collectors.groupingBy(Hold::getGroupId, LinkedHashMap::new, Collectors.toList()))
+				.values().stream()
 				.map(OwnerHomeVisit::from)
 				.toList();
 
