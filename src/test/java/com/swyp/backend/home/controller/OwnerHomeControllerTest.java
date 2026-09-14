@@ -179,19 +179,32 @@ class OwnerHomeControllerTest {
 	void getOwnerHome_countsOneVisitForACustomerHoldingSeveralProducts() throws Exception {
 		Product carrot = createProduct("당근", 10);
 		Product potato = createProduct("감자", 5);
+		Product onion = createProduct("양파", 5);
 		User consumer = createConsumer();
-		holdRepository.saveAllAndFlush(HoldFixture.group(
-			consumer, Instant.now().plus(Duration.ofMinutes(15)), carrot, 2, potato, 1));
+		User other = createConsumer();
+		Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+		Hold firstHeld = holdRepository.saveAndFlush(
+			HoldFixture.hold(consumer, carrot, 2, now.plus(Duration.ofMinutes(30))));
+		holdRepository.saveAndFlush(new Hold(
+			consumer, store, potato, 1, firstHeld.getGroupId(), now.plus(Duration.ofMinutes(10))));
+		Hold otherVisit = holdRepository.saveAndFlush(
+			HoldFixture.hold(other, onion, 4, now.plus(Duration.ofMinutes(20))));
 		carrot.hold(2);
 		potato.hold(1);
-		productRepository.saveAllAndFlush(List.of(carrot, potato));
+		onion.hold(4);
+		productRepository.saveAllAndFlush(List.of(carrot, potato, onion));
 
 		mockMvc.perform(get("/owner/home").header("Authorization", "Bearer " + token))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.summary.upcomingVisitCount").value(1))
-			.andExpect(jsonPath("$.data.upcomingVisits.length()").value(1))
+			.andExpect(jsonPath("$.data.summary.upcomingVisitCount").value(2))
+			.andExpect(jsonPath("$.data.upcomingVisits.length()").value(2))
+			.andExpect(jsonPath("$.data.upcomingVisits[0].holdId").value(firstHeld.getId()))
 			.andExpect(jsonPath("$.data.upcomingVisits[0].summary").value("당근, 감자"))
-			.andExpect(jsonPath("$.data.upcomingVisits[0].totalQty").value(3));
+			.andExpect(jsonPath("$.data.upcomingVisits[0].totalQty").value(3))
+			.andExpect(jsonPath("$.data.upcomingVisits[0].expiresAt")
+				.value(now.plus(Duration.ofMinutes(10)).toString()))
+			.andExpect(jsonPath("$.data.upcomingVisits[1].holdId").value(otherVisit.getId()))
+			.andExpect(jsonPath("$.data.upcomingVisits[1].summary").value("양파"));
 	}
 
 	@Test
