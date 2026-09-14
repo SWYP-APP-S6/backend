@@ -42,6 +42,11 @@ public class SecurityConfig {
 		"/uploads/**",
 	};
 
+	private static final String[] PUBLIC_TERMS_ENDPOINTS = {
+		"/terms",
+		"/terms/*",
+	};
+
 	private static final String[] PUBLIC_ENDPOINTS = {
 		"/ping",
 		"/admin/auth/login",
@@ -128,6 +133,7 @@ public class SecurityConfig {
 			.authorizeHttpRequests(auth -> {
 				auth.requestMatchers(PUBLIC_ENDPOINTS).permitAll();
 				auth.requestMatchers(HttpMethod.GET, PUBLIC_IMAGE_ENDPOINTS).permitAll();
+				auth.requestMatchers(HttpMethod.GET, PUBLIC_TERMS_ENDPOINTS).permitAll();
 				if (apiDocsEnabled) {
 					auth.requestMatchers(API_DOCS_ENDPOINTS).permitAll();
 				}
