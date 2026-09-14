@@ -134,4 +134,13 @@ class SecurityConfigTest {
 				.header("Access-Control-Request-Method", "GET"))
 			.andExpect(status().isForbidden());
 	}
+
+	@Test
+	void terms_areReadableBeforeAnAccountExists_butNothingUnderThemIsWritableAnonymously() throws Exception {
+		mockMvc.perform(get("/terms").param("role", "CONSUMER"))
+			.andExpect(status().isOk());
+		mockMvc.perform(post("/terms"))
+			.andExpect(status().isUnauthorized())
+			.andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+	}
 }

@@ -25,7 +25,10 @@ paths:
 - **조회 엔드포인트(`/recipes/**`·`/products/nearby` 등)는 `BROWSE_ENDPOINTS`에 등록**해 **GET만**
   GUEST·ADMIN·(`REALM_USER`+`ROLE_CONSUMER`) 셋에 연다 — **점주는 제외된다.** realm만 걸면
   `REALM_USER`가 소비자와 점주를 함께 통과시켜, `/owner/**`와 대칭인 구멍이 반대 방향으로 남는다.
-- `permitAll`은 `/ping`과 인증 엔드포인트에만 쓴다(익명 대량 요청의 구멍을 남기지 않기 위해).
+- `permitAll`은 `/ping`과 인증 엔드포인트에만 쓴다(익명 대량 요청의 구멍을 남기지 않기 위해). **예외는 약관 조회
+  (`GET /terms`, `/terms/*`) 하나다** — 가입 화면은 계정이 생기기 전에 약관을 보여줘야 하는데, 그 시점의 앱에는
+  액세스 토큰이 없다(카카오 로그인은 `signupToken`만 준다). 개인정보처리방침은 누구나 볼 수 있어야 하는 문서이기도
+  하다. GET만 열고 쓰기 경로는 만들지 않는다.
 
 ## realm
 
@@ -53,8 +56,11 @@ refresh를 `/admin/auth/refresh`에 넣어도 회전되지 않는다). access �
 
 첫 카카오 로그인은 `registered:false` + 단기 **signupToken**만 주고 `users` row를 만들지 않는다.
 약관 동의 후 `/auth/signup`이 계정을 만든다(기능명세서 C-002: 인증됐으나 약관 미동의인 계정이 남으면
-안 된다 — 이탈하면 아무것도 남지 않는다). 필수 약관 3건은 `SignupRequest`의 `@AssertTrue`로 강제하고,
-스키마엔 `terms_agreed_at` 한 건으로 기록한다(항목별 이력이 필요해지면 별도 테이블).
+안 된다 — 이탈하면 아무것도 남지 않는다). 필수 동의 4건(서비스·개인정보 수집·위치기반·제3자 제공)은 `SignupRequest`의 `@AssertTrue`로 강제하고,
+스키마엔 `users.terms_agreed_at`(가입 시각)과 **`user_terms_agreements`(동의한 문서의 판 × 동의 시각)** 에
+함께 기록한다. 약관 원문은 `terms_documents`에 판(version) 단위로 두고 `db/data/terms_data_1.sql`로 넣으며, 동의는
+가입 순간 그 역할의 **현재 판**에 대해 남는다 — 앱이 보여준 판과 어긋나지 않게, 누군가 동의한 판의 본문은 고치지 않고
+개정은 새 version으로 넣는다. 문서가 하나도 없는 역할이면 기록 없이 가입되고 경고 로그만 남는다(시드 누락 신호).
 
 ## guest (비회원 구경하기)
 

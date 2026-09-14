@@ -8,7 +8,7 @@ Flyway 경로(`db/migration`) **밖**이다. 자동 실행되지 않으며, 필�
 
 ## 파일
 
-투입할 파일은 **두 개**다. 나머지는 그 둘이 쓰는 재료다. 이전의 조각이던
+투입할 파일은 **세 개**다. 나머지는 그 셋이 쓰는 재료다. 이전의 조각이던
 `dev_seed_users.sql` · `dev_seed_stores.sql` 은 `test_data_1.sql` 이 대체해 지웠다 —
 둘을 같이 넣으면 이름이 겹치는 가게가 두 벌 생긴다.
 
@@ -16,6 +16,7 @@ Flyway 경로(`db/migration`) **밖**이다. 자동 실행되지 않으며, 필�
 |---|---|---|
 | **`init_data_1.sql`** | ✗ | **처음 뜰 때 필요한 실제 데이터** — 레시피 1,156건(`\ir` 로 `mfds_cookrcp01.sql` + `recipe_estimates.sql` 을 읽어 온다) + 관리자 9명. 관리자 INSERT 에 팀원 이메일과 전화번호 해시가 들어가 `.gitignore` 한다. `create_admins.sh` 로 언제든 다시 만든다 |
 | **`test_data_1.sql`** | ✓ | **런칭 전 샘플** — 가게 7곳 · 상품 25개 · 유저 12명. 전부 가짜다. 기준점에서 거리가 0 / 234 / 701 / 1,501 / 3,002 / 5,993m 로 갈리게 배치해 `radiusMeters` 를 500 → 5000 으로 올리면 매장이 1 → 3 → 4 → 5곳으로 늘어난다. 픽업 시각이 `now()` 상대값이라 언제 넣어도 판매중이고, 다시 돌리면 갱신된다 |
+| **`terms_data_1.sql`** | ✓ | **약관 원문 v1** — 소비자 6종 · 점주 4종(`terms_documents`). 노션 「맹그로 이용 약관」을 마크다운으로 옮겼고, 원문과 달라진 곳(중복 초안 제거 · FCM 수탁/토큰 보유기간 행)은 파일 머리 주석에 적었다. **이미 들어간 판은 파일을 고쳐 다시 돌려도 바뀌지 않는다** — 누군가 동의한 판의 본문을 사후에 고치지 않으려는 것이라, 개정은 `version` 을 올린 새 행으로 넣는다. 시행일·최종 개정일은 2026-09-16(`effective_date` 와 본문 문구 모두)이고, 회사명 등 나머지 `〔확인 필요〕` 자리표시자는 남아 있다 |
 | **`recipe_estimates.sql`** | ✓ | **레시피 난이도·조리시간 추정값 1,156건** — 식약처 원본에 두 항목이 없어 LLM 이 제목·조리법·재료 수로 판단해 채웠다. `(source, source_id)` 로 조인해 `update` 하므로 **레시피 본체 뒤에** 넣어야 하고, 사람이 고친 행(`*_source = 'HUMAN'`)은 건드리지 않는다. `docs/recipe-backfill/to_sql.py` 가 만들지만 판단 결과가 저장소 밖에 있어 **재생성 경로가 없다 — 그래서 유일하게 커밋하는 파생 파일이다** |
 | `mfds_cookrcp01.sql` | ✗ | 식약처 조리식품 레시피 DB 1,156건 → `recipes` / `recipe_steps` / `recipe_ingredients` / `ingredients` / `recipe_nutrition` / `recipe_tags`. `init_data_1.sql` 이 이 파일을 읽는다 |
 | `mfds_cookrcp01_raw.sql` | ✗ | 원본 API 응답 → `recipe_raw`. 선택 사항이며, 재수집 없이 파서만 고쳐 다시 만들 때 쓴다. 본체를 먼저 넣어야 한다 |
@@ -27,9 +28,10 @@ Flyway 경로(`db/migration`) **밖**이다. 자동 실행되지 않으며, 필�
 DB="postgresql://swyp:swyp@localhost:5432/swyp"
 psql "$DB" -v ON_ERROR_STOP=1 -f src/main/resources/db/data/init_data_1.sql   # 레시피 + 관리자
 psql "$DB" -v ON_ERROR_STOP=1 -f src/main/resources/db/data/test_data_1.sql   # 샘플 가게·상품
+psql "$DB" -v ON_ERROR_STOP=1 -f src/main/resources/db/data/terms_data_1.sql  # 약관 원문
 ```
 
-둘 다 **재실행해도 안전**하다. `init_data_1.sql` 은 이미 있는 행을 건드리지 않고,
+셋 다 **재실행해도 안전**하다. `terms_data_1.sql` 은 `(role, type, version)` 이 이미 있으면 건너뛴다. `init_data_1.sql` 은 이미 있는 행을 건드리지 않고,
 `test_data_1.sql` 은 자기가 만든 행(`users.oauth_provider = 'seed'`)만 지우고 다시 넣는다 —
 동료들이 관리자 페이지에서 만든 데이터는 남는다.
 
