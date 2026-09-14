@@ -176,6 +176,43 @@ class OwnerHomeControllerTest {
 	}
 
 	@Test
+	void getOwnerHome_countsOneVisitForACustomerHoldingSeveralProducts() throws Exception {
+		Product carrot = createProduct("당근", 10);
+		Product potato = createProduct("감자", 5);
+		User consumer = createConsumer();
+		holdRepository.saveAllAndFlush(HoldFixture.group(
+			consumer, Instant.now().plus(Duration.ofMinutes(15)), carrot, 2, potato, 1));
+		carrot.hold(2);
+		potato.hold(1);
+		productRepository.saveAllAndFlush(List.of(carrot, potato));
+
+		mockMvc.perform(get("/owner/home").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.summary.upcomingVisitCount").value(1))
+			.andExpect(jsonPath("$.data.upcomingVisits.length()").value(1))
+			.andExpect(jsonPath("$.data.upcomingVisits[0].summary").value("당근, 감자"))
+			.andExpect(jsonPath("$.data.upcomingVisits[0].totalQty").value(3));
+	}
+
+	@Test
+	void getOwnerHome_reportsTheProductsWhoseHoldsOutrunTheShelf() throws Exception {
+		Product carrot = createProduct("당근", 10);
+		createProduct("감자", 5);
+		holdRepository.saveAndFlush(
+			HoldFixture.hold(createConsumer(), carrot, 3, Instant.now().plus(Duration.ofMinutes(15))));
+		carrot.hold(3);
+		carrot.restock(1);
+		productRepository.saveAndFlush(carrot);
+
+		mockMvc.perform(get("/owner/home").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.issues.productsShortOfStock").value(1))
+			.andExpect(jsonPath("$.data.issues.shortfallQty").value(2))
+			.andExpect(jsonPath("$.data.products[?(@.name == '당근')].shortfallQty").value(2))
+			.andExpect(jsonPath("$.data.products[?(@.name == '감자')].shortfallQty").value(0));
+	}
+
+	@Test
 	void getOwnerHome_showsTheSellingProductsWithTheirSalePrice() throws Exception {
 		createProduct("당근", 6);
 

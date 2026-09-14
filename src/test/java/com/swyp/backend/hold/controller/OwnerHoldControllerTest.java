@@ -322,6 +322,25 @@ class OwnerHoldControllerTest {
 			.allSatisfy(hold -> assertThat(hold.getStatus()).isEqualTo(HoldStatus.COMPLETED));
 	}
 
+	@Test
+	void completePickup_whenTheShelfWasCountedBelowTheHolds_emptiesTheShelfInsteadOfFailing() throws Exception {
+		Product product = createProduct("복숭아", 10);
+		product.hold(3);
+		product.restock(1);
+		productRepository.saveAndFlush(product);
+		Hold hold = holding(product, 3, Duration.ofMinutes(9));
+
+		mockMvc.perform(post("/owner/holds/" + hold.getId() + "/complete")
+				.header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.status").value("COMPLETED"));
+
+		Product reloaded = productRepository.findById(product.getId()).orElseThrow();
+		assertThat(reloaded.getStockQty()).isZero();
+		assertThat(reloaded.getHeldQty()).isZero();
+		assertThat(reloaded.getAvailableQty()).isZero();
+	}
+
 	private void expireWithStockBack(Hold hold, Product product) {
 		hold.expire();
 		product.releaseHold(hold.getQty());
