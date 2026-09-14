@@ -177,7 +177,7 @@ public class Product extends BaseTimeEntity {
 			throw new IllegalStateException("complete qty exceeds held qty");
 		}
 		this.heldQty -= qty;
-		this.stockQty -= qty;
+		this.stockQty = Math.max(0, stockQty - qty);
 		syncAvailableWithStock();
 	}
 
@@ -203,7 +203,7 @@ public class Product extends BaseTimeEntity {
 	}
 
 	public int minAdjustableQty() {
-		return reconfirmSentAt == null ? reconfirmThresholdQty() : 0;
+		return reconfirmSentAt == null ? Math.min(reconfirmThresholdQty(), stockQty) : 0;
 	}
 
 	public void confirmStock(Instant confirmedAt) {
