@@ -7,14 +7,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
+import com.swyp.backend.AppDataCleaner;
 import com.swyp.backend.RedisTestcontainersConfiguration;
 import com.swyp.backend.TestcontainersConfiguration;
 import com.swyp.backend.common.exception.BusinessException;
+import com.swyp.backend.terms.entity.TermsDocument;
+import com.swyp.backend.terms.entity.TermsRequirement;
+import com.swyp.backend.terms.entity.TermsType;
+import com.swyp.backend.terms.repository.TermsDocumentRepository;
 import com.swyp.backend.user.entity.User;
 import com.swyp.backend.user.entity.UserRole;
 import com.swyp.backend.user.exception.UserAuthErrorCode;
 import com.swyp.backend.user.repository.UserRepository;
 import com.swyp.backend.user.service.KakaoOauthClient;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -27,6 +33,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
@@ -43,6 +50,15 @@ class UserAuthFlowTest {
 
 	@Autowired
 	StubKakaoOauthClient kakaoOauthClient;
+
+	@Autowired
+	AppDataCleaner appDataCleaner;
+
+	@Autowired
+	TermsDocumentRepository termsDocumentRepository;
+
+	@Autowired
+	JdbcTemplate jdbcTemplate;
 
 	private ResultActions login(UserRole role, String kakaoToken) throws Exception {
 		String path = role == UserRole.CONSUMER ? "/auth/consumer/kakao" : "/auth/owner/kakao";
@@ -281,6 +297,94 @@ class UserAuthFlowTest {
 		mockMvc.perform(get("/admin/users").header("Authorization", "Bearer " + signupToken))
 			.andExpect(status().isUnauthorized())
 			.andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+	}
+
+	@Test
+	void signup_recordsWhichVersionOfEachDocumentWasAgreedTo_atTheMomentOfSignup() throws Exception {
+		appDataCleaner.clear();
+		publishConsumerTerms();
+		publish(UserRole.CONSUMER, TermsType.SERVICE, 2, TermsRequirement.REQUIRED);
+
+		Long userId = signUpAgreeing(UserRole.CONSUMER, "token-terms-1", "kakao-2001", false);
+
+		assertThat(agreedDocuments(userId))
+			.as("the privacy policy is shown rather than agreed to, and marketing was declined")
+			.containsExactlyInAnyOrder("SERVICE v2", "PRIVACY_COLLECTION v1", "LOCATION v1", "THIRD_PARTY v1");
+		assertThat(jdbcTemplate.queryForObject("""
+				select count(*) from user_terms_agreements a join users u on u.id = a.user_id
+				where a.user_id = ? and a.agreed_at <> u.terms_agreed_at""", Integer.class, userId))
+			.as("each agreement carries the same instant as the account's own signup time")
+			.isZero();
+	}
+
+	@Test
+	void signup_recordsTheMarketingConsentOnlyWhenItWasGiven() throws Exception {
+		appDataCleaner.clear();
+		publishConsumerTerms();
+
+		Long userId = signUpAgreeing(UserRole.CONSUMER, "token-terms-2", "kakao-2002", true);
+
+		assertThat(agreedDocuments(userId)).contains("MARKETING v1");
+	}
+
+	@Test
+	void ownerSignup_recordsOnlyTheDocumentsTheOwnerAppShows() throws Exception {
+		appDataCleaner.clear();
+		publishConsumerTerms();
+		publish(UserRole.OWNER, TermsType.SERVICE, 1, TermsRequirement.REQUIRED);
+		publish(UserRole.OWNER, TermsType.PRIVACY_COLLECTION, 1, TermsRequirement.REQUIRED);
+		publish(UserRole.OWNER, TermsType.MARKETING, 1, TermsRequirement.OPTIONAL);
+		publish(UserRole.OWNER, TermsType.PRIVACY_POLICY, 1, TermsRequirement.NOTICE);
+
+		Long userId = signUpAgreeing(UserRole.OWNER, "token-terms-3", "kakao-2003", false);
+
+		assertThat(agreedDocuments(userId))
+			.as("the owner request still carries the location and third-party flags, but the owner app "
+				+ "has no such documents, and a consumer document never lands on an owner")
+			.containsExactlyInAnyOrder("SERVICE v1", "PRIVACY_COLLECTION v1");
+	}
+
+	@Test
+	void signup_stillCreatesTheAccountWhenNoTermsArePublished() throws Exception {
+		appDataCleaner.clear();
+
+		Long userId = signUpAgreeing(UserRole.CONSUMER, "token-terms-4", "kakao-2004", false);
+
+		assertThat(agreedDocuments(userId)).isEmpty();
+	}
+
+	private Long signUpAgreeing(UserRole role, String kakaoToken, String providerId, boolean marketingOptIn)
+			throws Exception {
+		String signupToken = signupTokenFor(role, kakaoToken, providerId, "약관동의자");
+		mockMvc.perform(post("/auth/signup")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"signupToken":"%s","serviceTermsAgreed":true,"privacyTermsAgreed":true,\
+					"locationTermsAgreed":true,"thirdPartyTermsAgreed":true,"marketingOptIn":%b}"""
+					.formatted(signupToken, marketingOptIn)))
+			.andExpect(status().isCreated());
+		return storedUser(providerId, role).orElseThrow().getId();
+	}
+
+	private void publishConsumerTerms() {
+		publish(UserRole.CONSUMER, TermsType.SERVICE, 1, TermsRequirement.REQUIRED);
+		publish(UserRole.CONSUMER, TermsType.PRIVACY_COLLECTION, 1, TermsRequirement.REQUIRED);
+		publish(UserRole.CONSUMER, TermsType.LOCATION, 1, TermsRequirement.REQUIRED);
+		publish(UserRole.CONSUMER, TermsType.THIRD_PARTY, 1, TermsRequirement.REQUIRED);
+		publish(UserRole.CONSUMER, TermsType.MARKETING, 1, TermsRequirement.OPTIONAL);
+		publish(UserRole.CONSUMER, TermsType.PRIVACY_POLICY, 1, TermsRequirement.NOTICE);
+	}
+
+	private void publish(UserRole role, TermsType type, int version, TermsRequirement requirement) {
+		termsDocumentRepository.saveAndFlush(
+			new TermsDocument(role, type, version, type + " v" + version, requirement, "본문", null));
+	}
+
+	private List<String> agreedDocuments(Long userId) {
+		return jdbcTemplate.queryForList("""
+				select d.type || ' v' || d.version from user_terms_agreements a
+				join terms_documents d on d.id = a.terms_document_id
+				where a.user_id = ?""", String.class, userId);
 	}
 
 	@TestConfiguration
