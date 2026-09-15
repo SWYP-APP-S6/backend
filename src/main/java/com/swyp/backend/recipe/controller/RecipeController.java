@@ -1,5 +1,6 @@
 package com.swyp.backend.recipe.controller;
 
+import com.swyp.backend.common.openapi.PageQueryParams;
 import com.swyp.backend.common.response.ApiResponse;
 import com.swyp.backend.common.response.PageResponse;
 import com.swyp.backend.common.response.SuccessCode;
@@ -7,6 +8,7 @@ import com.swyp.backend.recipe.dto.RecipeDetailResponse;
 import com.swyp.backend.recipe.dto.RecipeSummaryResponse;
 import com.swyp.backend.recipe.service.RecipeService;
 import java.util.List;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
@@ -37,8 +39,10 @@ public class RecipeController {
 	}
 
 	@GetMapping
+	@PageQueryParams
 	public ApiResponse<PageResponse<RecipeSummaryResponse>> getRecipes(
 			@RequestParam(required = false) String category,
+			@Parameter(hidden = true)
 			@PageableDefault(size = 20, sort = "viewCount", direction = Sort.Direction.DESC) Pageable pageable) {
 		return ApiResponse.of(SuccessCode.OK, recipeService.getRecipes(category, pageable));
 	}

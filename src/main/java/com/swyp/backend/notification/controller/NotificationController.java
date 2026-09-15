@@ -1,11 +1,13 @@
 package com.swyp.backend.notification.controller;
 
+import com.swyp.backend.common.openapi.PageQueryParams;
 import com.swyp.backend.common.response.ApiResponse;
 import com.swyp.backend.common.response.SuccessCode;
 import com.swyp.backend.notification.dto.NotificationResponse;
 import com.swyp.backend.notification.dto.NotificationsReadResponse;
 import com.swyp.backend.notification.dto.NotificationsResponse;
 import com.swyp.backend.notification.service.NotificationService;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
@@ -27,8 +29,10 @@ public class NotificationController {
 	private final NotificationService notificationService;
 
 	@GetMapping
+	@PageQueryParams
 	public ApiResponse<NotificationsResponse> getNotifications(
-			@AuthenticationPrincipal Long userId, @PageableDefault(size = 20) Pageable pageable) {
+			@AuthenticationPrincipal Long userId,
+			@Parameter(hidden = true) @PageableDefault(size = 20) Pageable pageable) {
 		return ApiResponse.of(SuccessCode.OK, notificationService.getNotifications(userId, pageable));
 	}
 
