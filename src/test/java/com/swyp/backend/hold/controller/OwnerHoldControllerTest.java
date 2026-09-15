@@ -94,6 +94,7 @@ class OwnerHoldControllerTest {
 
 		mockMvc.perform(get("/owner/holds?status=HOLDING").header("Authorization", "Bearer " + token))
 			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.serverTime").isNotEmpty())
 			.andExpect(jsonPath("$.data.holds.totalElements").value(2))
 			.andExpect(jsonPath("$.data.holds.content[0].qty").value(2))
 			.andExpect(jsonPath("$.data.holds.content[0].status").value("HOLDING"))

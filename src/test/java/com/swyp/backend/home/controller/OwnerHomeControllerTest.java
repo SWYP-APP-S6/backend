@@ -88,6 +88,7 @@ class OwnerHomeControllerTest {
 	void getOwnerHome_describesTheStoreAboveTheSummary() throws Exception {
 		mockMvc.perform(get("/owner/home").header("Authorization", "Bearer " + token))
 			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.serverTime").isNotEmpty())
 			.andExpect(jsonPath("$.data.store.name").value("청과마을"))
 			.andExpect(jsonPath("$.data.store.status").value("APPROVED"))
 			.andExpect(jsonPath("$.data.store.categories[0]").value("VEGETABLE"))

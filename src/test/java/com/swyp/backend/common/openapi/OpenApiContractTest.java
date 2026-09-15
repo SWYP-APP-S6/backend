@@ -153,6 +153,37 @@ class OpenApiContractTest {
 				.isEmpty();
 	}
 
+	@Test
+	void aPageIsRequestedWithPlainPageAndSizeQueryParameters() throws Exception {
+		List<String> pageableObjects = new ArrayList<>();
+		for (Endpoint endpoint : endpoints()) {
+			endpoint.operation().path("parameters").forEach(parameter -> {
+				JsonNode ref = parameter.at("/schema/$ref");
+				if (ref.isString() && ref.asString().endsWith("/Pageable")) {
+					pageableObjects.add(endpoint.method() + " " + endpoint.path());
+				}
+			});
+		}
+
+		assertThat(pageableObjects)
+				.as("a Pageable argument without @PageQueryParams documents one ?pageable=<object> "
+						+ "query parameter, which the generator sends and the server never reads")
+				.isEmpty();
+		assertThat(queryParameterNames("/owner/holds"))
+				.contains("page", "size")
+				.doesNotContain("pageable", "sort");
+		assertThat(queryParameterNames("/notifications"))
+				.contains("page", "size")
+				.doesNotContain("pageable", "sort");
+	}
+
+	private List<String> queryParameterNames(String path) throws Exception {
+		List<String> names = new ArrayList<>();
+		spec().at("/paths/" + path.replace("/", "~1") + "/get/parameters")
+				.forEach(parameter -> names.add(parameter.get("name").asString()));
+		return names;
+	}
+
 	private static boolean carriesBinary(JsonNode media) {
 		JsonNode properties = media.at("/schema/properties");
 		if (!properties.isObject()) {
