@@ -6,14 +6,23 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import com.swyp.backend.RedisTestcontainersConfiguration;
 import com.swyp.backend.TestcontainersConfiguration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.method.HandlerMethod;
+import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
+import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -31,8 +40,14 @@ class OpenApiContractTest {
 
 	private static final List<String> ERROR_STATUSES = List.of("400", "401", "403", "429", "500");
 
+	private static final List<String> NON_APP_PATH_PREFIXES = List.of("/admin/", "/dev/");
+
 	@Autowired
 	MockMvc mockMvc;
+
+	@Autowired
+	@Qualifier("requestMappingHandlerMapping")
+	RequestMappingHandlerMapping handlerMapping;
 
 	@Autowired
 	ObjectMapper objectMapper;
@@ -154,33 +169,46 @@ class OpenApiContractTest {
 	}
 
 	@Test
-	void aPageIsRequestedWithPlainPageAndSizeQueryParameters() throws Exception {
-		List<String> pageableObjects = new ArrayList<>();
-		for (Endpoint endpoint : endpoints()) {
-			endpoint.operation().path("parameters").forEach(parameter -> {
-				JsonNode ref = parameter.at("/schema/$ref");
-				if (ref.isString() && ref.asString().endsWith("/Pageable")) {
-					pageableObjects.add(endpoint.method() + " " + endpoint.path());
+	void aPagedListDeclaresPageAndSizeButNeitherPageableNorSort() throws Exception {
+		List<String> checked = new ArrayList<>();
+		List<String> misdeclared = new ArrayList<>();
+		for (Map.Entry<RequestMappingInfo, HandlerMethod> handler
+				: handlerMapping.getHandlerMethods().entrySet()) {
+			if (!takesPageable(handler.getValue())) {
+				continue;
+			}
+			for (String path : handler.getKey().getPatternValues()) {
+				if (NON_APP_PATH_PREFIXES.stream().anyMatch(path::startsWith)) {
+					continue;
 				}
-			});
+				for (RequestMethod method : handler.getKey().getMethodsCondition().getMethods()) {
+					checked.add(method + " " + path);
+					List<String> names = parameterNames(
+							spec().path("paths").path(path).path(method.name().toLowerCase(Locale.ROOT)));
+					if (!names.containsAll(List.of("page", "size"))
+							|| names.contains("pageable") || names.contains("sort")) {
+						misdeclared.add(method + " " + path + " " + names);
+					}
+				}
+			}
 		}
 
-		assertThat(pageableObjects)
-				.as("a Pageable argument without @PageQueryParams documents one ?pageable=<object> "
-						+ "query parameter, which the generator sends and the server never reads")
+		assertThat(checked).isNotEmpty();
+		assertThat(misdeclared)
+				.as("a bare Pageable documents one ?pageable=<object> the server never reads, a "
+						+ "@ParameterObject one advertises a sort the server overrides, and a hidden one "
+						+ "without @PageQueryParams leaves the generated client no way to page")
 				.isEmpty();
-		assertThat(queryParameterNames("/owner/holds"))
-				.contains("page", "size")
-				.doesNotContain("pageable", "sort");
-		assertThat(queryParameterNames("/notifications"))
-				.contains("page", "size")
-				.doesNotContain("pageable", "sort");
 	}
 
-	private List<String> queryParameterNames(String path) throws Exception {
+	private static boolean takesPageable(HandlerMethod handler) {
+		return Arrays.stream(handler.getMethodParameters())
+				.anyMatch(parameter -> Pageable.class.isAssignableFrom(parameter.getParameterType()));
+	}
+
+	private static List<String> parameterNames(JsonNode operation) {
 		List<String> names = new ArrayList<>();
-		spec().at("/paths/" + path.replace("/", "~1") + "/get/parameters")
-				.forEach(parameter -> names.add(parameter.get("name").asString()));
+		operation.path("parameters").forEach(parameter -> names.add(parameter.get("name").asString()));
 		return names;
 	}
 
