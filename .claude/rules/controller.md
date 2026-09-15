@@ -25,7 +25,9 @@ paths:
     이름이 바뀔 수 있다. `/admin`과 앱 스펙은 그룹으로 갈라져 있고, 중복은 `OpenApiContractTest`가 막는다.
   - **`Pageable` 인자는 `@Parameter(hidden = true)`로 가리고 메서드에 `@PageQueryParams`를 단다.**
     그냥 두면 springdoc이 `pageable` 객체 하나를 쿼리 파라미터로 적어, 생성된 클라이언트가
-    `?pageable=…`을 보내고 서버는 그걸 읽지 못한다. `sort`는 명세에 올리지 않는다 — 목록 순서는 서버가
-    정한다(`HoldFunction`·`NotificationFunction`이 `PageRequest`를 다시 만든다). 회귀는
-    `OpenApiContractTest`가 막는다.
+    `?pageable=…`을 보내고 서버는 그걸 읽지 못한다. `sort`는 명세에 올리지 않고 **클라이언트가 보내도
+    따르지 않는다** — 목록 순서는 function이 페이지 번호·크기만 받아 `PageRequest`를 다시 만들어
+    정한다(`HoldFunction`·`NotificationFunction`·`RecipeFunction`). 클라이언트 `Pageable`을 리포지토리에
+    그대로 넘기면 숨긴 `sort`가 여전히 먹히고, 없는 필드면 500이 난다. 앱 명세(`/admin`·`/dev` 제외)에서
+    `Pageable`을 받는 모든 핸들러를 `OpenApiContractTest`가 검사한다.
 - 인증 주체 접근(현재 사용자 등)은 auth 도입 후(지금 TBD). 레퍼런스: `com.swyp.backend.ping.PingController`.
