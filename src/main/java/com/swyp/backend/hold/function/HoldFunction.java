@@ -6,6 +6,7 @@ import com.swyp.backend.hold.dto.HoldRef;
 import com.swyp.backend.hold.dto.HoldStatusCount;
 import com.swyp.backend.hold.dto.OverdueHold;
 import com.swyp.backend.hold.dto.OwnerHoldStatus;
+import com.swyp.backend.hold.dto.ProductHoldId;
 import com.swyp.backend.hold.entity.Hold;
 import com.swyp.backend.hold.entity.HoldStatus;
 import com.swyp.backend.hold.exception.HoldErrorCode;
@@ -14,6 +15,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -80,6 +82,15 @@ public class HoldFunction {
 		return holdIds.isEmpty() ? List.of() : holdRepository.findProductIdsOfHolds(holdIds);
 	}
 
+	public Map<Long, Long> getProductIdByHold(List<Long> holdIds) {
+		Map<Long, Long> productIdByHold = holdRepository.findProductHoldIdsByHoldIds(holdIds).stream()
+				.collect(Collectors.toMap(ProductHoldId::holdId, ProductHoldId::productId));
+		if (productIdByHold.size() != holdIds.stream().distinct().count()) {
+			throw new BusinessException(HoldErrorCode.HOLD_NOT_FOUND);
+		}
+		return productIdByHold;
+	}
+
 	public long nextGroupId() {
 		return holdRepository.nextGroupId();
 	}
@@ -138,8 +149,20 @@ public class HoldFunction {
 		return holdRepository.findByProductIdAndStatus(productId, HoldStatus.HOLDING);
 	}
 
-	public List<Long> findActiveHoldIdsOfProduct(Long productId) {
-		return holdRepository.findIdsByProductIdAndStatus(productId, HoldStatus.HOLDING);
+	public List<Hold> findHoldingOfProducts(List<Long> productIds) {
+		return productIds.isEmpty() ? List.of() : holdRepository.findHoldingWithUserOfProducts(productIds);
+	}
+
+	public Map<Long, Integer> heldOrderOfProducts(List<Long> productIds) {
+		if (productIds.isEmpty()) {
+			return Map.of();
+		}
+		Map<Long, Integer> placedSoFar = new HashMap<>();
+		Map<Long, Integer> orderByHold = new HashMap<>();
+		for (ProductHoldId held : holdRepository.findProductHoldIdsInHeldOrder(productIds)) {
+			orderByHold.put(held.holdId(), placedSoFar.merge(held.productId(), 1, Integer::sum));
+		}
+		return orderByHold;
 	}
 
 	public List<Hold> findHoldingOfStore(Long storeId) {

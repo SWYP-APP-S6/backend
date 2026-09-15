@@ -4,6 +4,7 @@ import com.swyp.backend.hold.dto.ActiveHoldQty;
 import com.swyp.backend.hold.dto.HoldRef;
 import com.swyp.backend.hold.dto.HoldStatusCount;
 import com.swyp.backend.hold.dto.OverdueHold;
+import com.swyp.backend.hold.dto.ProductHoldId;
 import com.swyp.backend.hold.entity.Hold;
 import com.swyp.backend.hold.entity.HoldCanceledBy;
 import com.swyp.backend.hold.entity.HoldStatus;
@@ -145,12 +146,28 @@ public interface HoldRepository extends JpaRepository<Hold, Long> {
 			@Param("productId") Long productId, @Param("status") HoldStatus status);
 
 	@Query("""
-			select h.id from Hold h
-			where h.product.id = :productId and h.status = :status
+			select h from Hold h
+			join fetch h.user
+			where h.product.id in :productIds
+				and h.status = com.swyp.backend.hold.entity.HoldStatus.HOLDING
 			order by h.createdAt asc, h.id asc
 			""")
-	List<Long> findIdsByProductIdAndStatus(
-			@Param("productId") Long productId, @Param("status") HoldStatus status);
+	List<Hold> findHoldingWithUserOfProducts(@Param("productIds") List<Long> productIds);
+
+	@Query("""
+			select new com.swyp.backend.hold.dto.ProductHoldId(h.product.id, h.id)
+			from Hold h
+			where h.product.id in :productIds
+			order by h.createdAt asc, h.id asc
+			""")
+	List<ProductHoldId> findProductHoldIdsInHeldOrder(@Param("productIds") List<Long> productIds);
+
+	@Query("""
+			select new com.swyp.backend.hold.dto.ProductHoldId(h.product.id, h.id)
+			from Hold h
+			where h.id in :holdIds
+			""")
+	List<ProductHoldId> findProductHoldIdsByHoldIds(@Param("holdIds") List<Long> holdIds);
 
 	@Query("""
 			select coalesce(sum(h.qty), 0) from Hold h
