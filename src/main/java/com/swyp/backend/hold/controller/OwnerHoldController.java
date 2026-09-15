@@ -1,11 +1,13 @@
 package com.swyp.backend.hold.controller;
 
+import com.swyp.backend.common.openapi.PageQueryParams;
 import com.swyp.backend.common.response.ApiResponse;
 import com.swyp.backend.common.response.SuccessCode;
 import com.swyp.backend.hold.dto.OwnerHoldDetailResponse;
 import com.swyp.backend.hold.dto.OwnerHoldListResponse;
 import com.swyp.backend.hold.dto.OwnerHoldStatus;
 import com.swyp.backend.hold.service.OwnerHoldService;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
@@ -27,10 +29,11 @@ public class OwnerHoldController {
 	private final OwnerHoldService ownerHoldService;
 
 	@GetMapping
+	@PageQueryParams
 	public ApiResponse<OwnerHoldListResponse> getOwnerHolds(
 			@AuthenticationPrincipal Long ownerId,
 			@RequestParam(required = false) OwnerHoldStatus status,
-			@PageableDefault(size = 20) Pageable pageable) {
+			@Parameter(hidden = true) @PageableDefault(size = 20) Pageable pageable) {
 		return ApiResponse.of(SuccessCode.OK, ownerHoldService.getHolds(ownerId, status, pageable));
 	}
 

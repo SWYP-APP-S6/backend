@@ -52,6 +52,7 @@ public class OwnerHoldService {
 				.map(OwnerHoldSummaryResponse::from)
 				.toList();
 		return new OwnerHoldListResponse(
+				Instant.now(clock),
 				OwnerHoldCounts.from(holdFunction.countStoreHoldsByOwnerStatus(store.getId())),
 				PageResponse.of(content, holds));
 	}

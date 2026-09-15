@@ -24,13 +24,18 @@ import java.util.Set;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 @Component
 @RequiredArgsConstructor
 public class RecipeFunction {
+
+	private static final Sort POPULAR_FIRST =
+			Sort.by(Sort.Direction.DESC, "viewCount").and(Sort.by(Sort.Direction.DESC, "id"));
 
 	private final RecipeRepository recipeRepository;
 	private final RecipeStepRepository recipeStepRepository;
@@ -45,9 +50,11 @@ public class RecipeFunction {
 	}
 
 	public Page<Recipe> findPublishedByCategory(String category, Pageable pageable) {
+		Pageable popularFirst =
+				PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), POPULAR_FIRST);
 		return StringUtils.hasText(category)
-				? recipeRepository.findByPublishedTrueAndCategory(category, pageable)
-				: recipeRepository.findByPublishedTrue(pageable);
+				? recipeRepository.findByPublishedTrueAndCategory(category, popularFirst)
+				: recipeRepository.findByPublishedTrue(popularFirst);
 	}
 
 	public List<String> findPublishedCategories() {
