@@ -19,7 +19,8 @@ public enum HoldErrorCode implements ApiCode {
 	HOLD_ALREADY_EXPIRED(HttpStatus.CONFLICT, "찜 시간이 지나 취소할 수 없습니다."),
 	OTHER_STORE_HOLD_ACTIVE(HttpStatus.CONFLICT, "다른 가게에서 찜이 진행 중입니다."),
 	CANCEL_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "취소 가능 횟수를 모두 사용했습니다."),
-	PRODUCT_STOCK_GONE(HttpStatus.CONFLICT, "남은 재고가 없어 수령 처리를 할 수 없습니다.");
+	PRODUCT_STOCK_GONE(HttpStatus.CONFLICT, "남은 재고가 없어 수령 처리를 할 수 없습니다."),
+	PRODUCT_NOT_SHORT_OF_STOCK(HttpStatus.CONFLICT, "재고가 부족하지 않은 상품의 찜은 취소할 수 없습니다.");
 
 	private final HttpStatus status;
 	private final String message;
