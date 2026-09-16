@@ -1,5 +1,6 @@
 package com.swyp.backend.user.dto;
 
+import com.swyp.backend.store.entity.Store;
 import com.swyp.backend.user.entity.User;
 import java.time.Instant;
 import org.jspecify.annotations.Nullable;
@@ -13,9 +14,13 @@ public record UserSummaryResponse(
 		@Nullable String regionName,
 		boolean marketingOptIn,
 		Instant termsAgreedAt,
-		Instant createdAt) {
+		Instant createdAt,
+		@Nullable OwnedStore store) {
 
-	public static UserSummaryResponse of(User user, String regionName) {
+	public record OwnedStore(Long id, String name, String status) {
+	}
+
+	public static UserSummaryResponse of(User user, @Nullable String regionName, @Nullable Store store) {
 		return new UserSummaryResponse(
 				user.getId(),
 				user.getRole().name(),
@@ -25,6 +30,9 @@ public record UserSummaryResponse(
 				regionName,
 				user.isMarketingOptIn(),
 				user.getTermsAgreedAt(),
-				user.getCreatedAt());
+				user.getCreatedAt(),
+				store == null
+						? null
+						: new OwnedStore(store.getId(), store.getName(), store.getStatus().name()));
 	}
 }

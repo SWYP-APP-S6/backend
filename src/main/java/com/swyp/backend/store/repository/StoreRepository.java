@@ -3,6 +3,7 @@ package com.swyp.backend.store.repository;
 import com.swyp.backend.store.entity.Store;
 import com.swyp.backend.store.entity.StoreStatus;
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
@@ -18,6 +19,8 @@ public interface StoreRepository extends JpaRepository<Store, Long> {
 	Optional<Store> findByOwnerId(Long ownerId);
 
 	boolean existsByOwnerId(Long ownerId);
+
+	List<Store> findByOwnerIdIn(Collection<Long> ownerIds);
 
 	List<Store> findByStatusAndLatitudeBetweenAndLongitudeBetween(
 			StoreStatus status,
