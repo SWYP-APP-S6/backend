@@ -112,6 +112,16 @@ class OpenApiContractTest {
 	}
 
 	@Test
+	void everyOperationKeepsTheValidationGuidanceOnItsBadRequest() throws Exception {
+		assertThat(endpoints()).allSatisfy(endpoint -> assertThat(
+				endpoint.operation().at("/responses/400/description").asString())
+				.as("%s %s declares business codes on 400, and a declaration must not push out the "
+						+ "VALIDATION_FAILED guidance the app needs to read fieldErrors",
+						endpoint.method(), endpoint.path())
+				.contains("code=VALIDATION_FAILED"));
+	}
+
+	@Test
 	void everyOperationIsTaggedWithAReadableName() throws Exception {
 		assertThat(endpoints()).allSatisfy(endpoint -> {
 			JsonNode tags = endpoint.operation().get("tags");

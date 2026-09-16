@@ -370,13 +370,6 @@ class UserAuthFlowTest {
 			.isEmpty();
 	}
 
-	private void publishOwnerTerms() {
-		publish(UserRole.OWNER, TermsType.SERVICE, 1, TermsRequirement.REQUIRED);
-		publish(UserRole.OWNER, TermsType.PRIVACY_COLLECTION, 1, TermsRequirement.REQUIRED);
-		publish(UserRole.OWNER, TermsType.MARKETING, 1, TermsRequirement.OPTIONAL);
-		publish(UserRole.OWNER, TermsType.PRIVACY_POLICY, 1, TermsRequirement.NOTICE);
-	}
-
 	@Test
 	void signup_stillCreatesTheAccountWhenNoTermsArePublished() throws Exception {
 		appDataCleaner.clear();
@@ -397,6 +390,13 @@ class UserAuthFlowTest {
 					.formatted(signupToken, marketingOptIn)))
 			.andExpect(status().isCreated());
 		return storedUser(providerId, role).orElseThrow().getId();
+	}
+
+	private void publishOwnerTerms() {
+		publish(UserRole.OWNER, TermsType.SERVICE, 1, TermsRequirement.REQUIRED);
+		publish(UserRole.OWNER, TermsType.PRIVACY_COLLECTION, 1, TermsRequirement.REQUIRED);
+		publish(UserRole.OWNER, TermsType.MARKETING, 1, TermsRequirement.OPTIONAL);
+		publish(UserRole.OWNER, TermsType.PRIVACY_POLICY, 1, TermsRequirement.NOTICE);
 	}
 
 	private void publishConsumerTerms() {
