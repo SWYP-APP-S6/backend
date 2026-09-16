@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
+import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.data.domain.Pageable;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.RequestMethod;
@@ -225,6 +226,38 @@ class OpenApiContractTest {
 			}
 		});
 		return !binary.isEmpty();
+	}
+
+	@Test
+	void anOperationDeclaresTheBusinessFailuresItAnswersWith() throws Exception {
+		JsonNode cancel = spec().at("/paths/~1owner~1holds~1cancel/post/responses");
+
+		assertThat(cancel.path("409").at("/content/application~1json/schema/$ref").asString())
+				.isEqualTo("#/components/schemas/ErrorResponse");
+		assertThat(cancel.path("409").path("description").asString())
+				.as("the app branches on the code, so a conflict the operation can answer with has to "
+						+ "reach the spec it generates from")
+				.contains("PRODUCT_NOT_SHORT_OF_STOCK", "HOLD_ALREADY_RESOLVED", "HOLD_ALREADY_EXPIRED")
+				.contains("이미 처리된 찜입니다.");
+		assertThat(cancel.path("404").path("description").asString())
+				.contains("HOLD_NOT_FOUND", "STORE_NOT_REGISTERED", "PRODUCT_NOT_FOUND");
+	}
+
+	@Test
+	void everyDeclaredErrorCodeNamesOneThatExists() {
+		List<String> unknown = new ArrayList<>();
+		handlerMapping.getHandlerMethods().values().forEach(handler ->
+				AnnotatedElementUtils
+						.findMergedRepeatableAnnotations(handler.getMethod(), ApiErrorCodes.class)
+						.forEach(declared -> Arrays.stream(declared.codes())
+								.filter(name -> Arrays.stream(declared.in().getEnumConstants())
+										.noneMatch(code -> code.name().equals(name)))
+								.forEach(name -> unknown.add(handler.getMethod().getName() + " -> "
+										+ declared.in().getSimpleName() + "." + name))));
+
+		assertThat(unknown)
+				.as("a renamed code would drop out of the spec without anyone noticing")
+				.isEmpty();
 	}
 
 	@Test
