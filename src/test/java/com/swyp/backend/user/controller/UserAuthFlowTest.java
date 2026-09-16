@@ -141,7 +141,9 @@ class UserAuthFlowTest {
 	}
 
 	@Test
-	void signup_withoutTheThirdPartyConsent_isRejected() throws Exception {
+	void signup_withoutTheThirdPartyConsent_isRejectedWhereThatDocumentIsRequired() throws Exception {
+		appDataCleaner.clear();
+		publishConsumerTerms();
 		String signupToken = signupTokenFor(UserRole.CONSUMER, "token-no-third", "kakao-1007", "제3자미동의");
 
 		mockMvc.perform(post("/auth/signup")
@@ -151,9 +153,7 @@ class UserAuthFlowTest {
 					"locationTermsAgreed":true,"thirdPartyTermsAgreed":false,"marketingOptIn":false}"""
 					.formatted(signupToken)))
 			.andExpect(status().isBadRequest())
-			.andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
-			.andExpect(jsonPath("$.fieldErrors.thirdPartyTermsAgreed")
-				.value("개인정보 제3자 제공 동의가 필요합니다."));
+			.andExpect(jsonPath("$.code").value("TERMS_AGREEMENT_REQUIRED"));
 
 		assertThat(storedUser("kakao-1007", UserRole.CONSUMER)).isEmpty();
 	}
@@ -328,20 +328,53 @@ class UserAuthFlowTest {
 	}
 
 	@Test
-	void ownerSignup_recordsOnlyTheDocumentsTheOwnerAppShows() throws Exception {
+	void ownerSignup_asksOnlyForTheTermsTheOwnerAppShows() throws Exception {
 		appDataCleaner.clear();
 		publishConsumerTerms();
+		publishOwnerTerms();
+		String signupToken = signupTokenFor(UserRole.OWNER, "token-terms-3", "kakao-2003", "사장님");
+
+		mockMvc.perform(post("/auth/signup")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"signupToken":"%s","serviceTermsAgreed":true,"privacyTermsAgreed":true,\
+					"locationTermsAgreed":false,"thirdPartyTermsAgreed":false,"marketingOptIn":false}"""
+					.formatted(signupToken)))
+			.andExpect(status().isCreated());
+
+		Long userId = storedUser("kakao-2003", UserRole.OWNER).orElseThrow().getId();
+		assertThat(agreedDocuments(userId))
+			.as("the owner screen shows neither the location nor the third-party document, and a "
+				+ "consumer document never lands on an owner")
+			.containsExactlyInAnyOrder("SERVICE v1", "PRIVACY_COLLECTION v1");
+	}
+
+	@Test
+	void ownerSignup_isRejectedOnceTheOwnerTermsRequireTheLocationConsent() throws Exception {
+		appDataCleaner.clear();
+		publishOwnerTerms();
+		publish(UserRole.OWNER, TermsType.LOCATION, 1, TermsRequirement.REQUIRED);
+		String signupToken = signupTokenFor(UserRole.OWNER, "token-terms-5", "kakao-2005", "사장님");
+
+		mockMvc.perform(post("/auth/signup")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"signupToken":"%s","serviceTermsAgreed":true,"privacyTermsAgreed":true,\
+					"locationTermsAgreed":false,"thirdPartyTermsAgreed":false,"marketingOptIn":false}"""
+					.formatted(signupToken)))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("TERMS_AGREEMENT_REQUIRED"));
+
+		assertThat(storedUser("kakao-2005", UserRole.OWNER))
+			.as("what a role must agree to follows the published documents, not a fixed list")
+			.isEmpty();
+	}
+
+	private void publishOwnerTerms() {
 		publish(UserRole.OWNER, TermsType.SERVICE, 1, TermsRequirement.REQUIRED);
 		publish(UserRole.OWNER, TermsType.PRIVACY_COLLECTION, 1, TermsRequirement.REQUIRED);
 		publish(UserRole.OWNER, TermsType.MARKETING, 1, TermsRequirement.OPTIONAL);
 		publish(UserRole.OWNER, TermsType.PRIVACY_POLICY, 1, TermsRequirement.NOTICE);
-
-		Long userId = signUpAgreeing(UserRole.OWNER, "token-terms-3", "kakao-2003", false);
-
-		assertThat(agreedDocuments(userId))
-			.as("the owner request still carries the location and third-party flags, but the owner app "
-				+ "has no such documents, and a consumer document never lands on an owner")
-			.containsExactlyInAnyOrder("SERVICE v1", "PRIVACY_COLLECTION v1");
 	}
 
 	@Test
