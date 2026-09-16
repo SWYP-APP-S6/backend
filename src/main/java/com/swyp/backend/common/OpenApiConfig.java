@@ -5,6 +5,7 @@ import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
+import com.swyp.backend.common.openapi.OpenApiBusinessErrors;
 import com.swyp.backend.common.openapi.OpenApiErrorResponses;
 import org.springdoc.core.models.GroupedOpenApi;
 import org.springframework.context.annotation.Bean;
@@ -30,20 +31,22 @@ public class OpenApiConfig {
 	}
 
 	@Bean
-	GroupedOpenApi appApi(OpenApiErrorResponses errorResponses) {
+	GroupedOpenApi appApi(OpenApiErrorResponses errorResponses, OpenApiBusinessErrors businessErrors) {
 		return GroupedOpenApi.builder()
 			.group("app")
 			.pathsToExclude(NON_APP_PATHS)
 			.addOpenApiCustomizer(errorResponses)
+			.addOperationCustomizer(businessErrors)
 			.build();
 	}
 
 	@Bean
-	GroupedOpenApi adminApi(OpenApiErrorResponses errorResponses) {
+	GroupedOpenApi adminApi(OpenApiErrorResponses errorResponses, OpenApiBusinessErrors businessErrors) {
 		return GroupedOpenApi.builder()
 			.group("admin")
 			.pathsToMatch(ADMIN_PATHS)
 			.addOpenApiCustomizer(errorResponses)
+			.addOperationCustomizer(businessErrors)
 			.build();
 	}
 }

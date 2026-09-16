@@ -17,7 +17,7 @@ paths:
 - 요청/응답 타입은 **DTO만** — `@Entity`를 노출하지 않는다.
 - **Swagger 명세는 앱의 코드젠 입력이다.** 앱(Android/Kotlin + Retrofit)이 `/v3/api-docs/app`으로
   클라이언트를 생성하므로 명세가 곧 계약이다. 대부분은 `common/openapi`가 자동 처리하고, 컨트롤러가
-  직접 지킬 것은 셋이다:
+  직접 지킬 것은 넷이다:
   - **컨트롤러마다 `@Tag(name = "…")`** — 없으면 태그가 `xxx-controller`가 되고 앱은
     `XxxControllerApi`라는 클래스를 읽게 된다.
   - **메서드명이 곧 `operationId`이고 앱의 메서드명이 된다.** 다른 컨트롤러와 겹치면 springdoc이
@@ -30,4 +30,11 @@ paths:
     정한다(`HoldFunction`·`NotificationFunction`·`RecipeFunction`). 클라이언트 `Pageable`을 리포지토리에
     그대로 넘기면 숨긴 `sort`가 여전히 먹히고, 없는 필드면 500이 난다. 앱 명세(`/admin`·`/dev` 제외)에서
     `Pageable`을 받는 모든 핸들러를 `OpenApiContractTest`가 검사한다.
+  - **비즈니스 실패는 `@ApiErrorCodes`로 선언한다.** 모든 오퍼레이션에 붙는 5종
+    (400·401·403·429·500) 밖의 실패 — 409 충돌이나 404 — 은 선언하지 않으면 명세에 아예 없고, 앱은
+    그 분기를 코드젠 결과로 받지 못한다.
+    `@ApiErrorCodes(in = HoldErrorCode.class, codes = {"HOLD_NOT_FOUND", …})`로 **그 오퍼레이션이
+    실제로 던지는 코드만** 적고(다른 feature의 코드도 던지면 애노테이션을 여러 번 단다), 문구는
+    enum의 `message`에서 그대로 온다 — 손으로 옮겨 적지 않는다. 없는 이름을 적으면 명세 생성이
+    `IllegalStateException`으로 실패하고, 회귀는 `OpenApiContractTest`가 막는다.
 - 인증 주체 접근(현재 사용자 등)은 auth 도입 후(지금 TBD). 레퍼런스: `com.swyp.backend.ping.PingController`.

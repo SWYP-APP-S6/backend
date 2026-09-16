@@ -1,5 +1,6 @@
 package com.swyp.backend.hold.controller;
 
+import com.swyp.backend.common.openapi.ApiErrorCodes;
 import com.swyp.backend.common.openapi.PageQueryParams;
 import com.swyp.backend.common.response.ApiResponse;
 import com.swyp.backend.common.response.SuccessCode;
@@ -8,8 +9,11 @@ import com.swyp.backend.hold.dto.OwnerHoldCancelRequest;
 import com.swyp.backend.hold.dto.OwnerHoldDetailResponse;
 import com.swyp.backend.hold.dto.OwnerHoldListResponse;
 import com.swyp.backend.hold.dto.OwnerHoldStatus;
+import com.swyp.backend.hold.exception.HoldErrorCode;
 import com.swyp.backend.hold.service.OwnerHoldCancelService;
 import com.swyp.backend.hold.service.OwnerHoldService;
+import com.swyp.backend.product.exception.ProductErrorCode;
+import com.swyp.backend.store.exception.StoreErrorCode;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -44,12 +48,17 @@ public class OwnerHoldController {
 	}
 
 	@GetMapping("/cancel-candidates")
+	@ApiErrorCodes(in = StoreErrorCode.class, codes = "STORE_NOT_REGISTERED")
 	public ApiResponse<OwnerHoldCancelCandidatesResponse> getHoldCancelCandidates(
 			@AuthenticationPrincipal Long ownerId) {
 		return ApiResponse.of(SuccessCode.OK, ownerHoldCancelService.getCancelCandidates(ownerId));
 	}
 
 	@PostMapping("/cancel")
+	@ApiErrorCodes(in = HoldErrorCode.class, codes = {"HOLD_NOT_FOUND", "HOLD_ALREADY_RESOLVED",
+			"HOLD_ALREADY_EXPIRED", "PRODUCT_NOT_SHORT_OF_STOCK"})
+	@ApiErrorCodes(in = StoreErrorCode.class, codes = "STORE_NOT_REGISTERED")
+	@ApiErrorCodes(in = ProductErrorCode.class, codes = "PRODUCT_NOT_FOUND")
 	public ApiResponse<OwnerHoldCancelCandidatesResponse> cancelHoldsForShortage(
 			@AuthenticationPrincipal Long ownerId, @Valid @RequestBody OwnerHoldCancelRequest request) {
 		return ApiResponse.of(SuccessCode.OK, ownerHoldCancelService.cancelHolds(ownerId, request));
