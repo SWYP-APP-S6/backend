@@ -2,11 +2,7 @@ package com.swyp.backend.product.service;
 
 import com.swyp.backend.common.exception.BusinessException;
 import com.swyp.backend.common.storage.ImageStorage;
-import com.swyp.backend.hold.entity.Hold;
-import com.swyp.backend.hold.entity.HoldStatus;
 import com.swyp.backend.hold.function.HoldFunction;
-import com.swyp.backend.notification.entity.NotificationType;
-import com.swyp.backend.notification.function.NotificationFunction;
 import com.swyp.backend.product.dto.ProductDetailResponse;
 import com.swyp.backend.product.dto.ProductPhotoResponse;
 import com.swyp.backend.product.dto.ProductPreviewResponse;
@@ -38,14 +34,12 @@ import org.springframework.web.multipart.MultipartFile;
 @Transactional(readOnly = true)
 public class ProductService {
 
-	private static final String OWNER_SHORTAGE_REASON = "매장 재고가 모자라 찜이 취소됐어요.";
 	private static final int MAX_PICKUP_WINDOW_HOURS = 24;
 	private static final String PHOTO_CATEGORY = "products";
 
 	private final ProductFunction productFunction;
 	private final HoldFunction holdFunction;
 	private final StoreFunction storeFunction;
-	private final NotificationFunction notificationFunction;
 	private final RecipeFunction recipeFunction;
 	private final ImageStorage imageStorage;
 	private final Clock clock;
@@ -128,9 +122,6 @@ public class ProductService {
 			throw new BusinessException(ProductErrorCode.QTY_BELOW_MINIMUM);
 		}
 
-		if (request.cancelOverflow()) {
-			cancelOverflowHolds(product, request.stockQty());
-		}
 		product.restock(request.stockQty());
 		return ProductDetailResponse.from(product, completedQtyOf(productId), now);
 	}
@@ -161,28 +152,6 @@ public class ProductService {
 		}
 		return ProductDetailResponse.from(
 				product, completedQtyOf(productId), LocalDateTime.now(clock));
-	}
-
-	private void cancelOverflowHolds(Product product, int stockQty) {
-		int remaining = stockQty;
-		for (Long holdId : holdFunction.findActiveHoldIdsOfProduct(product.getId())) {
-			Hold hold = holdFunction.getByIdForUpdate(holdId);
-			if (hold.getStatus() != HoldStatus.HOLDING) {
-				continue;
-			}
-			if (hold.getQty() <= remaining) {
-				remaining -= hold.getQty();
-				continue;
-			}
-			hold.cancelByOwner(Instant.now(clock), OWNER_SHORTAGE_REASON);
-			product.releaseHold(hold.getQty());
-			notificationFunction.notify(
-					hold.getUser(),
-					NotificationType.HOLD_CANCELED_BY_OWNER,
-					"찜이 취소됐어요",
-					product.getName() + " 재고가 모자라 찜이 취소됐어요. 결제된 금액은 없어요.",
-					null);
-		}
 	}
 
 	private long completedQtyOf(Long productId) {

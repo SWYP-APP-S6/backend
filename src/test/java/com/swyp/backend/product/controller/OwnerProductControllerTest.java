@@ -117,7 +117,7 @@ class OwnerProductControllerTest {
 				.header("Authorization", "Bearer " + token)
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
-					{"stockQty":8,"cancelOverflow":false}"""))
+					{"stockQty":8}"""))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.availableQty").value(5))
 			.andExpect(jsonPath("$.data.heldQty").value(3))
@@ -132,7 +132,7 @@ class OwnerProductControllerTest {
 				.header("Authorization", "Bearer " + token)
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
-					{"stockQty":5,"cancelOverflow":false}"""))
+					{"stockQty":5}"""))
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.code").value("QTY_BELOW_MINIMUM"));
 	}
@@ -147,41 +147,20 @@ class OwnerProductControllerTest {
 				.header("Authorization", "Bearer " + token)
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
-					{"stockQty":0,"cancelOverflow":false}"""))
+					{"stockQty":0}"""))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.availableQty").value(0))
 			.andExpect(jsonPath("$.data.status").value("SOLD_OUT"));
 	}
 
 	@Test
-	void updateStock_leavingTheOverflowAlone_keepsTheHoldsAndReportsTheShortfall() throws Exception {
+	void updateStock_belowTheHolds_keepsThemAndReportsTheShortfall_evenWhenAnOldAppAsksToCancel()
+			throws Exception {
 		Product product = askedToReconfirm("당근", 10);
 		holdRepository.saveAndFlush(
 			HoldFixture.hold(createConsumer(), product, 3, Instant.now().plus(Duration.ofMinutes(15))));
 		product.hold(3);
 		productRepository.saveAndFlush(product);
-
-		mockMvc.perform(patch("/owner/products/" + product.getId() + "/stock")
-				.header("Authorization", "Bearer " + token)
-				.contentType(MediaType.APPLICATION_JSON)
-				.content("""
-					{"stockQty":1,"cancelOverflow":false}"""))
-			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.heldQty").value(3))
-			.andExpect(jsonPath("$.data.availableQty").value(0))
-			.andExpect(jsonPath("$.data.shortfallQty").value(2));
-
-		assertThat(holdRepository.findAll())
-			.as("BR-015: a shortfall never cancels on its own")
-			.allMatch(hold -> hold.getStatus() == HoldStatus.HOLDING);
-	}
-
-	@Test
-	void updateStock_cancelingTheOverflow_keepsWhoeverHeldFirst() throws Exception {
-		Product product = askedToReconfirm("당근", 10);
-		Hold first = holdWithQty(product, 1, Duration.ofMinutes(15));
-		Hold second = holdWithQty(product, 2, Duration.ofMinutes(14));
-		Hold third = holdWithQty(product, 1, Duration.ofMinutes(13));
 		long notificationsBefore = notificationRepository.count();
 
 		mockMvc.perform(patch("/owner/products/" + product.getId() + "/stock")
@@ -190,18 +169,14 @@ class OwnerProductControllerTest {
 				.content("""
 					{"stockQty":1,"cancelOverflow":true}"""))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.heldQty").value(1))
+			.andExpect(jsonPath("$.data.heldQty").value(3))
 			.andExpect(jsonPath("$.data.availableQty").value(0))
-			.andExpect(jsonPath("$.data.shortfallQty").value(0));
+			.andExpect(jsonPath("$.data.shortfallQty").value(2));
 
-		assertThat(holdRepository.findById(first.getId()).orElseThrow().getStatus())
-			.as("the customer who held first keeps the one unit that exists")
-			.isEqualTo(HoldStatus.HOLDING);
-		assertThat(holdRepository.findById(second.getId()).orElseThrow().getStatus())
-			.isEqualTo(HoldStatus.CANCELED);
-		assertThat(holdRepository.findById(third.getId()).orElseThrow().getStatus())
-			.isEqualTo(HoldStatus.CANCELED);
-		assertThat(notificationRepository.count()).isEqualTo(notificationsBefore + 2);
+		assertThat(holdRepository.findAll())
+			.as("saving the shelf never cancels a hold - the owner picks whom to cancel on its own screen")
+			.allMatch(hold -> hold.getStatus() == HoldStatus.HOLDING);
+		assertThat(notificationRepository.count()).isEqualTo(notificationsBefore);
 	}
 
 	@Test
@@ -221,7 +196,7 @@ class OwnerProductControllerTest {
 				.header("Authorization", "Bearer " + token)
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
-					{"stockQty":6,"cancelOverflow":false}"""))
+					{"stockQty":6}"""))
 			.andExpect(status().isConflict())
 			.andExpect(jsonPath("$.code").value("STOCK_LOCKED"));
 	}
@@ -263,7 +238,7 @@ class OwnerProductControllerTest {
 				.header("Authorization", "Bearer " + token)
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
-					{"stockQty":8,"cancelOverflow":false}"""))
+					{"stockQty":8}"""))
 			.andExpect(status().isConflict())
 			.andExpect(jsonPath("$.code").value("PRODUCT_CLOSED"));
 
@@ -315,7 +290,7 @@ class OwnerProductControllerTest {
 				.header("Authorization", "Bearer " + token)
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
-					{"stockQty":4,"cancelOverflow":false}"""))
+					{"stockQty":4}"""))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.stockQty").value(4));
 	}
@@ -328,7 +303,7 @@ class OwnerProductControllerTest {
 				.header("Authorization", "Bearer " + token)
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
-					{"stockQty":2147483647,"cancelOverflow":false}"""))
+					{"stockQty":2147483647}"""))
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
 	}
@@ -350,7 +325,7 @@ class OwnerProductControllerTest {
 				.header("Authorization", "Bearer " + token)
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
-					{"stockQty":0}"""))
+					{}"""))
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
 
@@ -376,7 +351,7 @@ class OwnerProductControllerTest {
 				.header("Authorization", "Bearer " + token)
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
-					{"stockQty":5,"cancelOverflow":false}"""))
+					{"stockQty":5}"""))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.stockQty").value(5));
 
@@ -384,7 +359,7 @@ class OwnerProductControllerTest {
 				.header("Authorization", "Bearer " + token)
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
-					{"stockQty":4,"cancelOverflow":false}"""))
+					{"stockQty":4}"""))
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.code").value("QTY_BELOW_MINIMUM"));
 	}
