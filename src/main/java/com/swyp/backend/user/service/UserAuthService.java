@@ -61,11 +61,15 @@ public class UserAuthService {
 				ticket.provider(), ticket.providerId(), ticket.role()).isPresent()) {
 			throw new BusinessException(UserAuthErrorCode.ALREADY_REGISTERED);
 		}
+		Set<TermsType> agreedTypes = agreedTypesOf(request);
+		if (!agreedTypes.containsAll(termsFunction.findRequiredTypesOf(ticket.role()))) {
+			throw new BusinessException(UserAuthErrorCode.TERMS_AGREEMENT_REQUIRED);
+		}
 		Instant now = Instant.now(clock);
 		User user = new User(ticket.role(), ticket.nickname(), null, request.marketingOptIn(), now);
 		user.linkOauthAccount(ticket.provider(), ticket.providerId());
 		userFunction.save(user);
-		recordTermsAgreements(user, request, now);
+		recordTermsAgreements(user, agreedTypes, now);
 		return issueTokensFor(user);
 	}
 
@@ -79,7 +83,7 @@ public class UserAuthService {
 		refreshTokenService.revoke(TokenRealm.USER, refreshToken);
 	}
 
-	private void recordTermsAgreements(User user, SignupRequest request, Instant agreedAt) {
+	private static Set<TermsType> agreedTypesOf(SignupRequest request) {
 		Set<TermsType> agreedTypes = EnumSet.noneOf(TermsType.class);
 		if (request.serviceTermsAgreed()) {
 			agreedTypes.add(TermsType.SERVICE);
@@ -96,6 +100,10 @@ public class UserAuthService {
 		if (request.marketingOptIn()) {
 			agreedTypes.add(TermsType.MARKETING);
 		}
+		return agreedTypes;
+	}
+
+	private void recordTermsAgreements(User user, Set<TermsType> agreedTypes, Instant agreedAt) {
 		if (termsFunction.recordAgreements(user, agreedTypes, agreedAt).isEmpty()) {
 			log.warn("No terms documents are published for {} -- user {} signed up without an agreement record",
 				user.getRole(), user.getId());

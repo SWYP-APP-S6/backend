@@ -2,6 +2,7 @@ package com.swyp.backend.terms.function;
 
 import com.swyp.backend.common.exception.BusinessException;
 import com.swyp.backend.terms.entity.TermsDocument;
+import com.swyp.backend.terms.entity.TermsRequirement;
 import com.swyp.backend.terms.entity.TermsType;
 import com.swyp.backend.terms.entity.UserTermsAgreement;
 import com.swyp.backend.terms.exception.TermsErrorCode;
@@ -10,8 +11,10 @@ import com.swyp.backend.terms.repository.UserTermsAgreementRepository;
 import com.swyp.backend.user.entity.User;
 import com.swyp.backend.user.entity.UserRole;
 import java.time.Instant;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -24,6 +27,13 @@ public class TermsFunction {
 
 	public List<TermsDocument> findCurrentOf(UserRole role) {
 		return termsDocumentRepository.findCurrentByRole(role);
+	}
+
+	public Set<TermsType> findRequiredTypesOf(UserRole role) {
+		return findCurrentOf(role).stream()
+				.filter(document -> document.getRequirement() == TermsRequirement.REQUIRED)
+				.map(TermsDocument::getType)
+				.collect(Collectors.toCollection(() -> EnumSet.noneOf(TermsType.class)));
 	}
 
 	public TermsDocument getById(Long termsDocumentId) {

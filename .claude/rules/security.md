@@ -56,7 +56,11 @@ refresh를 `/admin/auth/refresh`에 넣어도 회전되지 않는다). access �
 
 첫 카카오 로그인은 `registered:false` + 단기 **signupToken**만 주고 `users` row를 만들지 않는다.
 약관 동의 후 `/auth/signup`이 계정을 만든다(기능명세서 C-002: 인증됐으나 약관 미동의인 계정이 남으면
-안 된다 — 이탈하면 아무것도 남지 않는다). 필수 동의 4건(서비스·개인정보 수집·위치기반·제3자 제공)은 `SignupRequest`의 `@AssertTrue`로 강제하고,
+안 된다 — 이탈하면 아무것도 남지 않는다). **필수 동의는 역할마다 다르다** — 서비스·개인정보 수집 2건은 두 역할
+모두 받아야 하므로 `SignupRequest`의 `@AssertTrue`로 강제하고(약관 표가 비어도 fail-closed), 위치기반·제3자
+제공은 **그 역할이 `REQUIRED`로 게시한 경우에만** `UserAuthService`가 요구한다(미동의 시 400
+`TERMS_AGREEMENT_REQUIRED`). 점주 약관에는 그 2건이 없어 점주 앱은 화면에 보이는 것만 보내면 된다 — 4건을
+일률적으로 강제하면 보여주지도 않은 동의를 받았다고 기록하게 된다. 동의는
 스키마엔 `users.terms_agreed_at`(가입 시각)과 **`user_terms_agreements`(동의한 문서의 판 × 동의 시각)** 에
 함께 기록한다. 약관 원문은 `terms_documents`에 판(version) 단위로 두고 `db/data/terms_data_1.sql`로 넣으며, 동의는
 가입 순간 그 역할의 **현재 판**에 대해 남는다 — 앱이 보여준 판과 어긋나지 않게, 누군가 동의한 판의 본문은 고치지 않고

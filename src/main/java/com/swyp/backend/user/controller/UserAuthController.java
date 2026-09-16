@@ -1,5 +1,6 @@
 package com.swyp.backend.user.controller;
 
+import com.swyp.backend.common.openapi.ApiErrorCodes;
 import com.swyp.backend.common.response.ApiResponse;
 import com.swyp.backend.common.response.SuccessCode;
 import com.swyp.backend.user.dto.GuestTokenRequest;
@@ -12,6 +13,7 @@ import com.swyp.backend.user.dto.RefreshRequest;
 import com.swyp.backend.user.dto.SignupRequest;
 import com.swyp.backend.user.dto.TokenResponse;
 import com.swyp.backend.user.entity.UserRole;
+import com.swyp.backend.user.exception.UserAuthErrorCode;
 import com.swyp.backend.user.service.GuestTokenService;
 import com.swyp.backend.user.service.UserAuthService;
 import jakarta.validation.Valid;
@@ -65,6 +67,8 @@ public class UserAuthController {
 	}
 
 	@PostMapping("/signup")
+	@ApiErrorCodes(in = UserAuthErrorCode.class,
+		codes = {"INVALID_SIGNUP_TOKEN", "ALREADY_REGISTERED", "TERMS_AGREEMENT_REQUIRED"})
 	public ResponseEntity<ApiResponse<TokenResponse>> signup(@Valid @RequestBody SignupRequest request) {
 		return ResponseEntity.status(HttpStatus.CREATED)
 			.body(ApiResponse.of(SuccessCode.CREATED, userAuthService.signup(request)));
