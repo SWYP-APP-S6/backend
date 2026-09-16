@@ -9,6 +9,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface StoreRepository extends JpaRepository<Store, Long> {
 
@@ -29,4 +32,8 @@ public interface StoreRepository extends JpaRepository<Store, Long> {
 
 	@EntityGraph(attributePaths = "owner")
 	Page<Store> findByStatus(StoreStatus status, Pageable pageable);
+
+	@Modifying
+	@Query("delete from Store s where s.owner.id = :ownerId")
+	int deleteByOwnerId(@Param("ownerId") Long ownerId);
 }

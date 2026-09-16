@@ -43,4 +43,8 @@ public class DeviceTokenFunction {
 				userDeviceTokenRepository.findByFcmToken(fcmToken)
 						.ifPresent(userDeviceTokenRepository::delete));
 	}
+
+	public void deleteAllOf(Long userId) {
+		userDeviceTokenRepository.deleteByUserId(userId);
+	}
 }

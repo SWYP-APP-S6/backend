@@ -9,6 +9,7 @@ import com.swyp.backend.recipe.entity.RecipeStep;
 import com.swyp.backend.recipe.entity.RecipeTag;
 import com.swyp.backend.recipe.exception.RecipeErrorCode;
 import com.swyp.backend.recipe.repository.IngredientRepository;
+import com.swyp.backend.recipe.repository.RecipeFeedbackRepository;
 import com.swyp.backend.recipe.repository.RecipeIngredientRepository;
 import com.swyp.backend.recipe.repository.RecipeNutritionRepository;
 import com.swyp.backend.recipe.repository.RecipeRepository;
@@ -43,6 +44,7 @@ public class RecipeFunction {
 	private final RecipeIngredientRepository recipeIngredientRepository;
 	private final RecipeNutritionRepository recipeNutritionRepository;
 	private final RecipeTagRepository recipeTagRepository;
+	private final RecipeFeedbackRepository recipeFeedbackRepository;
 
 	public Recipe getPublishedById(Long id) {
 		return recipeRepository.findByIdAndPublishedTrue(id)
@@ -118,5 +120,9 @@ public class RecipeFunction {
 
 	public List<RecipeTag> findTags(Long recipeId) {
 		return recipeTagRepository.findByRecipeIdOrderByIdAsc(recipeId);
+	}
+
+	public void deleteFeedbackOf(Long userId) {
+		recipeFeedbackRepository.deleteByUserId(userId);
 	}
 }

@@ -66,4 +66,8 @@ public class StoreFunction {
 		return e.getCause() instanceof ConstraintViolationException violation
 				&& OWNER_UNIQUE_CONSTRAINT.equalsIgnoreCase(violation.getConstraintName());
 	}
+
+	public void deleteOwnedBy(Long ownerId) {
+		storeRepository.deleteByOwnerId(ownerId);
+	}
 }

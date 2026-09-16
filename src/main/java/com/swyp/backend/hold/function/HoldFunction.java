@@ -232,4 +232,16 @@ public class HoldFunction {
 				: Sort.Direction.DESC;
 		return Sort.by(direction, "expiresAt").and(Sort.by(direction, "id"));
 	}
+
+	public boolean hasHoldingOf(Long userId) {
+		return holdRepository.existsByUserIdAndStatus(userId, HoldStatus.HOLDING);
+	}
+
+	public boolean hasHoldingAtStoreOwnedBy(Long ownerId) {
+		return holdRepository.existsByStoreOwnerIdAndStatus(ownerId, HoldStatus.HOLDING);
+	}
+
+	public void deleteAllInvolving(Long userId) {
+		holdRepository.deleteAllInvolving(userId);
+	}
 }

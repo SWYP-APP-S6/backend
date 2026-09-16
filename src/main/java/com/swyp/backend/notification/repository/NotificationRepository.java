@@ -8,6 +8,7 @@ import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -30,4 +31,8 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
 			""")
 	List<PendingPush> findPendingPushes(
 			@Param("pushState") NotificationPushState pushState, Pageable pageable);
+
+	@Modifying
+	@Query("delete from Notification n where n.user.id = :userId")
+	int deleteByUserId(@Param("userId") Long userId);
 }

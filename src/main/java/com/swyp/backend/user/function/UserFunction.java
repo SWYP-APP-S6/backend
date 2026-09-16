@@ -45,4 +45,8 @@ public class UserFunction {
 			throw new BusinessException(UserAuthErrorCode.ALREADY_REGISTERED);
 		}
 	}
+
+	public void delete(User user) {
+		userRepository.delete(user);
+	}
 }

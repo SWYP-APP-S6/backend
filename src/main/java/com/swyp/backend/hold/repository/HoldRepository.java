@@ -301,4 +301,15 @@ public interface HoldRepository extends JpaRepository<Hold, Long> {
 			""")
 	List<ActiveHoldQty> findActiveHoldQtyByStoreId(@Param("storeId") Long storeId);
 
+	boolean existsByUserIdAndStatus(Long userId, HoldStatus status);
+
+	boolean existsByStoreOwnerIdAndStatus(Long ownerId, HoldStatus status);
+
+	@Modifying
+	@Query("""
+			delete from Hold h
+			where h.user.id = :userId
+				or h.store.id in (select s.id from Store s where s.owner.id = :userId)
+			""")
+	int deleteAllInvolving(@Param("userId") Long userId);
 }

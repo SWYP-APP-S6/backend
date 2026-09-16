@@ -106,4 +106,8 @@ public class ProductFunction {
 				store.getLongitude().doubleValue()));
 		return new SellableStoreGroup(store, products, distanceMeters);
 	}
+
+	public void deleteAllOfStoreOwnedBy(Long ownerId) {
+		productRepository.deleteAllOfStoreOwnedBy(ownerId);
+	}
 }
