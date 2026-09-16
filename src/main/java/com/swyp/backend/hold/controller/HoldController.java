@@ -1,5 +1,6 @@
 package com.swyp.backend.hold.controller;
 
+import com.swyp.backend.common.openapi.PageQueryParams;
 import com.swyp.backend.common.response.ApiResponse;
 import com.swyp.backend.common.response.SuccessCode;
 import com.swyp.backend.hold.dto.ActiveHoldResponse;
@@ -7,6 +8,7 @@ import com.swyp.backend.hold.dto.HoldCreateRequest;
 import com.swyp.backend.hold.dto.HoldDetailResponse;
 import com.swyp.backend.hold.dto.HoldHistoryResponse;
 import com.swyp.backend.hold.service.HoldService;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -39,8 +41,10 @@ public class HoldController {
 	}
 
 	@GetMapping
+	@PageQueryParams
 	public ApiResponse<HoldHistoryResponse> getHolds(
-			@AuthenticationPrincipal Long userId, @PageableDefault(size = 20) Pageable pageable) {
+			@AuthenticationPrincipal Long userId,
+			@Parameter(hidden = true) @PageableDefault(size = 20) Pageable pageable) {
 		return ApiResponse.of(SuccessCode.OK, holdService.getHolds(userId, pageable));
 	}
 

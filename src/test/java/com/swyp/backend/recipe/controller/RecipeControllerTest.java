@@ -131,6 +131,23 @@ class RecipeControllerTest {
 	}
 
 	@Test
+	void getRecipes_keepsPopularityOrderWhateverSortIsSent() throws Exception {
+		Recipe low = recipeRepository.save(recipe("무침", true));
+		Recipe high = recipeRepository.save(recipe("무침", true));
+		for (int i = 0; i < 3; i++) {
+			high.increaseViewCount();
+		}
+
+		mockMvc.perform(get("/recipes").param("category", "무침").param("sort", "id,asc")
+				.header("Authorization", guestBearer()))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.content[0].id").value(high.getId()))
+			.andExpect(jsonPath("$.data.content[1].id").value(low.getId()));
+		mockMvc.perform(get("/recipes").param("sort", "noSuchProperty").header("Authorization", guestBearer()))
+			.andExpect(status().isOk());
+	}
+
+	@Test
 	void getRecipe_exposesDifficultyAndCookTime() throws Exception {
 		Recipe recipe = recipe("반찬", true);
 		recipe.assignDifficulty(RecipeDifficulty.NORMAL, EstimateSource.AI);

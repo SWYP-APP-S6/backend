@@ -13,6 +13,8 @@ import com.swyp.backend.product.entity.Product;
 import com.swyp.backend.product.function.ProductFunction;
 import com.swyp.backend.store.entity.Store;
 import com.swyp.backend.store.function.StoreFunction;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +32,7 @@ public class OwnerHomeService {
 	private final ProductFunction productFunction;
 	private final HoldFunction holdFunction;
 	private final NotificationFunction notificationFunction;
+	private final Clock clock;
 
 	public OwnerHomeResponse getOwnerHome(Long ownerId) {
 		Store store = storeFunction.getByOwnerId(ownerId);
@@ -61,6 +64,7 @@ public class OwnerHomeService {
 		boolean hasRegisteredProduct = productFunction.hasAnyProduct(storeId);
 
 		return new OwnerHomeResponse(
+				Instant.now(clock),
 				OwnerHomeStore.from(store),
 				summary,
 				issues,

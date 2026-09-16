@@ -180,7 +180,7 @@ public interface HoldRepository extends JpaRepository<Hold, Long> {
 			join fetch h.user
 			join fetch h.product
 			where h.store.id = :storeId and h.status = :status
-			order by h.expiresAt asc
+			order by h.expiresAt asc, h.id asc
 			""")
 	List<Hold> findStoreHoldsByStatus(
 			@Param("storeId") Long storeId, @Param("status") HoldStatus status);

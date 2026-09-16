@@ -1,7 +1,8 @@
 package com.swyp.backend.hold.dto;
 
 import com.swyp.backend.common.response.PageResponse;
+import java.time.Instant;
 
 public record OwnerHoldListResponse(
-		OwnerHoldCounts counts, PageResponse<OwnerHoldSummaryResponse> holds) {
+		Instant serverTime, OwnerHoldCounts counts, PageResponse<OwnerHoldSummaryResponse> holds) {
 }
