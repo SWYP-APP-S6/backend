@@ -33,7 +33,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.LongStream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -163,6 +166,35 @@ class OwnerHoldCancelControllerTest {
 	}
 
 	@Test
+	void getHoldCancelCandidates_leavesOutAHoldWhoseTimeIsUp() throws Exception {
+		Product peach = createProduct("복숭아 4입");
+		Hold live = holding(peach, "윤지현", 2);
+		expiredHolding(peach, "늦은손님", 2);
+		shelve(peach, 4, 2);
+
+		candidates()
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.products.length()").value(1))
+			.andExpect(jsonPath("$.data.products[0].shortfallQty").value(2))
+			.andExpect(jsonPath("$.data.products[0].holds.length()").value(1))
+			.andExpect(jsonPath("$.data.products[0].holds[0].holdId").value(live.getId()))
+			.andExpect(jsonPath("$.data.products[0].holds[0].suggested").value(false))
+			.andExpect(jsonPath("$.data.suggestedCancelCount").value(0));
+	}
+
+	@Test
+	void getHoldCancelCandidates_whenEveryHoldOfAProductIsPastItsTime_dropsTheProduct() throws Exception {
+		Product peach = createProduct("복숭아 4입");
+		expiredHolding(peach, "늦은손님", 3);
+		shelve(peach, 3, 1);
+
+		candidates()
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.productsShortOfStock").value(0))
+			.andExpect(jsonPath("$.data.products.length()").value(0));
+	}
+
+	@Test
 	void cancelHoldsForShortage_cancelsWhomeverTheOwnerPicked_andGivesTheStockBack() throws Exception {
 		Product peach = createProduct("복숭아 4입");
 		Hold first = holding(peach, "윤지현", 2);
@@ -241,6 +273,47 @@ class OwnerHoldCancelControllerTest {
 	}
 
 	@Test
+	void cancelHoldsForShortage_ofAHoldWhoseTimeIsUp_isRejected() throws Exception {
+		Product peach = createProduct("복숭아 4입");
+		Hold overdue = expiredHolding(peach, "늦은손님", 2);
+		holding(peach, "윤지현", 2);
+		shelve(peach, 4, 2);
+
+		cancel(overdue.getId())
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("HOLD_ALREADY_EXPIRED"));
+
+		assertThat(holdRepository.findById(overdue.getId()).orElseThrow().getStatus())
+			.isEqualTo(HoldStatus.HOLDING);
+		assertThat(notificationRepository.count()).isZero();
+	}
+
+	@Test
+	void cancelHoldsForShortage_withTheSameHoldTwiceInOneBody_cancelsItOnce() throws Exception {
+		Product peach = createProduct("복숭아 4입");
+		Hold first = holding(peach, "윤지현", 2);
+		holding(peach, "송유나", 2);
+		shelve(peach, 4, 2);
+
+		cancel(first.getId(), first.getId())
+			.andExpect(status().isOk());
+
+		assertThat(productRepository.findById(peach.getId()).orElseThrow().getHeldQty())
+			.as("the stock comes back once, not once per repeated id")
+			.isEqualTo(2);
+		assertThat(notificationRepository.count()).isEqualTo(1);
+	}
+
+	@Test
+	void cancelHoldsForShortage_withMoreHoldsThanTheCap_isRejected() throws Exception {
+		Long[] overTheCap = LongStream.rangeClosed(1, 101).boxed().toArray(Long[]::new);
+
+		cancel(overTheCap)
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+	}
+
+	@Test
 	void cancelHoldsForShortage_ofAnotherStore_isNotFound() throws Exception {
 		Hold othersHold = holdOfAnotherStore();
 
@@ -275,12 +348,13 @@ class OwnerHoldCancelControllerTest {
 			.header("Authorization", "Bearer " + token));
 	}
 
-	private ResultActions cancel(Long holdId) throws Exception {
+	private ResultActions cancel(Long... holdIds) throws Exception {
+		String ids = Arrays.stream(holdIds).map(String::valueOf).collect(Collectors.joining(","));
 		return mockMvc.perform(post("/owner/holds/cancel")
 			.header("Authorization", "Bearer " + token)
 			.contentType(MediaType.APPLICATION_JSON)
 			.content("""
-				{"holdIds":[%d]}""".formatted(holdId)));
+				{"holdIds":[%s]}""".formatted(ids)));
 	}
 
 	private Product createProduct(String name) {
@@ -298,6 +372,11 @@ class OwnerHoldCancelControllerTest {
 	private Hold holding(Product product, String nickname, int qty) {
 		return holdRepository.saveAndFlush(HoldFixture.hold(
 			consumer(nickname), product, qty, Instant.now().plus(Duration.ofMinutes(15))));
+	}
+
+	private Hold expiredHolding(Product product, String nickname, int qty) {
+		return holdRepository.saveAndFlush(HoldFixture.hold(
+			consumer(nickname), product, qty, Instant.now().minus(Duration.ofMinutes(1))));
 	}
 
 	private User consumer(String nickname) {
