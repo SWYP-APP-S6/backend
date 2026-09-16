@@ -64,11 +64,14 @@ public class OwnerHoldCancelService {
 		if (holds.stream().anyMatch(hold -> hold.getStatus() != HoldStatus.HOLDING)) {
 			throw new BusinessException(HoldErrorCode.HOLD_ALREADY_RESOLVED);
 		}
+		Instant now = Instant.now(clock);
+		if (holds.stream().anyMatch(hold -> hold.isOverdueAt(now))) {
+			throw new BusinessException(HoldErrorCode.HOLD_ALREADY_EXPIRED);
+		}
 		if (locked.values().stream().anyMatch(product -> product.shortfallQty() <= 0)) {
 			throw new BusinessException(HoldErrorCode.PRODUCT_NOT_SHORT_OF_STOCK);
 		}
 
-		Instant now = Instant.now(clock);
 		String notice = noticeOf(store);
 		for (Hold hold : holds) {
 			hold.cancelByOwner(now, OWNER_SHORTAGE_REASON);
@@ -80,11 +83,13 @@ public class OwnerHoldCancelService {
 	}
 
 	private OwnerHoldCancelCandidatesResponse candidatesOf(Store store) {
+		Instant now = Instant.now(clock);
 		List<Product> shortProducts = productFunction.findSellingNowOfStore(store.getId()).stream()
 				.filter(product -> product.shortfallQty() > 0)
 				.toList();
 		List<Long> productIds = shortProducts.stream().map(Product::getId).toList();
 		Map<Long, List<Hold>> holdsByProduct = holdFunction.findHoldingOfProducts(productIds).stream()
+				.filter(hold -> !hold.isOverdueAt(now))
 				.collect(Collectors.groupingBy(hold -> hold.getProduct().getId()));
 		Map<Long, Integer> heldOrder = holdFunction.heldOrderOfProducts(productIds);
 
@@ -92,6 +97,9 @@ public class OwnerHoldCancelService {
 		int suggestedCancelCount = 0;
 		for (Product product : shortProducts) {
 			List<Hold> inHeldOrder = holdsByProduct.getOrDefault(product.getId(), List.of());
+			if (inHeldOrder.isEmpty()) {
+				continue;
+			}
 			Set<Long> overflow = holdsThatDoNotFit(product, inHeldOrder);
 			suggestedCancelCount += overflow.size();
 			products.add(new OwnerHoldCancelProduct(
