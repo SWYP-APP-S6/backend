@@ -20,6 +20,7 @@ Flyway 경로(`db/migration`) **밖**이다. 자동 실행되지 않으며, 필�
 | **`recipe_estimates.sql`** | ✓ | **레시피 난이도·조리시간 추정값 1,156건** — 식약처 원본에 두 항목이 없어 LLM 이 제목·조리법·재료 수로 판단해 채웠다. `(source, source_id)` 로 조인해 `update` 하므로 **레시피 본체 뒤에** 넣어야 하고, 사람이 고친 행(`*_source = 'HUMAN'`)은 건드리지 않는다. `docs/recipe-backfill/to_sql.py` 가 만들지만 판단 결과가 저장소 밖에 있어 **재생성 경로가 없다 — 그래서 유일하게 커밋하는 파생 파일이다** |
 | `mfds_cookrcp01.sql` | ✗ | 식약처 조리식품 레시피 DB 1,156건 → `recipes` / `recipe_steps` / `recipe_ingredients` / `ingredients` / `recipe_nutrition` / `recipe_tags`. `init_data_1.sql` 이 이 파일을 읽는다 |
 | `mfds_cookrcp01_raw.sql` | ✗ | 원본 API 응답 → `recipe_raw`. 선택 사항이며, 재수집 없이 파서만 고쳐 다시 만들 때 쓴다. 본체를 먼저 넣어야 한다 |
+| `purge_user.sql` | ✓ | **시드가 아니라 운영 도구** — 유저 한 명과 그에 딸린 행(점주면 가게·상품·그 가게의 찜까지)을 지운다. 대상은 `-v uid=<id>`로 받고 **기본은 dry-run**(행 수만 보여 주고 롤백), `-v commit=1`을 붙여야 지운다. 같은 일을 `DELETE /admin/users/{id}`가 하지만 그쪽은 진행 중인 찜이 있으면 거절한다 — 이 파일은 거절하지 않는다 |
 | `team_admins.tsv` | ✗ | 관리자 계정 명단(이메일·이름·타입·전화번호). 개인정보이고 이 저장소는 public 이라 `.gitignore` 한다 |
 
 ## 투입 (권장 순서)

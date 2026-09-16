@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -91,4 +92,8 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 			ProductStatus status, LocalDateTime pickupEndAt);
 
 	boolean existsByStoreIdAndReconfirmSentAtIsNotNullAndReconfirmAnsweredAtIsNull(Long storeId);
+
+	@Modifying
+	@Query("delete from Product p where p.store.id in (select s.id from Store s where s.owner.id = :ownerId)")
+	int deleteAllOfStoreOwnedBy(@Param("ownerId") Long ownerId);
 }

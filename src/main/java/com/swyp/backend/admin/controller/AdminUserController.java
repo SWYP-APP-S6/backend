@@ -5,13 +5,16 @@ import com.swyp.backend.common.response.PageResponse;
 import com.swyp.backend.common.response.SuccessCode;
 import com.swyp.backend.user.dto.UserSummaryResponse;
 import com.swyp.backend.user.entity.UserRole;
+import com.swyp.backend.user.service.UserDeletionService;
 import com.swyp.backend.user.service.UserService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -23,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminUserController {
 
 	private final UserService userService;
+	private final UserDeletionService userDeletionService;
 
 	@GetMapping
 	public ApiResponse<PageResponse<UserSummaryResponse>> getUsers(
@@ -30,5 +34,11 @@ public class AdminUserController {
 			@PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
 			Pageable pageable) {
 		return ApiResponse.of(SuccessCode.OK, userService.getUsers(role, pageable));
+	}
+
+	@DeleteMapping("/{id}")
+	public ApiResponse<Void> deleteUser(@PathVariable Long id) {
+		userDeletionService.delete(id);
+		return ApiResponse.of(SuccessCode.OK);
 	}
 }

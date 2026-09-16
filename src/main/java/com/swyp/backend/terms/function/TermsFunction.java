@@ -38,4 +38,8 @@ public class TermsFunction {
 				.toList();
 		return userTermsAgreementRepository.saveAll(agreements);
 	}
+
+	public void deleteAgreementsOf(Long userId) {
+		userTermsAgreementRepository.deleteByUserId(userId);
+	}
 }

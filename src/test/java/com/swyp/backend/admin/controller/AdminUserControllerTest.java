@@ -13,11 +13,14 @@ import com.swyp.backend.admin.entity.AdminType;
 import com.swyp.backend.admin.repository.AdminRepository;
 import com.swyp.backend.hold.repository.HoldRepository;
 import com.swyp.backend.product.repository.ProductRepository;
+import com.swyp.backend.store.entity.Store;
 import com.swyp.backend.store.repository.StoreRepository;
 import com.swyp.backend.user.entity.User;
 import com.swyp.backend.user.entity.UserRole;
 import com.swyp.backend.user.repository.UserRepository;
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalTime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -119,6 +122,30 @@ class AdminUserControllerTest {
 				.header("Authorization", "Bearer " + accessToken()))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.content[0].phone").value("01033334444"));
+	}
+
+	@Test
+	void ownerRows_carryTheStoreUnderReview_andConsumerRowsCarryNone() throws Exception {
+		User owner = userRepository.findAll().stream()
+			.filter(user -> user.getRole() == UserRole.OWNER)
+			.findFirst().orElseThrow();
+		Store store = storeRepository.save(new Store(
+			owner, "판매자하나네", "04524", "서울특별시 강남구 역삼로 1", null, "021234567",
+			new BigDecimal("37.500000"), new BigDecimal("127.030000"),
+			LocalTime.of(9, 0), LocalTime.of(21, 0)));
+		String token = accessToken();
+
+		mockMvc.perform(get("/admin/users").param("role", "OWNER")
+				.header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.content[0].store.id").value(store.getId()))
+			.andExpect(jsonPath("$.data.content[0].store.name").value("판매자하나네"))
+			.andExpect(jsonPath("$.data.content[0].store.status").value("PENDING"));
+
+		mockMvc.perform(get("/admin/users").param("role", "CONSUMER")
+				.header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.content[0].store").value(org.hamcrest.Matchers.nullValue()));
 	}
 
 	@Test

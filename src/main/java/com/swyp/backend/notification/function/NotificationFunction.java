@@ -58,4 +58,8 @@ public class NotificationFunction {
 			User user, NotificationType type, String title, String body, String deepLink) {
 		return notificationRepository.save(new Notification(user, type, title, body, deepLink));
 	}
+
+	public void deleteAllOf(Long userId) {
+		notificationRepository.deleteByUserId(userId);
+	}
 }

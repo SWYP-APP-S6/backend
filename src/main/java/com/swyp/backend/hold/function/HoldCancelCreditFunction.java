@@ -52,4 +52,9 @@ public class HoldCancelCreditFunction {
 		List<Long> charged = holdCancelCreditEventRepository.findChargedHoldIds(holdIds);
 		return Set.copyOf(charged);
 	}
+
+	public void deleteAllInvolving(Long userId) {
+		holdCancelCreditEventRepository.deleteAllInvolving(userId);
+		holdCancelCreditRepository.deleteByUserId(userId);
+	}
 }

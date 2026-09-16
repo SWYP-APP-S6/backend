@@ -8,7 +8,10 @@ import com.swyp.backend.store.repository.StoreRepository;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -24,6 +27,14 @@ public class StoreFunction {
 
 	public boolean existsByOwnerId(Long ownerId) {
 		return storeRepository.findByOwnerId(ownerId).isPresent();
+	}
+
+	public Map<Long, Store> findByOwnerIds(Collection<Long> ownerIds) {
+		if (ownerIds.isEmpty()) {
+			return Map.of();
+		}
+		return storeRepository.findByOwnerIdIn(ownerIds).stream()
+				.collect(Collectors.toMap(store -> store.getOwner().getId(), store -> store));
 	}
 
 	public Store getByOwnerId(Long ownerId) {
@@ -65,5 +76,9 @@ public class StoreFunction {
 	private static boolean isOwnerConflict(DataIntegrityViolationException e) {
 		return e.getCause() instanceof ConstraintViolationException violation
 				&& OWNER_UNIQUE_CONSTRAINT.equalsIgnoreCase(violation.getConstraintName());
+	}
+
+	public void deleteOwnedBy(Long ownerId) {
+		storeRepository.deleteByOwnerId(ownerId);
 	}
 }
