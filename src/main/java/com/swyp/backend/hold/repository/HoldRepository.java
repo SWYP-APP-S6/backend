@@ -170,6 +170,12 @@ public interface HoldRepository extends JpaRepository<Hold, Long> {
 	List<ProductHoldId> findProductHoldIdsByHoldIds(@Param("holdIds") List<Long> holdIds);
 
 	@Query("""
+			select distinct h.store.id from Hold h
+			where h.id in :holdIds
+			""")
+	List<Long> findStoreIdsOfHolds(@Param("holdIds") List<Long> holdIds);
+
+	@Query("""
 			select coalesce(sum(h.qty), 0) from Hold h
 			where h.product.id = :productId and h.status = :status
 			""")

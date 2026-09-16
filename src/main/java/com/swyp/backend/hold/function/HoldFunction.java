@@ -112,6 +112,10 @@ public class HoldFunction {
 				.orElseThrow(() -> new BusinessException(HoldErrorCode.HOLD_NOT_FOUND));
 	}
 
+	public List<Long> findStoreIdsOfHolds(List<Long> holdIds) {
+		return holdIds.isEmpty() ? List.of() : holdRepository.findStoreIdsOfHolds(holdIds);
+	}
+
 	public Optional<Long> findHoldingIdOf(Long userId, Long productId) {
 		return holdRepository.findHoldingIdOfProduct(userId, productId);
 	}

@@ -52,14 +52,15 @@ public class OwnerHoldCancelService {
 	public OwnerHoldCancelCandidatesResponse cancelHolds(Long ownerId, OwnerHoldCancelRequest request) {
 		Store store = storeFunction.getByOwnerId(ownerId);
 		List<Long> holdIds = request.holdIds().stream().distinct().sorted().toList();
+		if (holdFunction.findStoreIdsOfHolds(holdIds).stream()
+				.anyMatch(storeId -> !storeId.equals(store.getId()))) {
+			throw new BusinessException(HoldErrorCode.HOLD_NOT_FOUND);
+		}
 		Map<Long, Long> productIdByHold = holdFunction.getProductIdByHold(holdIds);
 
 		Map<Long, Product> locked = new LinkedHashMap<>();
 		productIdByHold.values().stream().distinct().sorted()
 				.forEach(productId -> locked.put(productId, productFunction.getByIdForUpdate(productId)));
-		if (locked.values().stream().anyMatch(product -> !product.getStore().getId().equals(store.getId()))) {
-			throw new BusinessException(HoldErrorCode.HOLD_NOT_FOUND);
-		}
 		List<Hold> holds = holdIds.stream().map(holdFunction::getByIdForUpdate).toList();
 		if (holds.stream().anyMatch(hold -> hold.getStatus() != HoldStatus.HOLDING)) {
 			throw new BusinessException(HoldErrorCode.HOLD_ALREADY_RESOLVED);
