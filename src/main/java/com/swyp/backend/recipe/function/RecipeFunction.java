@@ -78,12 +78,12 @@ public class RecipeFunction {
 		return recipeNutritionRepository.findById(recipeId);
 	}
 
-	public boolean allIngredientsExist(Collection<Integer> ingredientIds) {
+	public boolean allAreTags(Collection<Integer> ingredientIds) {
 		Set<Integer> distinctIds = Set.copyOf(ingredientIds);
 		if (distinctIds.isEmpty()) {
 			return true;
 		}
-		return ingredientRepository.countByIdIn(distinctIds) == distinctIds.size();
+		return ingredientRepository.countByIdInAndTagTrue(distinctIds) == distinctIds.size();
 	}
 
 	public List<Ingredient> searchIngredients(String query, int limit) {

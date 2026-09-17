@@ -79,7 +79,7 @@ public class ProductService {
 		if (!pickupEndAt.isAfter(now) || pickupEndAt.isAfter(now.plusHours(MAX_PICKUP_WINDOW_HOURS))) {
 			throw new BusinessException(ProductErrorCode.INVALID_PICKUP_WINDOW);
 		}
-		if (request.ingredientTags() != null && !recipeFunction.allIngredientsExist(request.ingredientTags())) {
+		if (request.ingredientTags() != null && !recipeFunction.allAreTags(request.ingredientTags())) {
 			throw new BusinessException(ProductErrorCode.INGREDIENT_NOT_FOUND);
 		}
 

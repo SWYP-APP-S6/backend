@@ -11,7 +11,7 @@ import org.springframework.data.repository.query.Param;
 
 public interface IngredientRepository extends JpaRepository<Ingredient, Integer> {
 
-	long countByIdIn(Collection<Integer> ids);
+	long countByIdInAndTagTrue(Collection<Integer> ids);
 
 	@Query("""
 			select i from Ingredient i
