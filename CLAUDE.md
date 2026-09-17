@@ -66,6 +66,12 @@
   **딥링크는 `notification.DeepLinks`에서만 만든다** — `mangro://` + 그 화면이 부르는 API 경로
   (`holds/{id}` · `owner/holds/{id}` · `owner/products/{id}`)라 앱이 경로를 그대로 조회에 쓴다.
   `notify()`에 `null`을 넘기면 푸시를 탭해도 앱이 열 화면을 모른다.
+- **식자재 태그는 사전의 대표 행(`ingredients.is_tag`)만이다.** 레시피에서 파싱한 사전은 같은 재료가
+  여러 이름으로 흩어져 있어(계란/달걀, `양념장: 간장`), 별칭 행은 `canonical_id`로 대표 태그를 가리키고
+  레시피 매칭·태그 검색은 대표 태그로 모은다. 상품 등록은 태그 행만 받고, LLM 추천도 서버가 준 태그
+  목록 안에서 고르며 **사전에 행을 만들지 않는다.** 목록의 단일 출처는 `scripts/ingredient_tags.py`의
+  `TAGS`이고 결과물 `db/data/ingredient_tags.sql`을 레시피 시드 뒤에 넣는다(Flyway가 시드보다 먼저
+  돌므로 마이그레이션에 넣지 않는다).
 - **제약 메시지는 `src/main/resources/ValidationMessages.properties`가 소유한다** — 없으면 Hibernate
   Validator 기본 번들이 **JVM 로케일에 따라** 골라져 로컬(ko)은 한국어, 운영 컨테이너
   (`eclipse-temurin`의 `LANG=en_US.UTF-8`)는 영어가 나간다. 이 번들은 로케일 접미사가 없어 모든
