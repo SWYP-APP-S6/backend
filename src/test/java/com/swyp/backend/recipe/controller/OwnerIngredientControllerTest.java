@@ -171,7 +171,7 @@ class OwnerIngredientControllerTest {
 
 	private Ingredient ingredient(String name, String category) {
 		return ingredientRepository.saveAndFlush(
-			new Ingredient(name, name.replace(" ", "").toLowerCase(), category));
+			Ingredient.tag(name, name.replace(" ", "").toLowerCase(), category));
 	}
 
 	private void clearAll() {
