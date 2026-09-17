@@ -1,10 +1,9 @@
 package com.swyp.backend.product.dto;
 
 import com.swyp.backend.product.entity.Product;
-import com.swyp.backend.recipe.dto.IngredientTagResponse;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.util.List;
+import java.util.Set;
 import org.jspecify.annotations.Nullable;
 
 public record ProductDetailResponse(
@@ -21,7 +20,7 @@ public record ProductDetailResponse(
 		LocalDateTime pickupStartAt,
 		LocalDateTime pickupEndAt,
 		String photoUrl,
-		List<IngredientTagResponse> ingredientTags,
+		Set<Integer> ingredientTags,
 		String status,
 		@Nullable Instant reconfirmSentAt,
 		@Nullable Instant reconfirmAnsweredAt,
@@ -34,10 +33,7 @@ public record ProductDetailResponse(
 		Instant createdAt) {
 
 	public static ProductDetailResponse from(
-			Product product,
-			long completedQty,
-			LocalDateTime now,
-			List<IngredientTagResponse> ingredientTags) {
+			Product product, long completedQty, LocalDateTime now) {
 		return new ProductDetailResponse(
 				product.getId(),
 				product.getName(),
@@ -52,7 +48,7 @@ public record ProductDetailResponse(
 				product.getPickupStartAt(),
 				product.getPickupEndAt(),
 				product.getPhotoUrl(),
-				ingredientTags,
+				product.getIngredientIds(),
 				product.getStatus().name(),
 				product.getReconfirmSentAt(),
 				product.getReconfirmAnsweredAt(),

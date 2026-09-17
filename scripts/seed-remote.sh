@@ -98,10 +98,6 @@ apply "$DATA_DIR/mfds_cookrcp01.sql"
 # 사람이 고친 행(*_source = 'HUMAN')은 건드리지 않으므로 다시 돌려도 안전하다.
 apply "$DATA_DIR/recipe_estimates.sql"
 
-# 식자재 태그 사전. 위 파일이 넣은 ingredients 행에 태그·별칭 표시를 매기므로 역시 뒤에 둔다.
-# 매번 표시를 지우고 다시 매기므로 목록을 고친 뒤 다시 돌리면 그대로 반영된다.
-apply "$DATA_DIR/ingredient_tags.sql"
-
 if [ "$WITH_RAW" -eq 1 ]; then
 	apply "$DATA_DIR/mfds_cookrcp01_raw.sql"
 fi
@@ -111,5 +107,4 @@ count recipes
 count recipe_steps
 count ingredients
 remote_psql -tA <<< "select 'recipes(난이도 채움)=' || count(*) from recipes where difficulty is not null"
-remote_psql -tA <<< "select 'ingredients(태그)=' || count(*) from ingredients where is_tag"
 echo "==> done"

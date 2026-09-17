@@ -166,32 +166,6 @@ class RecipeRepositoryTest {
 		}).hasMessageContaining("chk_recipes_difficulty_source");
 	}
 
-	@Test
-	void findIdsMatchingIngredients_gathersRecipesThatUseAnAliasUnderItsTag() {
-		Ingredient egg = entityManager.persist(Ingredient.tag("달걀", "test-egg", "달걀·유제품"));
-		Ingredient eggAlias = entityManager.persist(Ingredient.aliasOf(egg, "계란", "test-egg-alias"));
-		Ingredient tofu = entityManager.persist(Ingredient.tag("두부", "test-tofu", "두부·콩"));
-		Recipe withAlias = recipeUsing("달걀말이", eggAlias);
-		Recipe withTag = recipeUsing("아침 한 그릇", egg);
-		recipeUsing("두부조림", tofu);
-		entityManager.flush();
-
-		assertThat(recipeRepository.findIdsMatchingIngredients(List.of(egg.getId()), 10))
-				.containsExactly(withAlias.getId(), withTag.getId());
-		assertThat(recipeRepository.findIdsMatchingIngredients(List.of(eggAlias.getId()), 10))
-				.containsExactly(withAlias.getId(), withTag.getId());
-	}
-
-	private Recipe recipeUsing(String title, Ingredient ingredient) {
-		Recipe recipe = new Recipe("mfds", "seq-" + System.nanoTime(), title, "반찬", "끓이기",
-				(short) 1, "kogl");
-		recipe.publish();
-		entityManager.persist(recipe);
-		entityManager.persist(new RecipeIngredient(recipe, (short) 1, ingredient, null, null, null,
-				ingredient.getName()));
-		return recipe;
-	}
-
 	private static Recipe recipe(String category, boolean published) {
 		Recipe recipe = new Recipe("mfds", "seq-" + System.nanoTime(), "제목", category, "끓이기",
 				(short) 1, "kogl");
