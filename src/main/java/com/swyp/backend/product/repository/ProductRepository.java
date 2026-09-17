@@ -11,6 +11,8 @@ import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
@@ -87,6 +89,27 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 			@Param("storeId") Long storeId, @Param("now") LocalDateTime now);
 
 	Optional<Product> findByIdAndStoreId(Long id, Long storeId);
+
+	@Query("select p from Product p where p.store.id = :storeId")
+	Page<Product> findStoreProducts(@Param("storeId") Long storeId, Pageable pageable);
+
+	@Query("""
+			select p from Product p
+			where p.store.id = :storeId
+				and p.availableQty = 0
+			""")
+	Page<Product> findStoreProductsSoldOut(@Param("storeId") Long storeId, Pageable pageable);
+
+	@Query("""
+			select p from Product p
+			where p.store.id = :storeId
+				and p.availableQty between 1 and :runningLowQty
+				and p.status <> com.swyp.backend.product.entity.ProductStatus.CLOSED
+			""")
+	Page<Product> findStoreProductsRunningLow(
+			@Param("storeId") Long storeId,
+			@Param("runningLowQty") int runningLowQty,
+			Pageable pageable);
 
 	List<Product> findByStatusNotAndPickupEndAtLessThanEqual(
 			ProductStatus status, LocalDateTime pickupEndAt);

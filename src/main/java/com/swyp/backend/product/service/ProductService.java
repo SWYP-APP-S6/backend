@@ -1,8 +1,12 @@
 package com.swyp.backend.product.service;
 
 import com.swyp.backend.common.exception.BusinessException;
+import com.swyp.backend.common.response.PageResponse;
 import com.swyp.backend.common.storage.ImageStorage;
 import com.swyp.backend.hold.function.HoldFunction;
+import com.swyp.backend.product.dto.OwnerProductFilter;
+import com.swyp.backend.product.dto.OwnerProductListResponse;
+import com.swyp.backend.product.dto.OwnerProductSummaryResponse;
 import com.swyp.backend.product.dto.ProductDetailResponse;
 import com.swyp.backend.product.dto.ProductPhotoResponse;
 import com.swyp.backend.product.dto.ProductPreviewResponse;
@@ -25,6 +29,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -94,6 +100,19 @@ public class ProductService {
 			product.replaceIngredientIds(request.ingredientTags());
 		}
 		return product;
+	}
+
+	public OwnerProductListResponse getMyProducts(
+			Long ownerId, OwnerProductFilter filter, Pageable pageable) {
+		Store store = storeFunction.getByOwnerId(ownerId);
+		Page<Product> products = productFunction.findStoreProducts(store.getId(), filter, pageable);
+		Map<Long, Long> activeHoldQtyByProduct =
+				holdFunction.activeQtyByProductOfStore(store.getId());
+		List<OwnerProductSummaryResponse> content = products.getContent().stream()
+				.map(product -> OwnerProductSummaryResponse.from(
+						product, activeHoldQtyByProduct.getOrDefault(product.getId(), 0L)))
+				.toList();
+		return new OwnerProductListResponse(Instant.now(clock), PageResponse.of(content, products));
 	}
 
 	public ProductDetailResponse getMyProduct(Long ownerId, Long productId) {
