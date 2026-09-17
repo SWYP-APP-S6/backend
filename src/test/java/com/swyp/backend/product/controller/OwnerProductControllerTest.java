@@ -432,9 +432,14 @@ class OwnerProductControllerTest {
 	}
 
 	private Product createProduct(String name, int initialQty) {
+		return createProduct(name, initialQty, LocalDateTime.now(), LocalDateTime.now().plusHours(1));
+	}
+
+	private Product createProduct(
+		String name, int initialQty, LocalDateTime pickupStartAt, LocalDateTime pickupEndAt) {
 		Product product = new Product(
 			store, name, ProductCategory.VEGETABLE, initialQty, 1000, 800,
-			LocalDateTime.now(), LocalDateTime.now().plusHours(1), "https://example.com/a.jpg");
+			pickupStartAt, pickupEndAt, "https://example.com/a.jpg");
 		return productRepository.saveAndFlush(product);
 	}
 
@@ -666,6 +671,181 @@ class OwnerProductControllerTest {
 		mockMvc.perform(get("/owner/products/" + othersProduct.getId()).header("Authorization", "Bearer " + token))
 			.andExpect(status().isNotFound())
 			.andExpect(jsonPath("$.code").value("PRODUCT_NOT_FOUND"));
+	}
+
+	@Test
+	void getMyProducts_showsTheClosedOnesTheHomeScreenDrops_newestFirst() throws Exception {
+		createProduct("당근", 10);
+		Product closed = createProduct("지난 상추", 5);
+		closed.close();
+		productRepository.saveAndFlush(closed);
+
+		mockMvc.perform(get("/owner/products").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.serverTime").exists())
+			.andExpect(jsonPath("$.data.products.totalElements").value(2))
+			.andExpect(jsonPath("$.data.products.content[0].name").value("지난 상추"))
+			.andExpect(jsonPath("$.data.products.content[0].status").value("CLOSED"))
+			.andExpect(jsonPath("$.data.products.content[1].name").value("당근"));
+	}
+
+	@Test
+	void getMyProducts_soldOut_countsWhatIsGone_evenAfterItClosed() throws Exception {
+		createProduct("당근", 10);
+		Product gone = createProduct("다 팔린 상추", 5);
+		gone.restock(0);
+		productRepository.saveAndFlush(gone);
+		Product goneAndClosed = createProduct("어제 다 팔린 애호박", 5);
+		goneAndClosed.restock(0);
+		goneAndClosed.close();
+		productRepository.saveAndFlush(goneAndClosed);
+
+		mockMvc.perform(get("/owner/products?filter=SOLD_OUT").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.products.totalElements").value(2))
+			.andExpect(jsonPath("$.data.products.content[0].name").value("어제 다 팔린 애호박"))
+			.andExpect(jsonPath("$.data.products.content[1].name").value("다 팔린 상추"));
+	}
+
+	@Test
+	void getMyProducts_soldOut_countsAShelfEveryUnitOfWhichIsHeld() throws Exception {
+		Product allHeld = createProduct("전량 찜된 당근", 3);
+		holdWithQty(allHeld, 3, Duration.ofMinutes(15));
+
+		mockMvc.perform(get("/owner/products?filter=SOLD_OUT").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.products.totalElements").value(1))
+			.andExpect(jsonPath("$.data.products.content[0].name").value("전량 찜된 당근"))
+			.andExpect(jsonPath("$.data.products.content[0].availableQty").value(0))
+			.andExpect(jsonPath("$.data.products.content[0].activeHoldQty").value(3))
+			.andExpect(jsonPath("$.data.products.content[0].status").value("SOLD_OUT"));
+	}
+
+	@Test
+	void getMyProducts_runningLow_leavesOutTheOnesPastTheirPickupWindow() throws Exception {
+		Product low = createProduct("두 개 남은 당근", 10);
+		low.restock(2);
+		productRepository.saveAndFlush(low);
+		Product lowButOver = createProduct(
+			"어제 두 개 남긴 상추", 10,
+			LocalDateTime.now().minusHours(3), LocalDateTime.now().minusHours(1));
+		lowButOver.restock(2);
+		productRepository.saveAndFlush(lowButOver);
+
+		mockMvc.perform(get("/owner/products?filter=RUNNING_LOW").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.products.totalElements").value(1))
+			.andExpect(jsonPath("$.data.products.content[0].name").value("두 개 남은 당근"));
+
+		mockMvc.perform(get("/owner/products").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.products.totalElements").value(2));
+	}
+
+	@Test
+	void getMyProducts_runningLow_leavesOutTheSoldOutAndTheClosed() throws Exception {
+		Product low = createProduct("두 개 남은 당근", 10);
+		low.restock(2);
+		productRepository.saveAndFlush(low);
+		createProduct("넉넉한 상추", 10);
+		Product gone = createProduct("다 팔린 애호박", 5);
+		gone.restock(0);
+		productRepository.saveAndFlush(gone);
+		Product closedButLow = createProduct("마감된 콩나물", 10);
+		closedButLow.restock(1);
+		closedButLow.close();
+		productRepository.saveAndFlush(closedButLow);
+
+		mockMvc.perform(get("/owner/products?filter=RUNNING_LOW").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.products.totalElements").value(1))
+			.andExpect(jsonPath("$.data.products.content[0].name").value("두 개 남은 당근"))
+			.andExpect(jsonPath("$.data.products.content[0].availableQty").value(2));
+	}
+
+	@Test
+	void getMyProducts_pagesTheShelf() throws Exception {
+		createProduct("상품1", 10);
+		createProduct("상품2", 10);
+		createProduct("상품3", 10);
+
+		mockMvc.perform(get("/owner/products?page=0&size=2").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.products.content.length()").value(2))
+			.andExpect(jsonPath("$.data.products.totalElements").value(3))
+			.andExpect(jsonPath("$.data.products.totalPages").value(2))
+			.andExpect(jsonPath("$.data.products.last").value(false));
+
+		mockMvc.perform(get("/owner/products?page=1&size=2").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.products.content.length()").value(1))
+			.andExpect(jsonPath("$.data.products.last").value(true))
+			.andExpect(jsonPath("$.data.products.content[0].name").value("상품1"));
+	}
+
+	@Test
+	void getMyProducts_carriesWhatEachProductIsHolding() throws Exception {
+		Product product = createProduct("당근", 10);
+		holdWithQty(product, 2, Duration.ofMinutes(15));
+
+		mockMvc.perform(get("/owner/products").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.products.content[0].activeHoldQty").value(2))
+			.andExpect(jsonPath("$.data.products.content[0].availableQty").value(8));
+	}
+
+	@Test
+	void getMyProducts_tellsHowMuchOfTheHoldsTheShelfCannotServe() throws Exception {
+		Product product = createProduct("복숭아 4입", 10);
+		holdWithQty(product, 3, Duration.ofMinutes(15));
+		product.restock(1);
+		productRepository.saveAndFlush(product);
+
+		mockMvc.perform(get("/owner/products").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.products.content[0].activeHoldQty").value(3))
+			.andExpect(jsonPath("$.data.products.content[0].availableQty").value(0))
+			.andExpect(jsonPath("$.data.products.content[0].shortfallQty").value(2));
+	}
+
+	@Test
+	void getMyProducts_leavesOutAnotherStoresShelf() throws Exception {
+		createProduct("내 당근", 10);
+		User otherOwner = userRepository.saveAndFlush(
+			new User(UserRole.OWNER, "다른점주", null, false, Instant.now()));
+		Store otherStore = storeRepository.saveAndFlush(new Store(
+			otherOwner, "다른가게", "04524", "주소", null, "0210001000",
+			new BigDecimal("37.1"), new BigDecimal("127.1"), LocalTime.of(9, 0), LocalTime.of(21, 0)));
+		productRepository.saveAndFlush(new Product(
+			otherStore, "남의상품", ProductCategory.FRUIT, 5, 1000, 800,
+			LocalDateTime.now(), LocalDateTime.now().plusHours(1), "https://example.com/b.jpg"));
+
+		mockMvc.perform(get("/owner/products").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.products.totalElements").value(1))
+			.andExpect(jsonPath("$.data.products.content[0].name").value("내 당근"));
+	}
+
+	@Test
+	void getMyProducts_withoutAStore_isRejected() throws Exception {
+		User ownerWithoutStore = userRepository.saveAndFlush(
+			new User(UserRole.OWNER, "가게없는점주", null, false, Instant.now()));
+		String tokenWithoutStore = tokenProvider.createAccessToken(
+			TokenRealm.USER, ownerWithoutStore.getId(), UserRole.OWNER.name());
+
+		mockMvc.perform(get("/owner/products").header("Authorization", "Bearer " + tokenWithoutStore))
+			.andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.code").value("STORE_NOT_REGISTERED"));
+	}
+
+	@Test
+	void getMyProducts_withAFilterTheServerDoesNotKnow_isRejected() throws Exception {
+		createProduct("당근", 10);
+
+		mockMvc.perform(get("/owner/products?filter=PICKED_UP")
+				.header("Authorization", "Bearer " + token))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("BAD_REQUEST"));
 	}
 
 

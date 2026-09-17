@@ -2,6 +2,8 @@ package com.swyp.backend.product.function;
 
 import com.swyp.backend.common.Distance;
 import com.swyp.backend.common.exception.BusinessException;
+import com.swyp.backend.product.ProductProperties;
+import com.swyp.backend.product.dto.OwnerProductFilter;
 import com.swyp.backend.product.dto.SellableStoreGroup;
 import com.swyp.backend.product.dto.StoreProductSummary;
 import com.swyp.backend.product.entity.Product;
@@ -19,6 +21,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -26,6 +32,7 @@ import org.springframework.stereotype.Component;
 public class ProductFunction {
 
 	private final ProductRepository productRepository;
+	private final ProductProperties productProperties;
 	private final Clock clock;
 
 	public Product getByIdAndStoreId(Long productId, Long storeId) {
@@ -53,6 +60,25 @@ public class ProductFunction {
 
 	public List<Product> findSellingNowOfStore(Long storeId) {
 		return productRepository.findSellingByStoreId(storeId, LocalDateTime.now(clock));
+	}
+
+	public Page<Product> findStoreProducts(
+			Long storeId, OwnerProductFilter filter, Pageable pageable) {
+		PageRequest newestFirst = PageRequest.of(
+				pageable.getPageNumber(),
+				pageable.getPageSize(),
+				Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by(Sort.Direction.DESC, "id")));
+		if (filter == null) {
+			return productRepository.findStoreProducts(storeId, newestFirst);
+		}
+		return switch (filter) {
+			case SOLD_OUT -> productRepository.findStoreProductsSoldOut(storeId, newestFirst);
+			case RUNNING_LOW -> productRepository.findStoreProductsRunningLow(
+					storeId,
+					productProperties.runningLowQty(),
+					LocalDateTime.now(clock),
+					newestFirst);
+		};
 	}
 
 	public boolean hasAnyProduct(Long storeId) {
