@@ -432,9 +432,14 @@ class OwnerProductControllerTest {
 	}
 
 	private Product createProduct(String name, int initialQty) {
+		return createProduct(name, initialQty, LocalDateTime.now(), LocalDateTime.now().plusHours(1));
+	}
+
+	private Product createProduct(
+		String name, int initialQty, LocalDateTime pickupStartAt, LocalDateTime pickupEndAt) {
 		Product product = new Product(
 			store, name, ProductCategory.VEGETABLE, initialQty, 1000, 800,
-			LocalDateTime.now(), LocalDateTime.now().plusHours(1), "https://example.com/a.jpg");
+			pickupStartAt, pickupEndAt, "https://example.com/a.jpg");
 		return productRepository.saveAndFlush(product);
 	}
 
@@ -700,6 +705,41 @@ class OwnerProductControllerTest {
 			.andExpect(jsonPath("$.data.products.totalElements").value(2))
 			.andExpect(jsonPath("$.data.products.content[0].name").value("어제 다 팔린 애호박"))
 			.andExpect(jsonPath("$.data.products.content[1].name").value("다 팔린 상추"));
+	}
+
+	@Test
+	void getMyProducts_soldOut_countsAShelfEveryUnitOfWhichIsHeld() throws Exception {
+		Product allHeld = createProduct("전량 찜된 당근", 3);
+		holdWithQty(allHeld, 3, Duration.ofMinutes(15));
+
+		mockMvc.perform(get("/owner/products?filter=SOLD_OUT").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.products.totalElements").value(1))
+			.andExpect(jsonPath("$.data.products.content[0].name").value("전량 찜된 당근"))
+			.andExpect(jsonPath("$.data.products.content[0].availableQty").value(0))
+			.andExpect(jsonPath("$.data.products.content[0].activeHoldQty").value(3))
+			.andExpect(jsonPath("$.data.products.content[0].status").value("SOLD_OUT"));
+	}
+
+	@Test
+	void getMyProducts_runningLow_leavesOutTheOnesPastTheirPickupWindow() throws Exception {
+		Product low = createProduct("두 개 남은 당근", 10);
+		low.restock(2);
+		productRepository.saveAndFlush(low);
+		Product lowButOver = createProduct(
+			"어제 두 개 남긴 상추", 10,
+			LocalDateTime.now().minusHours(3), LocalDateTime.now().minusHours(1));
+		lowButOver.restock(2);
+		productRepository.saveAndFlush(lowButOver);
+
+		mockMvc.perform(get("/owner/products?filter=RUNNING_LOW").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.products.totalElements").value(1))
+			.andExpect(jsonPath("$.data.products.content[0].name").value("두 개 남은 당근"));
+
+		mockMvc.perform(get("/owner/products").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.products.totalElements").value(2));
 	}
 
 	@Test
