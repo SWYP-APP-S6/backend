@@ -71,7 +71,7 @@ pull 방향 배포가 성립한다. 서버로 들어오는 인바운드 연결�
 | `FCM_ANDROID_CHANNEL_ID` | ❌ | 안드로이드 앱이 만드는 알림 채널 id. **앱과 값이 어긋나면 푸시가 도착해도 트레이에 안 뜬다** |
 | `MFDS_API_KEY` | ❌ | 레시피 수집 배치 전용. 비어 있어도 앱은 뜬다 |
 | `GEMINI_API_KEY` | ❌ | 상품 등록의 식자재 태그 추천용. 비면 **추천만 빈 목록**이 되고 등록은 그대로 된다 |
-| `GEMINI_MODEL` | ❌ | 추천에 쓰는 모델 ID. 비면 `application.properties` 의 기본값을 쓴다 — 모델이 바뀌면 코드 배포 없이 이 값만 바꾼다 |
+| `GEMINI_MODEL` | ❌ | 추천에 쓰는 모델 ID. 비면 코드의 기본값(`GeminiIngredientTagRecommender.DEFAULT_MODEL`)을 쓴다 — compose 가 빈 값을 넘기므로 properties 기본값으로는 막을 수 없다. 모델이 바뀌면 코드 배포 없이 이 값만 바꾼다 |
 | `KAKAO_CONSUMER_REST_API_KEY` | ❌ | 관리자 웹 `/kakao-test` 의 인가 코드 교환 전용. 네이티브 앱 로그인은 SDK 토큰을 쓰므로 영향 없다 — 비면 그 페이지의 웹 로그인만 거부된다 |
 | `KAKAO_OWNER_REST_API_KEY` | ❌ | 위와 같음(점주 앱 키) |
 | `KAKAO_CONSUMER_CLIENT_SECRET` | ❌ | 위 REST API 키의 클라이언트 시크릿. 콘솔에서 켜 둔 앱이면 **필수** — 없으면 교환이 401(`invalid_client`/KOE010) |

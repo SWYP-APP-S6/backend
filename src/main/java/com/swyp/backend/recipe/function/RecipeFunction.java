@@ -86,21 +86,39 @@ public class RecipeFunction {
 		return ingredientRepository.countByIdInAndTagTrue(distinctIds) == distinctIds.size();
 	}
 
-	public List<Ingredient> searchIngredients(String query, int limit) {
+	public List<Ingredient> searchTags(String query, int limit) {
 		String trimmed = query == null ? "" : query.strip();
 		if (trimmed.isEmpty()) {
 			return List.of();
 		}
-		return ingredientRepository.searchByName(
-				trimmed, PageRequest.of(0, Math.clamp(limit, 1, MAX_INGREDIENT_HITS)));
+		return ingredientRepository.searchTagsByName(
+				escapeLike(trimmed), PageRequest.of(0, Math.clamp(limit, 1, MAX_INGREDIENT_HITS)));
 	}
 
-	public Optional<Ingredient> findIngredientByNormKey(String normKey) {
-		return ingredientRepository.findByNormKey(normKey);
+	public List<Ingredient> findAllTags() {
+		return ingredientRepository.findByTagTrueOrderByNameAsc();
 	}
 
-	public Ingredient saveIngredient(Ingredient ingredient) {
-		return ingredientRepository.saveAndFlush(ingredient);
+	public List<Ingredient> findTagsByNormKeys(List<String> normKeys) {
+		if (normKeys.isEmpty()) {
+			return List.of();
+		}
+		Map<String, Ingredient> byNormKey = ingredientRepository.findByNormKeyIn(normKeys).stream()
+				.collect(Collectors.toMap(Ingredient::getNormKey, ingredient -> ingredient));
+		List<Integer> tagIds = normKeys.stream()
+				.map(byNormKey::get)
+				.filter(Objects::nonNull)
+				.map(ingredient -> ingredient.getCanonicalId() != null
+						? ingredient.getCanonicalId()
+						: ingredient.getId())
+				.distinct()
+				.toList();
+		if (tagIds.isEmpty()) {
+			return List.of();
+		}
+		Map<Integer, Ingredient> tagsById = ingredientRepository.findByIdInAndTagTrue(tagIds).stream()
+				.collect(Collectors.toMap(Ingredient::getId, ingredient -> ingredient));
+		return tagIds.stream().map(tagsById::get).filter(Objects::nonNull).toList();
 	}
 
 	public List<Ingredient> findIngredientsByIds(Collection<Integer> ingredientIds) {
@@ -110,6 +128,10 @@ public class RecipeFunction {
 		return ingredientRepository.findByIdIn(ingredientIds).stream()
 				.sorted(Comparator.comparing(Ingredient::getName))
 				.toList();
+	}
+
+	private static String escapeLike(String query) {
+		return query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
 	}
 
 	public List<String> ingredientNamesOf(Collection<Integer> ingredientIds) {

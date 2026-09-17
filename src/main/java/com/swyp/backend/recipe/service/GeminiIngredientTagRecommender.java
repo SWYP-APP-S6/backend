@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -15,18 +16,23 @@ import tools.jackson.databind.ObjectMapper;
 @Component
 public class GeminiIngredientTagRecommender implements IngredientTagRecommender {
 
+	static final String DEFAULT_MODEL = "gemini-3.8-flash";
+
 	private static final String GENERATE_CONTENT_PATH = "/v1beta/models/{model}:generateContent";
+	private static final String API_KEY_HEADER = "x-goog-api-key";
 
 	private static final String PROMPT = """
 			너는 한국 동네 가게의 마감 임박 상품에 식자재 태그를 다는 도우미다.
 			상품명: "%s"
 
-			이 상품을 찾는 손님이 떠올릴 만한 한국어 식자재 태그를 최대 %d개 제안해라.
+			아래 태그 목록에서 이 상품의 재료를 가리키는 태그를 최대 %d개 골라라.
 			규칙:
-			- 상품 자체를 가리키는 말과 그 상위 분류를 함께 넣는다. 예: "복숭아" -> ["복숭아", "과일"]
-			- 한 태그는 공백 없는 한국어 낱말로 짧게 쓴다. 수량·단위·포장 표현은 넣지 않는다.
-			- 브랜드명, 가게 이름, 형용사는 넣지 않는다.
-			- 상품명이 식자재로 보이지 않으면 빈 배열을 준다.
+			- 목록에 있는 태그만, 목록에 적힌 글자 그대로 쓴다.
+			- 상품에 실제로 들어가는 재료만 고르고, 관련이 큰 것부터 쓴다.
+			- 간장·참기름 같은 양념은 상품 자체가 그 양념일 때만 고른다.
+			- 식자재로 보이지 않거나 맞는 태그가 없으면 빈 배열을 준다.
+
+			태그 목록: %s
 			""";
 
 	private final RestClient restClient;
@@ -39,11 +45,11 @@ public class GeminiIngredientTagRecommender implements IngredientTagRecommender 
 			ObjectMapper objectMapper,
 			@Value("${gemini.api-base-url}") String baseUrl,
 			@Value("${gemini.api-key:}") String apiKey,
-			@Value("${gemini.model}") String model) {
+			@Value("${gemini.model:}") String model) {
 		this.restClient = builder.clone().baseUrl(baseUrl).build();
 		this.objectMapper = objectMapper;
 		this.apiKey = apiKey;
-		this.model = model;
+		this.model = model.isBlank() ? DEFAULT_MODEL : model.strip();
 		if (apiKey.isBlank()) {
 			log.warn("No Gemini API key configured — ingredient tag recommendation stays empty "
 				+ "until one is set");
@@ -51,33 +57,32 @@ public class GeminiIngredientTagRecommender implements IngredientTagRecommender 
 	}
 
 	@Override
-	public List<String> recommendTagNames(String productName, int limit) {
+	public List<String> recommendTagNames(String productName, List<String> tagNames, int limit) {
 		if (apiKey.isBlank()) {
 			return List.of();
 		}
 		try {
 			JsonNode answer = restClient.post()
-				.uri(uriBuilder -> uriBuilder
-					.path(GENERATE_CONTENT_PATH)
-					.queryParam("key", apiKey)
-					.build(Map.of("model", model)))
-				.body(requestBody(productName, limit))
+				.uri(GENERATE_CONTENT_PATH, Map.of("model", model))
+				.header(API_KEY_HEADER, apiKey)
+				.body(requestBody(productName, tagNames, limit))
 				.retrieve()
 				.body(JsonNode.class);
 			return tagNamesOf(answer);
-		} catch (RestClientException e) {
+		} catch (RestClientException | JacksonException e) {
 			log.warn("Gemini did not answer the tag recommendation for {}", productName, e);
 			return List.of();
 		}
 	}
 
-	private static Map<String, Object> requestBody(String productName, int limit) {
+	private static Map<String, Object> requestBody(String productName, List<String> tagNames, int limit) {
+		String prompt = PROMPT.formatted(productName, limit, String.join(", ", tagNames));
 		return Map.of(
 			"contents", List.of(Map.of(
-				"parts", List.of(Map.of("text", PROMPT.formatted(productName, limit))))),
+				"parts", List.of(Map.of("text", prompt)))),
 			"generationConfig", Map.of(
-				"response_mime_type", "application/json",
-				"response_schema", Map.of(
+				"responseMimeType", "application/json",
+				"responseSchema", Map.of(
 					"type", "ARRAY",
 					"items", Map.of("type", "STRING"))));
 	}
@@ -90,11 +95,11 @@ public class GeminiIngredientTagRecommender implements IngredientTagRecommender 
 		if (!text.isString()) {
 			return List.of();
 		}
-		List<String> names = new ArrayList<>();
 		JsonNode written = objectMapper.readTree(text.asString());
 		if (!written.isArray()) {
 			return List.of();
 		}
+		List<String> names = new ArrayList<>();
 		written.forEach(node -> {
 			if (node.isString()) {
 				names.add(node.asString());

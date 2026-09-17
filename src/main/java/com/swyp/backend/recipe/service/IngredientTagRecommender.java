@@ -4,5 +4,5 @@ import java.util.List;
 
 public interface IngredientTagRecommender {
 
-	List<String> recommendTagNames(String productName, int limit);
+	List<String> recommendTagNames(String productName, List<String> tagNames, int limit);
 }
