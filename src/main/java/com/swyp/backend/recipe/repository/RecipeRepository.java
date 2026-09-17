@@ -27,10 +27,13 @@ public interface RecipeRepository extends JpaRepository<Recipe, Long> {
 			from recipes r
 			join recipe_ingredients ri on ri.recipe_id = r.id
 			join ingredients i on i.id = ri.ingredient_id
-			where r.is_published and i.id in (:ingredientIds)
+			join ingredients t on t.id = coalesce(i.canonical_id, i.id)
+			where r.is_published
+				and t.id in (
+					select coalesce(p.canonical_id, p.id) from ingredients p where p.id in (:ingredientIds))
 			group by r.id
 			order by
-				max(case when position(i.name in r.title) > 0 then 1 else 0 end) desc,
+				max(case when position(t.name in r.title) > 0 then 1 else 0 end) desc,
 				(select count(*) from recipe_ingredients x where x.recipe_id = r.id) asc,
 				r.id asc
 			limit :limit

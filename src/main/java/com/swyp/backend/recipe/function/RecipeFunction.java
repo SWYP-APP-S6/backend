@@ -16,6 +16,7 @@ import com.swyp.backend.recipe.repository.RecipeRepository;
 import com.swyp.backend.recipe.repository.RecipeStepRepository;
 import com.swyp.backend.recipe.repository.RecipeTagRepository;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +35,8 @@ import org.springframework.util.StringUtils;
 @Component
 @RequiredArgsConstructor
 public class RecipeFunction {
+
+	private static final int MAX_INGREDIENT_HITS = 50;
 
 	private static final Sort POPULAR_FIRST =
 			Sort.by(Sort.Direction.DESC, "viewCount").and(Sort.by(Sort.Direction.DESC, "id"));
@@ -75,12 +78,60 @@ public class RecipeFunction {
 		return recipeNutritionRepository.findById(recipeId);
 	}
 
-	public boolean allIngredientsExist(Collection<Integer> ingredientIds) {
+	public boolean allAreTags(Collection<Integer> ingredientIds) {
 		Set<Integer> distinctIds = Set.copyOf(ingredientIds);
 		if (distinctIds.isEmpty()) {
 			return true;
 		}
-		return ingredientRepository.countByIdIn(distinctIds) == distinctIds.size();
+		return ingredientRepository.countByIdInAndTagTrue(distinctIds) == distinctIds.size();
+	}
+
+	public List<Ingredient> searchTags(String query, int limit) {
+		String trimmed = query == null ? "" : query.strip();
+		if (trimmed.isEmpty()) {
+			return List.of();
+		}
+		return ingredientRepository.searchTagsByName(
+				escapeLike(trimmed), PageRequest.of(0, Math.clamp(limit, 1, MAX_INGREDIENT_HITS)));
+	}
+
+	public List<Ingredient> findAllTags() {
+		return ingredientRepository.findByTagTrueOrderByNameAsc();
+	}
+
+	public List<Ingredient> findTagsByNormKeys(List<String> normKeys) {
+		if (normKeys.isEmpty()) {
+			return List.of();
+		}
+		Map<String, Ingredient> byNormKey = ingredientRepository.findByNormKeyIn(normKeys).stream()
+				.collect(Collectors.toMap(Ingredient::getNormKey, ingredient -> ingredient));
+		List<Integer> tagIds = normKeys.stream()
+				.map(byNormKey::get)
+				.filter(Objects::nonNull)
+				.map(ingredient -> ingredient.getCanonicalId() != null
+						? ingredient.getCanonicalId()
+						: ingredient.getId())
+				.distinct()
+				.toList();
+		if (tagIds.isEmpty()) {
+			return List.of();
+		}
+		Map<Integer, Ingredient> tagsById = ingredientRepository.findByIdInAndTagTrue(tagIds).stream()
+				.collect(Collectors.toMap(Ingredient::getId, ingredient -> ingredient));
+		return tagIds.stream().map(tagsById::get).filter(Objects::nonNull).toList();
+	}
+
+	public List<Ingredient> findIngredientsByIds(Collection<Integer> ingredientIds) {
+		if (ingredientIds.isEmpty()) {
+			return List.of();
+		}
+		return ingredientRepository.findByIdIn(ingredientIds).stream()
+				.sorted(Comparator.comparing(Ingredient::getName))
+				.toList();
+	}
+
+	private static String escapeLike(String query) {
+		return query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
 	}
 
 	public List<String> ingredientNamesOf(Collection<Integer> ingredientIds) {

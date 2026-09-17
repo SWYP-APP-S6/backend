@@ -29,9 +29,27 @@ public class Ingredient {
 	@Column(length = 32)
 	private String category;
 
+	@Column(name = "is_tag", nullable = false)
+	private boolean tag;
+
+	@Column(name = "canonical_id")
+	private Integer canonicalId;
+
 	public Ingredient(String name, String normKey, String category) {
 		this.name = name;
 		this.normKey = normKey;
 		this.category = category;
+	}
+
+	public static Ingredient tag(String name, String normKey, String category) {
+		Ingredient ingredient = new Ingredient(name, normKey, category);
+		ingredient.tag = true;
+		return ingredient;
+	}
+
+	public static Ingredient aliasOf(Ingredient tag, String name, String normKey) {
+		Ingredient ingredient = new Ingredient(name, normKey, null);
+		ingredient.canonicalId = tag.getId();
+		return ingredient;
 	}
 }
