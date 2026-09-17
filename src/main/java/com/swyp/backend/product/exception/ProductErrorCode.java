@@ -12,7 +12,7 @@ public enum ProductErrorCode implements ApiCode {
 	PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다."),
 	INVALID_PRICE(HttpStatus.BAD_REQUEST, "할인가는 정가보다 낮아야 합니다."),
 	INVALID_PICKUP_WINDOW(HttpStatus.BAD_REQUEST, "픽업 마감 시간은 현재 시각 이후 24시간 이내여야 합니다."),
-	INGREDIENT_NOT_FOUND(HttpStatus.BAD_REQUEST, "태그로 고를 수 없는 재료가 포함되어 있습니다."),
+	INGREDIENT_NOT_FOUND(HttpStatus.BAD_REQUEST, "존재하지 않는 재료가 포함되어 있습니다."),
 	PRODUCT_CLOSED(HttpStatus.CONFLICT, "마감된 상품은 수정할 수 없습니다."),
 	STOCK_LOCKED(HttpStatus.CONFLICT, "수량이 맞다고 확인한 상품은 픽업 마감까지 수정할 수 없습니다."),
 	QTY_BELOW_MINIMUM(HttpStatus.BAD_REQUEST, "재고 재확인 전에는 최초 등록 수량의 일부 아래로 내릴 수 없습니다."),

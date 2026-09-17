@@ -24,8 +24,6 @@ import com.swyp.backend.product.PhotoFixture;
 import com.swyp.backend.product.entity.Product;
 import com.swyp.backend.product.entity.ProductCategory;
 import com.swyp.backend.product.repository.ProductRepository;
-import com.swyp.backend.recipe.entity.Ingredient;
-import com.swyp.backend.recipe.repository.IngredientRepository;
 import com.swyp.backend.store.entity.Store;
 import com.swyp.backend.store.repository.StoreRepository;
 import com.swyp.backend.user.entity.User;
@@ -71,9 +69,6 @@ class OwnerProductControllerTest {
 
 	@Autowired
 	JwtTokenProvider tokenProvider;
-
-	@Autowired
-	IngredientRepository ingredientRepository;
 
 	private User owner;
 	private Store store;
@@ -614,35 +609,6 @@ class OwnerProductControllerTest {
 					"photoUrl":"%s","ingredientTags":[999999]}""".formatted(photoUrl)))
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.code").value("INGREDIENT_NOT_FOUND"));
-	}
-
-	@Test
-	void registerProduct_withADictionaryRowThatIsNotATag_isRejected() throws Exception {
-		Ingredient tag = ingredientRepository.saveAndFlush(
-			Ingredient.tag("당근", "test-carrot-" + System.nanoTime(), "채소"));
-		Ingredient alias = ingredientRepository.saveAndFlush(
-			Ingredient.aliasOf(tag, "다진 당근", "test-carrot-alias-" + System.nanoTime()));
-
-		mockMvc.perform(post("/owner/products")
-				.header("Authorization", "Bearer " + token)
-				.contentType(MediaType.APPLICATION_JSON)
-				.content(registerBodyWithTags(alias.getId())))
-			.andExpect(status().isBadRequest())
-			.andExpect(jsonPath("$.code").value("INGREDIENT_NOT_FOUND"));
-
-		mockMvc.perform(post("/owner/products")
-				.header("Authorization", "Bearer " + token)
-				.contentType(MediaType.APPLICATION_JSON)
-				.content(registerBodyWithTags(tag.getId())))
-			.andExpect(status().isCreated())
-			.andExpect(jsonPath("$.data.ingredientTags[0].id").value(tag.getId()))
-			.andExpect(jsonPath("$.data.ingredientTags[0].category").value("채소"));
-	}
-
-	private String registerBodyWithTags(Integer ingredientId) {
-		return """
-			{"name":"당근","category":"VEGETABLE","initialQty":10,"originalPrice":1000,"salePrice":800,\
-			"photoUrl":"%s","ingredientTags":[%d]}""".formatted(photoUrl, ingredientId);
 	}
 
 	@Test
