@@ -74,7 +74,10 @@ public class ProductFunction {
 		return switch (filter) {
 			case SOLD_OUT -> productRepository.findStoreProductsSoldOut(storeId, newestFirst);
 			case RUNNING_LOW -> productRepository.findStoreProductsRunningLow(
-					storeId, productProperties.runningLowQty(), newestFirst);
+					storeId,
+					productProperties.runningLowQty(),
+					LocalDateTime.now(clock),
+					newestFirst);
 		};
 	}
 

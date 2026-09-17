@@ -105,10 +105,12 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 			where p.store.id = :storeId
 				and p.availableQty between 1 and :runningLowQty
 				and p.status <> com.swyp.backend.product.entity.ProductStatus.CLOSED
+				and p.pickupEndAt > :now
 			""")
 	Page<Product> findStoreProductsRunningLow(
 			@Param("storeId") Long storeId,
 			@Param("runningLowQty") int runningLowQty,
+			@Param("now") LocalDateTime now,
 			Pageable pageable);
 
 	List<Product> findByStatusNotAndPickupEndAtLessThanEqual(
