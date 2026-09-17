@@ -9,6 +9,7 @@ import com.swyp.backend.hold.HoldFixture;
 import com.swyp.backend.hold.entity.Hold;
 import com.swyp.backend.hold.entity.HoldStatus;
 import com.swyp.backend.hold.repository.HoldRepository;
+import com.swyp.backend.notification.DeepLinks;
 import com.swyp.backend.notification.repository.NotificationRepository;
 import com.swyp.backend.product.entity.Product;
 import com.swyp.backend.product.entity.ProductCategory;
@@ -142,12 +143,18 @@ class HoldExpiryServiceTest {
 
 		assertThat(notificationRepository.findByUserIdAndReadAtIsNull(consumerId))
 			.singleElement()
-			.satisfies(notification -> assertThat(notification.getType())
-					.isEqualTo(com.swyp.backend.notification.entity.NotificationType.HOLD_EXPIRED));
+			.satisfies(notification -> {
+				assertThat(notification.getType())
+					.isEqualTo(com.swyp.backend.notification.entity.NotificationType.HOLD_EXPIRED);
+				assertThat(notification.getDeepLink()).isEqualTo(DeepLinks.consumerHold(overdue.getId()));
+			});
 		assertThat(notificationRepository.findByUserIdAndReadAtIsNull(ownerId))
 			.singleElement()
-			.satisfies(notification -> assertThat(notification.getType())
-					.isEqualTo(com.swyp.backend.notification.entity.NotificationType.HOLD_UNCONFIRMED));
+			.satisfies(notification -> {
+				assertThat(notification.getType())
+					.isEqualTo(com.swyp.backend.notification.entity.NotificationType.HOLD_UNCONFIRMED);
+				assertThat(notification.getDeepLink()).isEqualTo(DeepLinks.ownerHold(overdue.getId()));
+			});
 	}
 
 	@Test

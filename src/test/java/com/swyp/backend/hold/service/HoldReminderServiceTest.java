@@ -11,6 +11,7 @@ import com.swyp.backend.hold.entity.Hold;
 import com.swyp.backend.hold.entity.HoldStatus;
 import com.swyp.backend.hold.function.HoldFunction;
 import com.swyp.backend.hold.repository.HoldRepository;
+import com.swyp.backend.notification.DeepLinks;
 import com.swyp.backend.notification.entity.NotificationType;
 import com.swyp.backend.notification.repository.NotificationRepository;
 import com.swyp.backend.product.entity.Product;
@@ -119,6 +120,7 @@ class HoldReminderServiceTest {
 			.satisfies(notification -> {
 				assertThat(notification.getType()).isEqualTo(NotificationType.HOLD_EXPIRING_SOON);
 				assertThat(notification.getBody()).contains("청과마을");
+				assertThat(notification.getDeepLink()).isEqualTo(DeepLinks.consumerHold(closing.getId()));
 			});
 	}
 

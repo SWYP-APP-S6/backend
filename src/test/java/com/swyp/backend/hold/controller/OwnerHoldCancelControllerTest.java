@@ -17,6 +17,7 @@ import com.swyp.backend.hold.entity.HoldCanceledBy;
 import com.swyp.backend.hold.entity.HoldStatus;
 import com.swyp.backend.hold.repository.HoldCancelCreditEventRepository;
 import com.swyp.backend.hold.repository.HoldRepository;
+import com.swyp.backend.notification.DeepLinks;
 import com.swyp.backend.notification.entity.Notification;
 import com.swyp.backend.notification.entity.NotificationType;
 import com.swyp.backend.notification.repository.NotificationRepository;
@@ -219,6 +220,7 @@ class OwnerHoldCancelControllerTest {
 		assertThat(notifications).hasSize(1);
 		assertThat(notifications.getFirst().getType()).isEqualTo(NotificationType.HOLD_CANCELED_BY_OWNER);
 		assertThat(notifications.getFirst().getBody()).isEqualTo(NOTICE);
+		assertThat(notifications.getFirst().getDeepLink()).isEqualTo(DeepLinks.consumerHold(first.getId()));
 		assertThat(holdCancelCreditEventRepository.count())
 			.as("an owner's cancel does not spend the customer's cancel credits")
 			.isZero();

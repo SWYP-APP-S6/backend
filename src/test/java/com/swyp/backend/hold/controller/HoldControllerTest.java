@@ -16,6 +16,7 @@ import com.swyp.backend.hold.entity.HoldCancelCredit;
 import com.swyp.backend.hold.entity.HoldStatus;
 import com.swyp.backend.hold.repository.HoldCancelCreditRepository;
 import com.swyp.backend.hold.repository.HoldRepository;
+import com.swyp.backend.notification.DeepLinks;
 import com.swyp.backend.notification.repository.NotificationRepository;
 import com.swyp.backend.product.entity.Product;
 import com.swyp.backend.product.entity.ProductCategory;
@@ -783,7 +784,7 @@ class HoldControllerTest {
 
 	@Test
 	void theOwnerIsToldAsSoonAsAConsumerOpensAHold() throws Exception {
-		holdAndReturnId(product, 1);
+		String holdId = holdAndReturnId(product, 1);
 
 		assertThat(notificationRepository.findByUserId(
 				product.getStore().getOwner().getId(), org.springframework.data.domain.Pageable.unpaged()))
@@ -792,7 +793,22 @@ class HoldControllerTest {
 				assertThat(notification.getType())
 					.isEqualTo(com.swyp.backend.notification.entity.NotificationType.NEW_HOLD_RECEIVED);
 				assertThat(notification.getBody()).contains("소비자", "복숭아 4입");
+				assertThat(notification.getDeepLink())
+					.isEqualTo(DeepLinks.ownerHold(Long.valueOf(holdId)));
 			});
+	}
+
+	@Test
+	void theOwnerIsAskedToRecheckStock_linkingToTheProduct_onceHoldsReachSixtyPercent() throws Exception {
+		holdAndReturnId(product, 2);
+
+		assertThat(notificationRepository.findByUserId(
+				product.getStore().getOwner().getId(), org.springframework.data.domain.Pageable.unpaged()))
+			.filteredOn(notification -> notification.getType()
+				== com.swyp.backend.notification.entity.NotificationType.STOCK_RECONFIRM_REQUEST)
+			.singleElement()
+			.satisfies(notification -> assertThat(notification.getDeepLink())
+				.isEqualTo(DeepLinks.ownerProduct(product.getId())));
 	}
 
 	@Test
