@@ -138,6 +138,11 @@
 - **앱 타임존은 `Asia/Seoul`**, 현재 시각은 **`Clock` 빈을 주입해** 얻는다 — 인자 없는 `now()`는 운영
   컨테이너의 UTC를 따라 9시간 어긋난다(로컬은 KST라 테스트로 안 잡힌다). 시간 타입·소프트 삭제와
   함께 `.claude/rules/entity.md`.
+- **JSON의 날짜+시각은 항상 `+09:00` 오프셋을 붙여 내보낸다** — `Instant`(절대 시각)와
+  `LocalDateTime`(한국 벽시계) 모두(`common/json`). 스펙이 둘 다 `format: date-time`(RFC 3339,
+  오프셋 필수)이고 앱 코드젠이 `OffsetDateTime`으로 받으므로, 오프셋이 빠지면 앱 파싱이 깨지고
+  `Z`와 섞이면 사람이 읽을 때 틀린다. 요청은 오프셋이 있으면 서울 시각으로 바꾸고 없으면 서울 시각으로
+  읽는다. 시각만(`LocalTime`)·날짜만(`LocalDate`)은 오프셋이 없다.
 
 ## Deployment
 
