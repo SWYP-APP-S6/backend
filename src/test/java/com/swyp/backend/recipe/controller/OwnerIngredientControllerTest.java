@@ -94,6 +94,42 @@ class OwnerIngredientControllerTest {
 	}
 
 	@Test
+	void searchIngredients_offersOnlyTags_evenWhenAnUntaggedRowMatches() throws Exception {
+		ingredient("복숭아", "과일");
+		ingredientRepository.saveAndFlush(new Ingredient("복숭아통조림 국물", "복숭아통조림국물", null));
+
+		search("복숭")
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.length()").value(1))
+			.andExpect(jsonPath("$.data[0].name").value("복숭아"));
+	}
+
+	@Test
+	void searchIngredients_byAnAliasName_findsItsTag() throws Exception {
+		Ingredient egg = ingredient("달걀", "달걀·유제품");
+		ingredientRepository.saveAndFlush(Ingredient.aliasOf(egg, "계란", "계란"));
+		ingredientRepository.saveAndFlush(Ingredient.aliasOf(egg, "계란노른자", "계란노른자"));
+
+		search("계란")
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.length()").value(1))
+			.andExpect(jsonPath("$.data[0].id").value(egg.getId()))
+			.andExpect(jsonPath("$.data[0].name").value("달걀"));
+	}
+
+	@Test
+	void searchIngredients_treatsLikeWildcardsAsPlainText() throws Exception {
+		ingredient("복숭아", "과일");
+
+		search("%")
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.length()").value(0));
+		search("_")
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.length()").value(0));
+	}
+
+	@Test
 	void searchIngredients_stopsAtTheRequestedSize() throws Exception {
 		ingredient("복숭아", "청과");
 		ingredient("백도 복숭아", "청과");

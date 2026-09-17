@@ -52,11 +52,18 @@ class OwnerIngredientRecommendationTest {
 	JwtTokenProvider tokenProvider;
 
 	private String token;
+	private Ingredient peach;
+	private Ingredient egg;
 
 	@BeforeEach
 	void setUp() {
-		ingredientRepository.deleteAll();
-		userRepository.deleteAll();
+		clearAll();
+		recommender.reset();
+
+		peach = ingredientRepository.saveAndFlush(Ingredient.tag("복숭아", "복숭아", "과일"));
+		egg = ingredientRepository.saveAndFlush(Ingredient.tag("달걀", "달걀", "달걀·유제품"));
+		ingredientRepository.saveAndFlush(Ingredient.aliasOf(egg, "계란", "계란"));
+		ingredientRepository.saveAndFlush(new Ingredient("소금", "소금", null));
 
 		User owner = userRepository.saveAndFlush(
 			new User(UserRole.OWNER, "테스트점주", null, false, Instant.now()));
@@ -65,55 +72,55 @@ class OwnerIngredientRecommendationTest {
 
 	@AfterEach
 	void tearDown() {
-		ingredientRepository.deleteAll();
-		userRepository.deleteAll();
+		clearAll();
 	}
 
 	@Test
-	void recommendTags_keepsTheTagTheDictionaryKnows_andWritesTheOneItDoesNot() throws Exception {
-		Ingredient peach = ingredientRepository.saveAndFlush(new Ingredient("복숭아", "복숭아", "청과"));
-		recommender.answer(List.of("복숭아", "과일"));
+	void recommendTags_offersTheModelOnlyTheTagList() throws Exception {
+		recommend("복숭아 4입").andExpect(status().isOk());
 
-		recommend("복숭아 4입")
+		assertThat(recommender.offeredTagNames())
+			.as("aliases and untagged dictionary rows are not offered")
+			.containsExactlyInAnyOrder("복숭아", "달걀");
+	}
+
+	@Test
+	void recommendTags_keepsTheTagsTheModelPicked_andReachesATagThroughItsAlias() throws Exception {
+		recommender.answer(List.of("복숭아", "계란"));
+
+		recommend("복숭아 달걀 샌드위치")
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.length()").value(2))
 			.andExpect(jsonPath("$.data[0].id").value(peach.getId()))
-			.andExpect(jsonPath("$.data[0].name").value("복숭아"))
-			.andExpect(jsonPath("$.data[1].name").value("과일"));
-
-		assertThat(ingredientRepository.findByNormKey("과일"))
-			.as("the dictionary gains the tag the owner can now pick")
-			.isPresent();
+			.andExpect(jsonPath("$.data[0].category").value("과일"))
+			.andExpect(jsonPath("$.data[1].id").value(egg.getId()))
+			.andExpect(jsonPath("$.data[1].name").value("달걀"));
 	}
 
 	@Test
-	void recommendTags_twiceForTheSameProduct_doesNotDuplicateTheDictionaryRow() throws Exception {
-		recommender.answer(List.of("과일"));
-
-		recommend("복숭아").andExpect(status().isOk());
-		recommend("복숭아").andExpect(status().isOk());
-
-		assertThat(ingredientRepository.findAll())
-			.as("a repeated recommendation maps onto the row it made the first time")
-			.hasSize(1);
-	}
-
-	@Test
-	void recommendTags_dropsWhatCannotBecomeATag() throws Exception {
-		recommender.answer(List.of("과일", "8g", "   ", "복숭아"));
+	void recommendTags_dropsWhatIsNotATag_withoutWritingToTheDictionary() throws Exception {
+		long rowsBefore = ingredientRepository.count();
+		recommender.answer(List.of("과일", "소금", "8g", "   ", "복숭아", "복숭아"));
 
 		recommend("복숭아")
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.length()").value(2))
-			.andExpect(jsonPath("$.data[0].name").value("과일"))
-			.andExpect(jsonPath("$.data[1].name").value("복숭아"));
+			.andExpect(jsonPath("$.data.length()").value(1))
+			.andExpect(jsonPath("$.data[0].name").value("복숭아"));
+
+		assertThat(ingredientRepository.count())
+			.as("a recommendation never adds a dictionary row")
+			.isEqualTo(rowsBefore);
 	}
 
 	@Test
 	void recommendTags_stopsAtFive() throws Exception {
-		recommender.answer(List.of("과일", "복숭아", "제철", "여름과일", "생과일", "후식"));
+		List<String> sixTags = List.of("가", "나", "다", "라", "마", "바");
+		for (String name : sixTags) {
+			ingredientRepository.saveAndFlush(Ingredient.tag(name, name, "채소"));
+		}
+		recommender.answer(sixTags);
 
-		recommend("복숭아")
+		recommend("모둠 채소")
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.length()").value(5));
 	}
@@ -125,6 +132,17 @@ class OwnerIngredientRecommendationTest {
 		recommend("복숭아")
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.length()").value(0));
+	}
+
+	@Test
+	void recommendTags_forANameLongerThanAProductCanHave_skipsTheModel() throws Exception {
+		recommender.answer(List.of("복숭아"));
+
+		recommend("복".repeat(31))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.length()").value(0));
+
+		assertThat(recommender.offeredTagNames()).isNull();
 	}
 
 	@Test
@@ -145,6 +163,11 @@ class OwnerIngredientRecommendationTest {
 			.header("Authorization", "Bearer " + token));
 	}
 
+	private void clearAll() {
+		ingredientRepository.deleteAll();
+		userRepository.deleteAll();
+	}
+
 	@TestConfiguration
 	static class StubTagRecommenderConfiguration {
 
@@ -158,13 +181,24 @@ class OwnerIngredientRecommendationTest {
 	static class StubTagRecommender implements IngredientTagRecommender {
 
 		private final AtomicReference<List<String>> answer = new AtomicReference<>(List.of());
+		private final AtomicReference<List<String>> offered = new AtomicReference<>();
 
 		void answer(List<String> tagNames) {
 			this.answer.set(tagNames);
 		}
 
+		void reset() {
+			answer.set(List.of());
+			offered.set(null);
+		}
+
+		List<String> offeredTagNames() {
+			return offered.get();
+		}
+
 		@Override
-		public List<String> recommendTagNames(String productName, int limit) {
+		public List<String> recommendTagNames(String productName, List<String> tagNames, int limit) {
+			offered.set(tagNames);
 			return answer.get();
 		}
 	}
