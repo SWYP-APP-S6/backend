@@ -16,6 +16,7 @@ import com.swyp.backend.recipe.repository.RecipeRepository;
 import com.swyp.backend.recipe.repository.RecipeStepRepository;
 import com.swyp.backend.recipe.repository.RecipeTagRepository;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +35,8 @@ import org.springframework.util.StringUtils;
 @Component
 @RequiredArgsConstructor
 public class RecipeFunction {
+
+	private static final int MAX_INGREDIENT_HITS = 50;
 
 	private static final Sort POPULAR_FIRST =
 			Sort.by(Sort.Direction.DESC, "viewCount").and(Sort.by(Sort.Direction.DESC, "id"));
@@ -81,6 +84,32 @@ public class RecipeFunction {
 			return true;
 		}
 		return ingredientRepository.countByIdIn(distinctIds) == distinctIds.size();
+	}
+
+	public List<Ingredient> searchIngredients(String query, int limit) {
+		String trimmed = query == null ? "" : query.strip();
+		if (trimmed.isEmpty()) {
+			return List.of();
+		}
+		return ingredientRepository.searchByName(
+				trimmed, PageRequest.of(0, Math.clamp(limit, 1, MAX_INGREDIENT_HITS)));
+	}
+
+	public Optional<Ingredient> findIngredientByNormKey(String normKey) {
+		return ingredientRepository.findByNormKey(normKey);
+	}
+
+	public Ingredient saveIngredient(Ingredient ingredient) {
+		return ingredientRepository.saveAndFlush(ingredient);
+	}
+
+	public List<Ingredient> findIngredientsByIds(Collection<Integer> ingredientIds) {
+		if (ingredientIds.isEmpty()) {
+			return List.of();
+		}
+		return ingredientRepository.findByIdIn(ingredientIds).stream()
+				.sorted(Comparator.comparing(Ingredient::getName))
+				.toList();
 	}
 
 	public List<String> ingredientNamesOf(Collection<Integer> ingredientIds) {
