@@ -105,6 +105,35 @@ class OwnerProductControllerTest {
 			"photoUrl":"%s","pickupEndAt":"%s"}""".formatted(photoUrl, pickupEndAt);
 	}
 
+	private String registerBodyWithRawPickupEndAt(String pickupEndAt) {
+		return """
+			{"name":"당근","category":"VEGETABLE","initialQty":10,"originalPrice":1000,"salePrice":800,\
+			"photoUrl":"%s","ingredientTags":[],"pickupEndAt":"%s"}""".formatted(photoUrl, pickupEndAt);
+	}
+
+	@Test
+	void registerProduct_readsThePickupDeadlineAsSeoulWallClock_howeverTheAppWritesIt() throws Exception {
+		LocalDateTime seoulDeadline = LocalDateTime.now(ClockConfig.SERVICE_ZONE)
+			.plusHours(2)
+			.truncatedTo(ChronoUnit.MINUTES);
+		String sameMomentInUtc = seoulDeadline.atZone(ClockConfig.SERVICE_ZONE)
+			.withZoneSameInstant(java.time.ZoneOffset.UTC)
+			.toLocalDateTime()
+			.truncatedTo(ChronoUnit.SECONDS) + "Z";
+
+		for (String written : java.util.List.of(
+				seoulDeadline.toString(),
+				seoulDeadline + "+09:00",
+				sameMomentInUtc)) {
+			mockMvc.perform(post("/owner/products")
+					.header("Authorization", "Bearer " + token)
+					.contentType(MediaType.APPLICATION_JSON)
+					.content(registerBodyWithRawPickupEndAt(written)))
+				.andExpect(status().isCreated())
+				.andExpect(jsonPath("$.data.pickupEndAt").value(startsWith(seoulDeadline.toString())));
+		}
+	}
+
 	@Test
 	void updateStock_countsWhatIsInTheShop_notWhatIsLeftOverTheHolds() throws Exception {
 		Product product = createProduct("당근", 10);
