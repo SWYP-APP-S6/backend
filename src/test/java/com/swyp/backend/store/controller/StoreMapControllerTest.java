@@ -217,7 +217,9 @@ class StoreMapControllerTest {
 			.andExpect(jsonPath("$.data.productCount").value(2))
 			.andExpect(jsonPath("$.data.earliestPickupEndAt").value(org.hamcrest.Matchers.startsWith(
 				now.plusHours(3).truncatedTo(java.time.temporal.ChronoUnit.MINUTES)
-					.toString().substring(0, 16))));
+					.toString().substring(0, 16))))
+			.andExpect(jsonPath("$.data.earliestPickupEndAt").value(org.hamcrest.Matchers.endsWith("+09:00")))
+			.andExpect(jsonPath("$.data.products[0].pickupEndAt").value(org.hamcrest.Matchers.endsWith("+09:00")));
 	}
 
 	@Test

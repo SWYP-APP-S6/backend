@@ -203,7 +203,8 @@ class OwnerHomeControllerTest {
 			.andExpect(jsonPath("$.data.upcomingVisits[0].summary").value("당근, 감자"))
 			.andExpect(jsonPath("$.data.upcomingVisits[0].totalQty").value(3))
 			.andExpect(jsonPath("$.data.upcomingVisits[0].expiresAt")
-				.value(now.plus(Duration.ofMinutes(10)).toString()))
+				.value(java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(
+					now.plus(Duration.ofMinutes(10)).atZone(com.swyp.backend.common.ClockConfig.SERVICE_ZONE))))
 			.andExpect(jsonPath("$.data.upcomingVisits[1].holdId").value(otherVisit.getId()))
 			.andExpect(jsonPath("$.data.upcomingVisits[1].summary").value("양파"));
 	}

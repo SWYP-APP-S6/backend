@@ -56,7 +56,7 @@ class UserControllerTest {
 			.andExpect(jsonPath("$.data.nickname").value("망원동 주민"))
 			.andExpect(jsonPath("$.data.phone").value("010-1234-5678"))
 			.andExpect(jsonPath("$.data.marketingOptIn").value(true))
-			.andExpect(jsonPath("$.data.termsAgreedAt").value("2026-09-01T00:00:00Z"))
+			.andExpect(jsonPath("$.data.termsAgreedAt").value("2026-09-01T09:00:00+09:00"))
 			.andExpect(jsonPath("$.data.joinedAt").exists());
 	}
 

@@ -112,7 +112,8 @@ class OwnerProductControllerTest {
 	}
 
 	@Test
-	void registerProduct_readsThePickupDeadlineAsSeoulWallClock_howeverTheAppWritesIt() throws Exception {
+	void registerProduct_readsThePickupDeadlineAsSeoulWallClock_howeverTheAppWritesIt_andAnswersWithTheOffset()
+			throws Exception {
 		LocalDateTime seoulDeadline = LocalDateTime.now(ClockConfig.SERVICE_ZONE)
 			.plusHours(2)
 			.truncatedTo(ChronoUnit.MINUTES);
@@ -130,7 +131,9 @@ class OwnerProductControllerTest {
 					.contentType(MediaType.APPLICATION_JSON)
 					.content(registerBodyWithRawPickupEndAt(written)))
 				.andExpect(status().isCreated())
-				.andExpect(jsonPath("$.data.pickupEndAt").value(startsWith(seoulDeadline.toString())));
+				.andExpect(jsonPath("$.data.pickupEndAt").value(
+					java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(
+						seoulDeadline.atZone(ClockConfig.SERVICE_ZONE))));
 		}
 	}
 
@@ -472,7 +475,7 @@ class OwnerProductControllerTest {
 				.contentType(MediaType.APPLICATION_JSON)
 				.content(registerBody("복숭아 4입", 10000, 4000)))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.pickupEndAt").value(endsWith("21:00:00")));
+			.andExpect(jsonPath("$.data.pickupEndAt").value(endsWith("21:00:00+09:00")));
 	}
 
 	@Test
