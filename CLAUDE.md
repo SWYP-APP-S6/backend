@@ -63,6 +63,9 @@
   한다. 키(`fcm.*`)가 없으면 **발송만 꺼지고** 알림함은 그대로다(fail-closed). 수신처는
   `user_device_tokens`이고 앱이 `POST`/`DELETE /notifications/device-tokens`로 등록·해제한다 —
   로그아웃 때 지우지 않으면 그 기기를 이어 쓰는 다음 사람이 남의 푸시를 받는다.
+  **딥링크는 `notification.DeepLinks`에서만 만든다** — `mangro://` + 그 화면이 부르는 API 경로
+  (`holds/{id}` · `owner/holds/{id}` · `owner/products/{id}`)라 앱이 경로를 그대로 조회에 쓴다.
+  `notify()`에 `null`을 넘기면 푸시를 탭해도 앱이 열 화면을 모른다.
 - **제약 메시지는 `src/main/resources/ValidationMessages.properties`가 소유한다** — 없으면 Hibernate
   Validator 기본 번들이 **JVM 로케일에 따라** 골라져 로컬(ko)은 한국어, 운영 컨테이너
   (`eclipse-temurin`의 `LANG=en_US.UTF-8`)는 영어가 나간다. 이 번들은 로케일 접미사가 없어 모든

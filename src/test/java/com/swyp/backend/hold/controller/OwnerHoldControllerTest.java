@@ -15,6 +15,7 @@ import com.swyp.backend.hold.HoldFixture;
 import com.swyp.backend.hold.entity.Hold;
 import com.swyp.backend.hold.entity.HoldStatus;
 import com.swyp.backend.hold.repository.HoldRepository;
+import com.swyp.backend.notification.DeepLinks;
 import com.swyp.backend.notification.repository.NotificationRepository;
 import com.swyp.backend.product.entity.Product;
 import com.swyp.backend.product.entity.ProductCategory;
@@ -239,7 +240,10 @@ class OwnerHoldControllerTest {
 		Product reloaded = productRepository.findById(product.getId()).orElseThrow();
 		assertThat(reloaded.getHeldQty()).isZero();
 		assertThat(reloaded.getAvailableQty()).isEqualTo(7);
-		assertThat(notificationRepository.count()).isEqualTo(1);
+		assertThat(notificationRepository.findAll())
+			.singleElement()
+			.satisfies(notification -> assertThat(notification.getDeepLink())
+				.isEqualTo(DeepLinks.consumerHold(hold.getId())));
 	}
 
 	@Test

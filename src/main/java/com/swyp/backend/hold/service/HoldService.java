@@ -16,6 +16,7 @@ import com.swyp.backend.hold.entity.HoldCancelCredit;
 import com.swyp.backend.hold.entity.HoldCancelCreditReason;
 import com.swyp.backend.hold.function.HoldCancelCreditFunction;
 import com.swyp.backend.hold.function.HoldFunction;
+import com.swyp.backend.notification.DeepLinks;
 import com.swyp.backend.notification.entity.NotificationType;
 import com.swyp.backend.notification.function.NotificationFunction;
 import com.swyp.backend.product.entity.Product;
@@ -82,19 +83,26 @@ public class HoldService {
 						slot.groupId(), slot.expiresAt())));
 		askOwnerToReconfirmStock(product, now);
 		holdFunction.flush();
+		List<Hold> group = holdFunction.findHoldingOfGroup(slot.groupId());
 		if (opensAPickup) {
 			notificationFunction.notify(
 					product.getStore().getOwner(),
 					NotificationType.NEW_HOLD_RECEIVED,
 					"새 찜이 들어왔어요",
 					user.getNickname() + "님이 " + product.getName() + " 상품을 찜했어요.",
-					null);
+					DeepLinks.ownerHold(holdOf(group, product).getId()));
 		}
-		return HoldDetailResponse.of(
-				holdFunction.findHoldingOfGroup(slot.groupId()), now, clock.getZone());
+		return HoldDetailResponse.of(group, now, clock.getZone());
 	}
 
 	private record GroupSlot(Long groupId, Instant expiresAt) {}
+
+	private static Hold holdOf(List<Hold> group, Product product) {
+		return group.stream()
+				.filter(hold -> hold.getProduct().getId().equals(product.getId()))
+				.findFirst()
+				.orElseThrow();
+	}
 
 	private void askOwnerToReconfirmStock(Product product, Instant now) {
 		if (!product.needsStockReconfirm()) {
@@ -106,7 +114,7 @@ public class HoldService {
 				NotificationType.STOCK_RECONFIRM_REQUEST,
 				"재고가 맞는지 확인해주세요",
 				product.getName() + " 찜이 등록 수량의 60%에 닿았어요. 지금 남은 수량을 확인해주세요.",
-				null);
+				DeepLinks.ownerProduct(product.getId()));
 	}
 
 
@@ -234,13 +242,13 @@ public class HoldService {
 				NotificationType.HOLD_EXPIRED,
 				"찜 시간이 끝났어요",
 				hold.getStore().getName() + "에서 찜한 상품의 픽업 시간이 지났어요.",
-				null);
+				DeepLinks.consumerHold(hold.getId()));
 		notificationFunction.notify(
 				hold.getStore().getOwner(),
 				NotificationType.HOLD_UNCONFIRMED,
 				"수령 확인이 안 된 찜이 있어요",
 				hold.getUser().getNickname() + "님의 찜 시간이 지났어요. 이미 수령했다면 수령 완료를 눌러주세요.",
-				null);
+				DeepLinks.ownerHold(hold.getId()));
 	}
 
 	private List<Long> productIdsToLock(Optional<HoldRef> current, Long productId) {

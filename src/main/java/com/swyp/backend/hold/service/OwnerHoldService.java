@@ -14,6 +14,7 @@ import com.swyp.backend.hold.entity.HoldStatus;
 import com.swyp.backend.hold.exception.HoldErrorCode;
 import com.swyp.backend.hold.function.HoldCancelCreditFunction;
 import com.swyp.backend.hold.function.HoldFunction;
+import com.swyp.backend.notification.DeepLinks;
 import com.swyp.backend.notification.entity.NotificationType;
 import com.swyp.backend.notification.function.NotificationFunction;
 import com.swyp.backend.product.entity.Product;
@@ -115,7 +116,7 @@ public class OwnerHoldService {
 				NotificationType.PICKUP_COMPLETED,
 				"수령이 완료됐어요",
 				requested.getStore().getName() + " 수령이 완료됐어요.",
-				null);
+				DeepLinks.consumerHold(requested.getId()));
 		return OwnerHoldDetailResponse.of(group, now);
 	}
 

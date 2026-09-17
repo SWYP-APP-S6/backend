@@ -150,11 +150,11 @@ class NotificationPushServiceTest {
 	@Test
 	void aDeepLinkRidesAlongOnlyWhenTheNotificationCarriesOne() {
 		registerDevice(PHONE);
-		notifyWithDeepLink("swyp://holds/7");
+		notifyWithDeepLink("mangro://holds/7");
 
 		notificationPushService.dispatchPendingPushes();
 
-		assertThat(pushSender.messages.getFirst().data()).containsEntry("deepLink", "swyp://holds/7");
+		assertThat(pushSender.messages.getFirst().data()).containsEntry("deepLink", "mangro://holds/7");
 	}
 
 	@Test

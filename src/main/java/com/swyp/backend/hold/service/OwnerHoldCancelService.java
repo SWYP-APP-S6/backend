@@ -9,6 +9,7 @@ import com.swyp.backend.hold.entity.Hold;
 import com.swyp.backend.hold.entity.HoldStatus;
 import com.swyp.backend.hold.exception.HoldErrorCode;
 import com.swyp.backend.hold.function.HoldFunction;
+import com.swyp.backend.notification.DeepLinks;
 import com.swyp.backend.notification.entity.NotificationType;
 import com.swyp.backend.notification.function.NotificationFunction;
 import com.swyp.backend.product.entity.Product;
@@ -78,7 +79,11 @@ public class OwnerHoldCancelService {
 			hold.cancelByOwner(now, OWNER_SHORTAGE_REASON);
 			locked.get(productIdByHold.get(hold.getId())).releaseHold(hold.getQty());
 			notificationFunction.notify(
-					hold.getUser(), NotificationType.HOLD_CANCELED_BY_OWNER, NOTICE_TITLE, notice, null);
+					hold.getUser(),
+					NotificationType.HOLD_CANCELED_BY_OWNER,
+					NOTICE_TITLE,
+					notice,
+					DeepLinks.consumerHold(hold.getId()));
 		}
 		return candidatesOf(store);
 	}
