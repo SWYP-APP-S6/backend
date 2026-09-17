@@ -3,6 +3,7 @@ package com.swyp.backend.hold.service;
 import com.swyp.backend.hold.entity.Hold;
 import com.swyp.backend.hold.entity.HoldStatus;
 import com.swyp.backend.hold.function.HoldFunction;
+import com.swyp.backend.notification.DeepLinks;
 import com.swyp.backend.notification.entity.NotificationType;
 import com.swyp.backend.notification.function.NotificationFunction;
 import com.swyp.backend.product.entity.Product;
@@ -43,13 +44,13 @@ public class HoldExpirer {
 				NotificationType.HOLD_EXPIRED,
 				"찜 시간이 끝났어요",
 				hold.getStore().getName() + "에서 찜한 상품의 픽업 시간이 지났어요.",
-				null);
+				DeepLinks.consumerHold(hold.getId()));
 		notificationFunction.notify(
 				hold.getStore().getOwner(),
 				NotificationType.HOLD_UNCONFIRMED,
 				"수령 확인이 안 된 찜이 있어요",
 				hold.getUser().getNickname() + "님의 찜 시간이 지났어요. 이미 수령했다면 수령 완료를 눌러주세요.",
-				null);
+				DeepLinks.ownerHold(hold.getId()));
 		return true;
 	}
 }

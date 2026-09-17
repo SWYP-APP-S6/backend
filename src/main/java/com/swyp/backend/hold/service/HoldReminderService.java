@@ -3,6 +3,7 @@ package com.swyp.backend.hold.service;
 import com.swyp.backend.hold.HoldProperties;
 import com.swyp.backend.hold.entity.Hold;
 import com.swyp.backend.hold.function.HoldFunction;
+import com.swyp.backend.notification.DeepLinks;
 import com.swyp.backend.notification.entity.NotificationType;
 import com.swyp.backend.notification.function.NotificationFunction;
 import java.time.Clock;
@@ -49,7 +50,7 @@ public class HoldReminderService {
 					NotificationType.HOLD_EXPIRING_SOON,
 					"찜 시간이 곧 끝나요",
 					hold.getStore().getName() + " 픽업 마감이 얼마 남지 않았어요.",
-					null);
+					DeepLinks.consumerHold(hold.getId()));
 			reminded++;
 		}
 		if (reminded > 0) {
