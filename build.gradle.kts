@@ -59,6 +59,9 @@ tasks.withType<Test> {
 	// 푸시 아웃박스 배치는 운영 주기(3초)로 두면 테스트가 알림을 넣는 동안 끼어들어 같은 행의
 	// push_state 를 바꾼다. 스케줄러는 사실상 꺼 두고, 배치를 검증하는 테스트가 직접 호출한다.
 	systemProperty("notification.push.scan-interval", "1h")
+	// 판매 마감 배치도 같다 -- 마감이 지난 상품을 일부러 만드는 테스트(재고 잠금 해제, 마감 상품
+	// 숨김)가 도는 사이에 끼어들면 그 상품이 CLOSED 로 바뀌어 기대가 흔들린다.
+	systemProperty("product.close-scan-interval", "1h")
 	// 업로드 테스트가 레포 안에 파일을 남기지 않도록 저장 위치를 빌드 디렉터리로 돌린다.
 	systemProperty("storage.image.root-dir", "build/test-uploads")
 }

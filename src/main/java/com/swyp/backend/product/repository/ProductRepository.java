@@ -3,10 +3,10 @@ package com.swyp.backend.product.repository;
 import com.swyp.backend.product.dto.StoreProductSummary;
 import com.swyp.backend.product.entity.Product;
 import com.swyp.backend.product.entity.ProductCategory;
-import com.swyp.backend.product.entity.ProductStatus;
 import jakarta.persistence.LockModeType;
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
@@ -113,8 +113,17 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 			@Param("now") LocalDateTime now,
 			Pageable pageable);
 
-	List<Product> findByStatusNotAndPickupEndAtLessThanEqual(
-			ProductStatus status, LocalDateTime pickupEndAt);
+	@Modifying
+	@Query(nativeQuery = true, value = """
+			update products
+			set status = 'CLOSED', updated_at = :closedAt
+			where id in (
+				select id from products
+				where status <> 'CLOSED' and pickup_end_at <= :now
+				order by id
+				for update)
+			""")
+	int closeEndedAsOf(@Param("now") LocalDateTime now, @Param("closedAt") Instant closedAt);
 
 	boolean existsByStoreIdAndReconfirmSentAtIsNotNullAndReconfirmAnsweredAtIsNull(Long storeId);
 

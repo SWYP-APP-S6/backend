@@ -14,6 +14,7 @@ import com.swyp.backend.store.entity.StoreStatus;
 import com.swyp.backend.store.entity.Store;
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -131,6 +132,11 @@ public class ProductFunction {
 				store.getLatitude().doubleValue(),
 				store.getLongitude().doubleValue()));
 		return new SellableStoreGroup(store, products, distanceMeters);
+	}
+
+	public int closeEndedProducts() {
+		Instant now = Instant.now(clock);
+		return productRepository.closeEndedAsOf(LocalDateTime.ofInstant(now, clock.getZone()), now);
 	}
 
 	public void deleteAllOfStoreOwnedBy(Long ownerId) {
