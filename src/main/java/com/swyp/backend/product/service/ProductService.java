@@ -69,6 +69,10 @@ public class ProductService {
 
 	private Product buildProduct(Long ownerId, ProductRegisterRequest request) {
 		Store store = storeFunction.getByOwnerId(ownerId);
+		LocalDateTime now = LocalDateTime.now(clock);
+		if (!store.opensOn(now.getDayOfWeek())) {
+			throw new BusinessException(ProductErrorCode.STORE_CLOSED_TODAY);
+		}
 		if (request.salePrice() >= request.originalPrice()) {
 			throw new BusinessException(ProductErrorCode.INVALID_PRICE);
 		}
@@ -76,7 +80,6 @@ public class ProductService {
 			throw new BusinessException(ProductErrorCode.INVALID_PHOTO_URL);
 		}
 
-		LocalDateTime now = LocalDateTime.now(clock);
 		LocalDateTime pickupEndAt = request.pickupEndAt() != null
 				? request.pickupEndAt()
 				: defaultPickupEndAt(store, now);
