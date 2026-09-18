@@ -169,7 +169,7 @@ class OwnerProductControllerTest {
 			.andExpect(jsonPath("$.data.stockQty").value(0))
 			.andExpect(jsonPath("$.data.availableQty").value(0))
 			.andExpect(jsonPath("$.data.status").value("SOLD_OUT"))
-			.andExpect(jsonPath("$.data.minAdjustableQty").value(0));
+			.andExpect(jsonPath("$.data.minAdjustableQty").doesNotExist());
 	}
 
 	@Test
@@ -250,7 +250,7 @@ class OwnerProductControllerTest {
 					{"confirmed":false}"""))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.stockEditable").value(true))
-			.andExpect(jsonPath("$.data.minAdjustableQty").value(0));
+			.andExpect(jsonPath("$.data.minAdjustableQty").doesNotExist());
 	}
 
 	@Test
