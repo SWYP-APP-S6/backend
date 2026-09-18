@@ -34,7 +34,11 @@ public class HoldExpiryService {
 
 		int expired = 0;
 		for (Map.Entry<Long, List<Long>> entry : productIdsByHold.entrySet()) {
-			expired += holdExpirer.expire(entry.getKey(), entry.getValue()) ? 1 : 0;
+			try {
+				expired += holdExpirer.expire(entry.getKey(), entry.getValue()) ? 1 : 0;
+			} catch (RuntimeException e) {
+				log.error("Failed to expire hold {}; moving on to the rest", entry.getKey(), e);
+			}
 		}
 		if (expired > 0) {
 			log.info("Expired {} overdue holds", expired);
