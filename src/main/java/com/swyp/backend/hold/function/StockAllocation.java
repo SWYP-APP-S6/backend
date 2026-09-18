@@ -1,19 +1,19 @@
 package com.swyp.backend.hold.function;
 
-public final class ShelfAllocation {
+public final class StockAllocation {
 
-	private ShelfAllocation() {
+	private StockAllocation() {
 	}
 
-	public static boolean[] unserved(int stockQty, int[] qtyInHeldOrder) {
+	public static boolean[] doesNotFit(int stockQty, int[] qtyInHeldOrder) {
 		int count = qtyInHeldOrder.length;
-		boolean[] unserved = new boolean[count];
+		boolean[] doesNotFit = new boolean[count];
 		int heldTotal = 0;
 		for (int qty : qtyInHeldOrder) {
 			heldTotal += qty;
 		}
 		if (heldTotal <= stockQty) {
-			return unserved;
+			return doesNotFit;
 		}
 
 		int capacity = Math.max(stockQty, 0);
@@ -36,9 +36,9 @@ public final class ShelfAllocation {
 			if (qty <= remaining && reachableFrom[i + 1][remaining - qty]) {
 				remaining -= qty;
 			} else {
-				unserved[i] = true;
+				doesNotFit[i] = true;
 			}
 		}
-		return unserved;
+		return doesNotFit;
 	}
 }

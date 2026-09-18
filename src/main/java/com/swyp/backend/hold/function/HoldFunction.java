@@ -167,11 +167,11 @@ public class HoldFunction {
 	}
 
 	public Set<Long> holdsThatDoNotFit(int stockQty, List<Hold> inHeldOrder) {
-		boolean[] unserved = ShelfAllocation.unserved(
+		boolean[] doesNotFit = StockAllocation.doesNotFit(
 				stockQty, inHeldOrder.stream().mapToInt(Hold::getQty).toArray());
 		Set<Long> overflow = new HashSet<>();
-		for (int i = 0; i < unserved.length; i++) {
-			if (unserved[i]) {
+		for (int i = 0; i < doesNotFit.length; i++) {
+			if (doesNotFit[i]) {
 				overflow.add(inHeldOrder.get(i).getId());
 			}
 		}

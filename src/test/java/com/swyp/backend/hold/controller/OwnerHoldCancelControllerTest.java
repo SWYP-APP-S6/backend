@@ -147,7 +147,7 @@ class OwnerHoldCancelControllerTest {
 	}
 
 	@Test
-	void getHoldCancelCandidates_suggestsCancellingWhateverLetsTheShelfSellOut() throws Exception {
+	void getHoldCancelCandidates_suggestsCancellingWhateverSellsTheMostStock() throws Exception {
 		Product peach = createProduct("복숭아 4입");
 		Hold first = holding(peach, "윤지현", 2);
 		Hold second = holding(peach, "송유나", 2);
