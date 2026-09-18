@@ -157,23 +157,8 @@ class OwnerProductControllerTest {
 	}
 
 	@Test
-	void updateStock_belowSixtyPercentOfWhatWasRegistered_isRejected() throws Exception {
+	void updateStock_toZero_beforeAnyReconfirm_hidesTheProduct() throws Exception {
 		Product product = createProduct("당근", 10);
-
-		mockMvc.perform(patch("/owner/products/" + product.getId() + "/stock")
-				.header("Authorization", "Bearer " + token)
-				.contentType(MediaType.APPLICATION_JSON)
-				.content("""
-					{"stockQty":5}"""))
-			.andExpect(status().isBadRequest())
-			.andExpect(jsonPath("$.code").value("QTY_BELOW_MINIMUM"));
-	}
-
-	@Test
-	void updateStock_belowSixtyPercent_opensUpOnceTheReconfirmWasAsked() throws Exception {
-		Product product = createProduct("당근", 10);
-		product.markReconfirmSent(Instant.now());
-		productRepository.saveAndFlush(product);
 
 		mockMvc.perform(patch("/owner/products/" + product.getId() + "/stock")
 				.header("Authorization", "Bearer " + token)
@@ -181,8 +166,29 @@ class OwnerProductControllerTest {
 				.content("""
 					{"stockQty":0}"""))
 			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.stockQty").value(0))
 			.andExpect(jsonPath("$.data.availableQty").value(0))
-			.andExpect(jsonPath("$.data.status").value("SOLD_OUT"));
+			.andExpect(jsonPath("$.data.status").value("SOLD_OUT"))
+			.andExpect(jsonPath("$.data.minAdjustableQty").value(0));
+	}
+
+	@Test
+	void updateStock_toZero_whileCustomersHoldIt_keepsTheHoldsAndReportsTheShortfall() throws Exception {
+		Product product = createProduct("당근", 10);
+		Hold hold = holdWithQty(product, 2, Duration.ofMinutes(15));
+
+		mockMvc.perform(patch("/owner/products/" + product.getId() + "/stock")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"stockQty":0}"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.stockQty").value(0))
+			.andExpect(jsonPath("$.data.status").value("SOLD_OUT"))
+			.andExpect(jsonPath("$.data.shortfallQty").value(2));
+
+		assertThat(holdRepository.findById(hold.getId()).orElseThrow().getStatus())
+			.isEqualTo(HoldStatus.HOLDING);
 	}
 
 	@Test
@@ -365,35 +371,6 @@ class OwnerProductControllerTest {
 			.isEqualTo(HoldStatus.HOLDING);
 		assertThat(productRepository.findById(product.getId()).orElseThrow().getStockQty())
 			.isEqualTo(10);
-	}
-
-	@Test
-	void updateStock_afterPickupsTookTheShelfBelowTheFloor_stillSavesWhatIsLeft() throws Exception {
-		Product product = createProduct("당근", 10);
-		product.hold(5);
-		product.completeHold(5);
-		productRepository.saveAndFlush(product);
-
-		mockMvc.perform(get("/owner/products/" + product.getId())
-				.header("Authorization", "Bearer " + token))
-			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.minAdjustableQty").value(5));
-
-		mockMvc.perform(patch("/owner/products/" + product.getId() + "/stock")
-				.header("Authorization", "Bearer " + token)
-				.contentType(MediaType.APPLICATION_JSON)
-				.content("""
-					{"stockQty":5}"""))
-			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.stockQty").value(5));
-
-		mockMvc.perform(patch("/owner/products/" + product.getId() + "/stock")
-				.header("Authorization", "Bearer " + token)
-				.contentType(MediaType.APPLICATION_JSON)
-				.content("""
-					{"stockQty":4}"""))
-			.andExpect(status().isBadRequest())
-			.andExpect(jsonPath("$.code").value("QTY_BELOW_MINIMUM"));
 	}
 
 	@Test
