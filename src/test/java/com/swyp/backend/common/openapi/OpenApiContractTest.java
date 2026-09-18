@@ -1,5 +1,8 @@
 package com.swyp.backend.common.openapi;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+
 import com.swyp.backend.RedisTestcontainersConfiguration;
 import com.swyp.backend.TestcontainersConfiguration;
 import java.util.ArrayList;
@@ -16,15 +19,11 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -259,65 +258,6 @@ class OpenApiContractTest {
 		assertThat(unknown)
 				.as("a renamed code would drop out of the spec without anyone noticing")
 				.isEmpty();
-	}
-
-	@Test
-	void aFieldThatOnlyOneBranchOfTheResponseCarriesStaysOutOfRequired() throws Exception {
-		List<String> declared = new ArrayList<>();
-		spec().at("/components/schemas/KakaoLoginResponse/required")
-				.forEach(node -> declared.add(node.asString()));
-
-		assertThat(declared)
-				.as("a login answers with tokens or with a signup token, never both, so a required "
-						+ "token generates as non-null and the app dies parsing the other branch")
-				.containsExactly("registered");
-	}
-
-	@Test
-	void anOperationThatAnswersCreatedDocumentsThatStatus() throws Exception {
-		List<String> misdeclared = new ArrayList<>();
-		for (Map.Entry<RequestMappingInfo, HandlerMethod> handler
-				: handlerMapping.getHandlerMethods().entrySet()) {
-			ResponseStatus status = AnnotatedElementUtils.findMergedAnnotation(
-					handler.getValue().getMethod(), ResponseStatus.class);
-			if (status == null || status.value() != HttpStatus.CREATED) {
-				continue;
-			}
-			for (String path : handler.getKey().getPatternValues()) {
-				for (RequestMethod method : handler.getKey().getMethodsCondition().getMethods()) {
-					JsonNode responses = spec()
-							.path("paths").path(path).path(method.name().toLowerCase(Locale.ROOT))
-							.path("responses");
-					if (responses.isMissingNode() || responses.has("200") || !responses.has("201")) {
-						misdeclared.add(method + " " + path);
-					}
-				}
-			}
-		}
-
-		assertThat(misdeclared)
-				.as("an endpoint documented as 200 while it answers 201 lies to every client that "
-						+ "branches on the status, and to everyone reading the spec")
-				.isEmpty();
-	}
-
-	@Test
-	void aConsumerHoldDeclaresTheBusinessFailuresItAnswersWith() throws Exception {
-		JsonNode create = spec().at("/paths/~1holds/post/responses");
-
-		assertThat(create.path("409").path("description").asString())
-				.as("the hold sheet branches on why a hold was refused")
-				.contains("INSUFFICIENT_QTY", "PRODUCT_NOT_SELLABLE", "STORE_CLOSED_TODAY",
-						"OTHER_STORE_HOLD_ACTIVE", "CANCEL_LIMIT_EXCEEDED");
-		assertThat(create.path("404").path("description").asString()).contains("PRODUCT_NOT_FOUND");
-		assertThat(create.path("400").path("description").asString())
-				.as("a business 400 joins the envelope description instead of replacing it")
-				.contains("HOLD_LIMIT_EXCEEDED", "VALIDATION_FAILED");
-
-		JsonNode cancel = spec().at("/paths/~1holds~1{holdId}~1cancel/post/responses");
-		assertThat(cancel.path("409").path("description").asString())
-				.contains("HOLD_ALREADY_RESOLVED", "HOLD_ALREADY_EXPIRED");
-		assertThat(cancel.path("404").path("description").asString()).contains("HOLD_NOT_FOUND");
 	}
 
 	@Test

@@ -57,20 +57,13 @@ public class OpenApiErrorResponses implements OpenApiCustomizer {
 	private static void addErrorResponses(Operation operation) {
 		ApiResponses responses = operation.getResponses();
 		ALWAYS.forEach((status, description) -> {
-			ApiResponse declared = responses.get(status);
-			if (declared == null) {
-				responses.addApiResponse(status, new ApiResponse()
-						.description(description)
-						.content(new Content().addMediaType("application/json",
-								new MediaType().schema(new Schema<>().$ref(REF)))));
+			if (responses.containsKey(status)) {
 				return;
 			}
-			String business = declared.getDescription();
-			if (business == null || business.isBlank()) {
-				declared.setDescription(description);
-			} else if (!business.contains(description)) {
-				declared.setDescription(description + "\n" + business);
-			}
+			responses.addApiResponse(status, new ApiResponse()
+					.description(description)
+					.content(new Content().addMediaType("application/json",
+							new MediaType().schema(new Schema<>().$ref(REF)))));
 		});
 	}
 }

@@ -1,13 +1,11 @@
 package com.swyp.backend.store.controller;
 
-import com.swyp.backend.common.openapi.ApiErrorCodes;
 import com.swyp.backend.common.response.ApiResponse;
 import com.swyp.backend.common.response.SuccessCode;
 import com.swyp.backend.store.dto.NearbyStoresRequest;
 import com.swyp.backend.store.dto.NearbyStoresResponse;
 import com.swyp.backend.store.dto.StoreProductsResponse;
 import com.swyp.backend.store.dto.StoreProductsRequest;
-import com.swyp.backend.store.exception.StoreErrorCode;
 import com.swyp.backend.store.service.StoreBrowseService;
 import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,14 +26,12 @@ public class StoreController {
 	private final StoreBrowseService storeBrowseService;
 
 	@GetMapping("/nearby")
-	@ApiErrorCodes(in = StoreErrorCode.class, codes = "VIEWPORT_TOO_LARGE")
 	public ApiResponse<NearbyStoresResponse> getNearbyStores(
 			@Valid @ParameterObject @ModelAttribute NearbyStoresRequest request) {
 		return ApiResponse.of(SuccessCode.OK, storeBrowseService.findNearbyStores(request));
 	}
 
 	@GetMapping("/{storeId}/products")
-	@ApiErrorCodes(in = StoreErrorCode.class, codes = "STORE_NOT_FOUND")
 	public ApiResponse<StoreProductsResponse> getStoreProducts(
 			@PathVariable Long storeId,
 			@Valid @ParameterObject @ModelAttribute StoreProductsRequest request) {
