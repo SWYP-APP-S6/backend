@@ -1,6 +1,6 @@
 plugins {
 	java
-	id("org.springframework.boot") version "4.1.0"
+	id("org.springframework.boot") version "4.1.1"
 	id("io.spring.dependency-management") version "1.1.7"
 }
 
@@ -27,9 +27,9 @@ dependencies {
 	// FCM HTTP v1 의 서비스 계정 JWT 서명 → 액세스 토큰 교환과 그 캐싱·갱신만 맡는다.
 	// 발송 자체는 RestClient 로 직접 친다(firebase-admin 은 v1 에 배치 엔드포인트가 없어져
 	// 재시도·에러코드 매핑 외에 남는 런타임 동작이 없고, guava·gRPC 를 함께 끌고 온다).
-	implementation("com.google.auth:google-auth-library-oauth2-http:1.48.0")
+	implementation("com.google.auth:google-auth-library-oauth2-http:1.52.0")
 	implementation("org.springframework.boot:spring-boot-starter-validation")
-	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.0")
+	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.1")
 	implementation("io.jsonwebtoken:jjwt-api:0.13.0")
 	runtimeOnly("io.jsonwebtoken:jjwt-impl:0.13.0")
 	runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.13.0")
