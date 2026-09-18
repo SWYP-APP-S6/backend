@@ -30,11 +30,14 @@ import com.swyp.backend.user.entity.User;
 import com.swyp.backend.user.entity.UserRole;
 import com.swyp.backend.user.repository.UserRepository;
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
+import java.util.EnumSet;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -84,10 +87,12 @@ class OwnerProductControllerTest {
 		userRepository.deleteAll();
 
 		owner = userRepository.saveAndFlush(new User(UserRole.OWNER, "테스트점주", null, false, Instant.now()));
-		store = storeRepository.saveAndFlush(new Store(
+		Store newStore = new Store(
 			owner, "테스트가게", "04524", "서울특별시 강남구 역삼로 1", null, "0212345678",
 			new BigDecimal("37.500000"), new BigDecimal("127.030000"),
-			LocalTime.of(9, 0), LocalTime.of(21, 0)));
+			LocalTime.of(9, 0), LocalTime.of(21, 0));
+		newStore.replaceBusinessDays(EnumSet.allOf(DayOfWeek.class));
+		store = storeRepository.saveAndFlush(newStore);
 		token = tokenProvider.createAccessToken(TokenRealm.USER, owner.getId(), owner.getRole().name());
 		photoUrl = PhotoFixture.uploadedPhotoUrl(mockMvc, token);
 	}
@@ -515,6 +520,30 @@ class OwnerProductControllerTest {
 			.andExpect(jsonPath("$.data.status").value("ON_SALE"))
 			.andExpect(jsonPath("$.data.discountRate").value(20))
 			.andExpect(jsonPath("$.data.availableQty").value(10));
+	}
+
+	@Test
+	void registerProduct_onADayTheStoreIsClosed_isRejected_andSoIsThePreview() throws Exception {
+		DayOfWeek today = LocalDate.now(ClockConfig.SERVICE_ZONE).getDayOfWeek();
+		EnumSet<DayOfWeek> everyOtherDay = EnumSet.complementOf(EnumSet.of(today));
+		store.replaceBusinessDays(everyOtherDay);
+		storeRepository.saveAndFlush(store);
+
+		mockMvc.perform(post("/owner/products")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(registerBody("당근", 1000, 800)))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("STORE_CLOSED_TODAY"));
+
+		mockMvc.perform(post("/owner/products/preview")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(registerBody("당근", 1000, 800)))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("STORE_CLOSED_TODAY"));
+
+		assertThat(productRepository.count()).isZero();
 	}
 
 	@Test

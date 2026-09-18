@@ -21,10 +21,12 @@ import com.swyp.backend.user.entity.UserRole;
 import com.swyp.backend.user.repository.UserRepository;
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.util.EnumSet;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -78,10 +80,12 @@ class OwnerProductDefaultPickupWindowTest {
 		userRepository.deleteAll();
 
 		User owner = userRepository.saveAndFlush(new User(UserRole.OWNER, "테스트점주", null, false, Instant.now()));
-		storeRepository.saveAndFlush(new Store(
+		Store store = new Store(
 			owner, "테스트가게", "04524", "서울특별시 강남구 역삼로 1", null, "0212345678",
 			new BigDecimal("37.500000"), new BigDecimal("127.030000"),
-			LocalTime.of(9, 0), CLOSE_TIME));
+			LocalTime.of(9, 0), CLOSE_TIME);
+		store.replaceBusinessDays(EnumSet.allOf(DayOfWeek.class));
+		storeRepository.saveAndFlush(store);
 		token = tokenProvider.createAccessToken(TokenRealm.USER, owner.getId(), owner.getRole().name());
 		photoUrl = PhotoFixture.uploadedPhotoUrl(mockMvc, token);
 	}
