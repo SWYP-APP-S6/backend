@@ -176,6 +176,34 @@ class OwnerHoldControllerTest {
 			.andExpect(jsonPath("$.data.holds.totalElements").value(1));
 	}
 
+	@Test
+	void getOwnerHolds_canceled_takesBothSidesAtOnce() throws Exception {
+		Product product = createProduct("시금치 한 단", 20);
+		holding(product, 1, Duration.ofMinutes(5));
+		Hold byOwner = holding(product, 1, Duration.ofMinutes(8));
+		byOwner.cancelByOwner(Instant.now(), "재고가 모자라요");
+		Hold byUser = holding(product, 1, Duration.ofMinutes(9));
+		byUser.cancelByUser(Instant.now());
+		holdRepository.saveAllAndFlush(List.of(byOwner, byUser));
+
+		mockMvc.perform(get("/owner/holds?status=CANCELED").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.holds.totalElements").value(2))
+			.andExpect(jsonPath("$.data.counts.canceled").value(2))
+			.andExpect(jsonPath("$.data.counts.canceledByOwner").value(1))
+			.andExpect(jsonPath("$.data.counts.canceledByUser").value(1))
+			.andExpect(jsonPath("$.data.holds.content[*].status")
+				.value(org.hamcrest.Matchers.containsInAnyOrder(
+					"CANCELED_BY_OWNER", "CANCELED_BY_USER")));
+	}
+
+	@Test
+	void getOwnerHolds_withAFilterTheServerDoesNotKnow_isRejected() throws Exception {
+		mockMvc.perform(get("/owner/holds?status=PICKED_UP").header("Authorization", "Bearer " + token))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("BAD_REQUEST"));
+	}
+
 	private ResultActions expectTheFiveBuckets(MockHttpServletRequestBuilder request) throws Exception {
 		return mockMvc.perform(request.header("Authorization", "Bearer " + token))
 			.andExpect(status().isOk())
