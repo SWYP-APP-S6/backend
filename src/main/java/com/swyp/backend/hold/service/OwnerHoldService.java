@@ -5,7 +5,7 @@ import com.swyp.backend.common.response.PageResponse;
 import com.swyp.backend.hold.dto.OwnerHoldCounts;
 import com.swyp.backend.hold.dto.OwnerHoldDetailResponse;
 import com.swyp.backend.hold.dto.OwnerHoldListResponse;
-import com.swyp.backend.hold.dto.OwnerHoldStatus;
+import com.swyp.backend.hold.dto.OwnerHoldFilter;
 import com.swyp.backend.hold.dto.OwnerHoldSummaryResponse;
 import com.swyp.backend.hold.HoldProperties;
 import com.swyp.backend.hold.entity.Hold;
@@ -46,7 +46,7 @@ public class OwnerHoldService {
 	private final Clock clock;
 
 	public OwnerHoldListResponse getHolds(
-			Long ownerId, OwnerHoldStatus filter, Pageable pageable) {
+			Long ownerId, OwnerHoldFilter filter, Pageable pageable) {
 		Store store = storeFunction.getByOwnerId(ownerId);
 		Page<Hold> holds = holdFunction.findStoreHolds(store.getId(), filter, pageable);
 		List<OwnerHoldSummaryResponse> content = holds.getContent().stream()

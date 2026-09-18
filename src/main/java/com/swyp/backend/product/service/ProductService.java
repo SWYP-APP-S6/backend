@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -108,9 +109,15 @@ public class ProductService {
 		Page<Product> products = productFunction.findStoreProducts(store.getId(), filter, pageable);
 		Map<Long, Long> activeHoldQtyByProduct =
 				holdFunction.activeQtyByProductOfStore(store.getId());
+		Map<Long, Long> shortfallCustomersByProduct = holdFunction.customersNotServedByProduct(
+				products.getContent().stream()
+						.filter(product -> product.shortfallQty() > 0)
+						.collect(Collectors.toMap(Product::getId, Product::getStockQty)));
 		List<OwnerProductSummaryResponse> content = products.getContent().stream()
 				.map(product -> OwnerProductSummaryResponse.from(
-						product, activeHoldQtyByProduct.getOrDefault(product.getId(), 0L)))
+						product,
+						activeHoldQtyByProduct.getOrDefault(product.getId(), 0L),
+						shortfallCustomersByProduct.getOrDefault(product.getId(), 0L)))
 				.toList();
 		return new OwnerProductListResponse(Instant.now(clock), PageResponse.of(content, products));
 	}

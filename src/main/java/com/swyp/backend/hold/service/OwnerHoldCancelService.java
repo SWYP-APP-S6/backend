@@ -106,7 +106,7 @@ public class OwnerHoldCancelService {
 			if (inHeldOrder.isEmpty()) {
 				continue;
 			}
-			Set<Long> overflow = holdsThatDoNotFit(product, inHeldOrder);
+			Set<Long> overflow = holdFunction.holdsThatDoNotFit(product.getStockQty(), inHeldOrder);
 			suggestedCancelCount += overflow.size();
 			products.add(new OwnerHoldCancelProduct(
 					product.getId(),
@@ -127,19 +127,6 @@ public class OwnerHoldCancelService {
 		}
 		return new OwnerHoldCancelCandidatesResponse(
 				products.size(), suggestedCancelCount, noticeOf(store), products);
-	}
-
-	private static Set<Long> holdsThatDoNotFit(Product product, List<Hold> inHeldOrder) {
-		int remaining = product.getStockQty();
-		Set<Long> overflow = new HashSet<>();
-		for (Hold hold : inHeldOrder) {
-			if (hold.getQty() <= remaining) {
-				remaining -= hold.getQty();
-			} else {
-				overflow.add(hold.getId());
-			}
-		}
-		return overflow;
 	}
 
 	private static String noticeOf(Store store) {

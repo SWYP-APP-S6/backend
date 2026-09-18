@@ -224,7 +224,27 @@ class OwnerHomeControllerTest {
 			.andExpect(jsonPath("$.data.issues.productsShortOfStock").value(1))
 			.andExpect(jsonPath("$.data.issues.shortfallQty").value(2))
 			.andExpect(jsonPath("$.data.products[?(@.name == '당근')].shortfallQty").value(2))
-			.andExpect(jsonPath("$.data.products[?(@.name == '감자')].shortfallQty").value(0));
+			.andExpect(jsonPath("$.data.products[?(@.name == '감자')].shortfallQty").value(0))
+			.andExpect(jsonPath("$.data.products[?(@.name == '당근')].shortfallCustomerCount").value(1))
+			.andExpect(jsonPath("$.data.products[?(@.name == '감자')].shortfallCustomerCount").value(0));
+	}
+
+	@Test
+	void getOwnerHome_countsPeopleNotUnits_whenTheShelfCannotServeEveryone() throws Exception {
+		Product peach = createProduct("복숭아", 10);
+		for (int i = 0; i < 3; i++) {
+			holdRepository.saveAndFlush(HoldFixture.hold(
+				createConsumer(), peach, 2, Instant.now().plus(Duration.ofMinutes(15))));
+			peach.hold(2);
+		}
+		peach.restock(3);
+		productRepository.saveAndFlush(peach);
+
+		mockMvc.perform(get("/owner/home").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.products[?(@.name == '복숭아')].shortfallQty").value(3))
+			.andExpect(jsonPath("$.data.products[?(@.name == '복숭아')].shortfallCustomerCount")
+				.value(2));
 	}
 
 	@Test

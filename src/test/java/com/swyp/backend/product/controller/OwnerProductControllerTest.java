@@ -809,6 +809,33 @@ class OwnerProductControllerTest {
 	}
 
 	@Test
+	void getMyProducts_countsPeopleNotUnits_whenTheShelfCannotServeEveryone() throws Exception {
+		Product product = createProduct("복숭아 4입", 10);
+		holdWithQty(product, 2, Duration.ofMinutes(15));
+		holdWithQty(product, 2, Duration.ofMinutes(15));
+		holdWithQty(product, 2, Duration.ofMinutes(15));
+		product.restock(3);
+		productRepository.saveAndFlush(product);
+
+		mockMvc.perform(get("/owner/products").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.products.content[0].activeHoldQty").value(6))
+			.andExpect(jsonPath("$.data.products.content[0].shortfallQty").value(3))
+			.andExpect(jsonPath("$.data.products.content[0].shortfallCustomerCount").value(2));
+	}
+
+	@Test
+	void getMyProducts_countsNobody_whenTheShelfServesEveryHold() throws Exception {
+		Product product = createProduct("당근", 10);
+		holdWithQty(product, 2, Duration.ofMinutes(15));
+
+		mockMvc.perform(get("/owner/products").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.products.content[0].shortfallQty").value(0))
+			.andExpect(jsonPath("$.data.products.content[0].shortfallCustomerCount").value(0));
+	}
+
+	@Test
 	void getMyProducts_leavesOutAnotherStoresShelf() throws Exception {
 		createProduct("내 당근", 10);
 		User otherOwner = userRepository.saveAndFlush(

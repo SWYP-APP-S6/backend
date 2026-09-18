@@ -5,6 +5,7 @@ import com.swyp.backend.hold.dto.ActiveHoldQty;
 import com.swyp.backend.hold.dto.HoldRef;
 import com.swyp.backend.hold.dto.HoldStatusCount;
 import com.swyp.backend.hold.dto.OverdueHold;
+import com.swyp.backend.hold.dto.OwnerHoldFilter;
 import com.swyp.backend.hold.dto.OwnerHoldStatus;
 import com.swyp.backend.hold.dto.ProductHoldId;
 import com.swyp.backend.hold.entity.Hold;
@@ -16,9 +17,11 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -157,6 +160,42 @@ public class HoldFunction {
 		return productIds.isEmpty() ? List.of() : holdRepository.findHoldingWithUserOfProducts(productIds);
 	}
 
+	public Set<Long> holdsThatDoNotFit(int stockQty, List<Hold> inHeldOrder) {
+		int remaining = stockQty;
+		Set<Long> overflow = new HashSet<>();
+		for (Hold hold : inHeldOrder) {
+			if (hold.getQty() <= remaining) {
+				remaining -= hold.getQty();
+			} else {
+				overflow.add(hold.getId());
+			}
+		}
+		return overflow;
+	}
+
+	public Map<Long, Long> customersNotServedByProduct(Map<Long, Integer> stockQtyByProduct) {
+		if (stockQtyByProduct.isEmpty()) {
+			return Map.of();
+		}
+		Map<Long, List<Hold>> holdsByProduct =
+				findHoldingOfProducts(List.copyOf(stockQtyByProduct.keySet())).stream()
+						.collect(Collectors.groupingBy(hold -> hold.getProduct().getId()));
+		Map<Long, Long> countByProduct = new HashMap<>();
+		stockQtyByProduct.forEach((productId, stockQty) -> {
+			List<Hold> inHeldOrder = holdsByProduct.getOrDefault(productId, List.of());
+			Set<Long> overflow = holdsThatDoNotFit(stockQty, inHeldOrder);
+			long customers = inHeldOrder.stream()
+					.filter(hold -> overflow.contains(hold.getId()))
+					.map(hold -> hold.getUser().getId())
+					.distinct()
+					.count();
+			if (customers > 0) {
+				countByProduct.put(productId, customers);
+			}
+		});
+		return countByProduct;
+	}
+
 	public Map<Long, Integer> heldOrderOfProducts(List<Long> productIds) {
 		if (productIds.isEmpty()) {
 			return Map.of();
@@ -181,7 +220,7 @@ public class HoldFunction {
 						Long::sum));
 	}
 
-	public Page<Hold> findStoreHolds(Long storeId, OwnerHoldStatus filter, Pageable pageable) {
+	public Page<Hold> findStoreHolds(Long storeId, OwnerHoldFilter filter, Pageable pageable) {
 		return holdRepository.findStoreHolds(
 				storeId,
 				filter == null ? null : filter.status(),
@@ -226,8 +265,8 @@ public class HoldFunction {
 		return LocalDate.now(clock).atStartOfDay(clock.getZone()).toInstant();
 	}
 
-	private static Sort sortFor(OwnerHoldStatus filter) {
-		Sort.Direction direction = filter == OwnerHoldStatus.HOLDING
+	private static Sort sortFor(OwnerHoldFilter filter) {
+		Sort.Direction direction = filter == OwnerHoldFilter.HOLDING
 				? Sort.Direction.ASC
 				: Sort.Direction.DESC;
 		return Sort.by(direction, "expiresAt").and(Sort.by(direction, "id"));

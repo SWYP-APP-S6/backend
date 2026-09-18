@@ -13,6 +13,7 @@ public record OwnerProductSummaryResponse(
 		int availableQty,
 		long activeHoldQty,
 		int shortfallQty,
+		long shortfallCustomerCount,
 		int originalPrice,
 		int salePrice,
 		short discountRate,
@@ -21,7 +22,8 @@ public record OwnerProductSummaryResponse(
 		boolean reconfirmPending,
 		Instant createdAt) {
 
-	public static OwnerProductSummaryResponse from(Product product, long activeHoldQty) {
+	public static OwnerProductSummaryResponse from(
+			Product product, long activeHoldQty, long shortfallCustomerCount) {
 		return new OwnerProductSummaryResponse(
 				product.getId(),
 				product.getName(),
@@ -31,6 +33,7 @@ public record OwnerProductSummaryResponse(
 				product.getAvailableQty(),
 				activeHoldQty,
 				product.shortfallQty(),
+				shortfallCustomerCount,
 				product.getOriginalPrice(),
 				product.getSalePrice(),
 				product.getDiscountRate(),
