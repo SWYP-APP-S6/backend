@@ -105,7 +105,7 @@ public class HoldService {
 	}
 
 	private void askOwnerToReconfirmStock(Product product, Instant now) {
-		if (!product.needsStockReconfirm()) {
+		if (!product.needsStockReconfirm(holdFunction.completedQtyOfProduct(product.getId()))) {
 			return;
 		}
 		product.markReconfirmSent(now);
@@ -113,7 +113,7 @@ public class HoldService {
 				product.getStore().getOwner(),
 				NotificationType.STOCK_RECONFIRM_REQUEST,
 				"재고가 맞는지 확인해주세요",
-				product.getName() + " 찜이 등록 수량의 60%에 닿았어요. 지금 남은 수량을 확인해주세요.",
+				product.getName() + " 찜과 픽업 완료가 등록 수량의 60%에 닿았어요. 지금 남은 수량을 확인해주세요.",
 				DeepLinks.ownerProduct(product.getId()));
 	}
 
