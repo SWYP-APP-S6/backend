@@ -58,7 +58,7 @@ public class OwnerHomeService {
 		OwnerHomeSummary summary = new OwnerHomeSummary(
 				upcomingVisits.size(),
 				holdFunction.countCompletedTodayOfStore(storeId),
-				sumAvailableQty(productCards));
+				productCards.size());
 		OwnerHomeIssues issues = new OwnerHomeIssues(
 				(int) holdFunction.countExpiredTodayOfStore(storeId),
 				(int) products.stream().filter(product -> product.shortfallQty() > 0).count(),
@@ -83,10 +83,6 @@ public class OwnerHomeService {
 		return products.stream()
 				.filter(product -> product.shortfallQty() > 0)
 				.collect(Collectors.toMap(Product::getId, Product::getStockQty));
-	}
-
-	private static int sumAvailableQty(List<OwnerHomeProductCard> productCards) {
-		return productCards.stream().mapToInt(OwnerHomeProductCard::availableQty).sum();
 	}
 
 	private static int countReconfirmPending(List<OwnerHomeProductCard> productCards) {
