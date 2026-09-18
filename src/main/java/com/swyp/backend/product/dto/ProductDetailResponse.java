@@ -53,7 +53,7 @@ public record ProductDetailResponse(
 				product.getReconfirmSentAt(),
 				product.getReconfirmAnsweredAt(),
 				product.isStockReconfirmPending(),
-				product.minAdjustableQty(),
+				0,
 				product.isStockEditableAt(now),
 				product.getHeldQty(),
 				product.shortfallQty(),
