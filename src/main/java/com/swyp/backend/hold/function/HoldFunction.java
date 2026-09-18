@@ -156,8 +156,14 @@ public class HoldFunction {
 		return holdRepository.findByProductIdAndStatus(productId, HoldStatus.HOLDING);
 	}
 
-	public List<Hold> findHoldingOfProducts(List<Long> productIds) {
-		return productIds.isEmpty() ? List.of() : holdRepository.findHoldingWithUserOfProducts(productIds);
+	public List<Hold> findLiveHoldingOfProducts(List<Long> productIds) {
+		if (productIds.isEmpty()) {
+			return List.of();
+		}
+		Instant now = Instant.now(clock);
+		return holdRepository.findHoldingWithUserOfProducts(productIds).stream()
+				.filter(hold -> !hold.isOverdueAt(now))
+				.toList();
 	}
 
 	public Set<Long> holdsThatDoNotFit(int stockQty, List<Hold> inHeldOrder) {
@@ -178,7 +184,7 @@ public class HoldFunction {
 			return Map.of();
 		}
 		Map<Long, List<Hold>> holdsByProduct =
-				findHoldingOfProducts(List.copyOf(stockQtyByProduct.keySet())).stream()
+				findLiveHoldingOfProducts(List.copyOf(stockQtyByProduct.keySet())).stream()
 						.collect(Collectors.groupingBy(hold -> hold.getProduct().getId()));
 		Map<Long, Long> countByProduct = new HashMap<>();
 		stockQtyByProduct.forEach((productId, stockQty) -> {
