@@ -89,13 +89,11 @@ public class OwnerHoldCancelService {
 	}
 
 	private OwnerHoldCancelCandidatesResponse candidatesOf(Store store) {
-		Instant now = Instant.now(clock);
 		List<Product> shortProducts = productFunction.findSellingNowOfStore(store.getId()).stream()
 				.filter(product -> product.shortfallQty() > 0)
 				.toList();
 		List<Long> productIds = shortProducts.stream().map(Product::getId).toList();
-		Map<Long, List<Hold>> holdsByProduct = holdFunction.findHoldingOfProducts(productIds).stream()
-				.filter(hold -> !hold.isOverdueAt(now))
+		Map<Long, List<Hold>> holdsByProduct = holdFunction.findLiveHoldingOfProducts(productIds).stream()
 				.collect(Collectors.groupingBy(hold -> hold.getProduct().getId()));
 		Map<Long, Integer> heldOrder = holdFunction.heldOrderOfProducts(productIds);
 
