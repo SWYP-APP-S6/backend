@@ -961,6 +961,24 @@ class OwnerProductControllerTest {
 	}
 
 	@Test
+	void getMyProducts_leavesOutAHoldWhoseTimeIsUp_likeTheCancelCandidatesDo() throws Exception {
+		Product product = createProduct("복숭아 4입", 10);
+		holdWithQty(product, 1, Duration.ofMinutes(15));
+		holdWithQty(product, 1, Duration.ofMinutes(-1));
+		product.restock(1);
+		productRepository.saveAndFlush(product);
+
+		mockMvc.perform(get("/owner/products").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.products.content[0].shortfallQty").value(1))
+			.andExpect(jsonPath("$.data.products.content[0].shortfallCustomerCount").value(0));
+
+		mockMvc.perform(get("/owner/holds/cancel-candidates").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.suggestedCancelCount").value(0));
+	}
+
+	@Test
 	void getMyProducts_countsNobody_whenTheShelfServesEveryHold() throws Exception {
 		Product product = createProduct("당근", 10);
 		holdWithQty(product, 2, Duration.ofMinutes(15));

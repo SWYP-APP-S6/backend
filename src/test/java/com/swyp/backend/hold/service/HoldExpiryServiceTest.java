@@ -107,6 +107,28 @@ class HoldExpiryServiceTest {
 	}
 
 	@Test
+	void aHoldThatCannotBeExpired_doesNotStopTheRestFromExpiring() {
+		Product onion = productRepository.saveAndFlush(new Product(
+				product.getStore(), "양파 1.5kg", ProductCategory.VEGETABLE, 5, 6_000, 3_000,
+				product.getPickupStartAt(), product.getPickupEndAt(),
+				"https://cdn.example.com/onion.jpg"));
+		User stuckCustomer = userRepository.saveAndFlush(
+				new User(UserRole.CONSUMER, "어긋난손님", null, false, Instant.now()));
+		Hold stuck = holdRepository.saveAndFlush(
+				HoldFixture.hold(stuckCustomer, onion, 1, Instant.now().minusSeconds(120)));
+		Hold overdue = hold("늦은손님", 2, Instant.now().minusSeconds(60));
+
+		int expired = holdExpiryService.expireOverdueHolds();
+
+		assertThat(expired).isEqualTo(1);
+		assertThat(holdRepository.findById(stuck.getId()).orElseThrow().getStatus())
+				.isEqualTo(HoldStatus.HOLDING);
+		assertThat(holdRepository.findById(overdue.getId()).orElseThrow().getStatus())
+				.isEqualTo(HoldStatus.EXPIRED);
+		assertThat(reloaded().getHeldQty()).isZero();
+	}
+
+	@Test
 	void everyItemInAnOverdueGroupComesBackAndTheOwnerIsTold() {
 		Product onion = productRepository.saveAndFlush(new Product(
 				product.getStore(), "양파 1.5kg", ProductCategory.VEGETABLE, 5, 6_000, 3_000,

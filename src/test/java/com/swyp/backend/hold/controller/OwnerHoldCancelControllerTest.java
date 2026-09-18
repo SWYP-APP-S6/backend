@@ -147,6 +147,25 @@ class OwnerHoldCancelControllerTest {
 	}
 
 	@Test
+	void getHoldCancelCandidates_suggestsCancellingWhateverLetsTheShelfSellOut() throws Exception {
+		Product peach = createProduct("복숭아 4입");
+		Hold first = holding(peach, "윤지현", 2);
+		Hold second = holding(peach, "송유나", 2);
+		Hold third = holding(peach, "건우건어물", 3);
+		shelve(peach, 7, 5);
+
+		candidates()
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.suggestedCancelCount").value(1))
+			.andExpect(jsonPath("$.data.products[0].holds[0].holdId").value(third.getId()))
+			.andExpect(jsonPath("$.data.products[0].holds[0].suggested").value(false))
+			.andExpect(jsonPath("$.data.products[0].holds[1].holdId").value(second.getId()))
+			.andExpect(jsonPath("$.data.products[0].holds[1].suggested").value(true))
+			.andExpect(jsonPath("$.data.products[0].holds[2].holdId").value(first.getId()))
+			.andExpect(jsonPath("$.data.products[0].holds[2].suggested").value(false));
+	}
+
+	@Test
 	void getHoldCancelCandidates_previewsTheNoticeWithTheStoreNameAndPhone() throws Exception {
 		candidates()
 			.andExpect(status().isOk())
