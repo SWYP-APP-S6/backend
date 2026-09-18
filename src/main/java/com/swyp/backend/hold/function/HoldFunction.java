@@ -5,6 +5,7 @@ import com.swyp.backend.hold.dto.ActiveHoldQty;
 import com.swyp.backend.hold.dto.HoldRef;
 import com.swyp.backend.hold.dto.HoldStatusCount;
 import com.swyp.backend.hold.dto.OverdueHold;
+import com.swyp.backend.hold.dto.OwnerHoldFilter;
 import com.swyp.backend.hold.dto.OwnerHoldStatus;
 import com.swyp.backend.hold.dto.ProductHoldId;
 import com.swyp.backend.hold.entity.Hold;
@@ -181,7 +182,7 @@ public class HoldFunction {
 						Long::sum));
 	}
 
-	public Page<Hold> findStoreHolds(Long storeId, OwnerHoldStatus filter, Pageable pageable) {
+	public Page<Hold> findStoreHolds(Long storeId, OwnerHoldFilter filter, Pageable pageable) {
 		return holdRepository.findStoreHolds(
 				storeId,
 				filter == null ? null : filter.status(),
@@ -226,8 +227,8 @@ public class HoldFunction {
 		return LocalDate.now(clock).atStartOfDay(clock.getZone()).toInstant();
 	}
 
-	private static Sort sortFor(OwnerHoldStatus filter) {
-		Sort.Direction direction = filter == OwnerHoldStatus.HOLDING
+	private static Sort sortFor(OwnerHoldFilter filter) {
+		Sort.Direction direction = filter == OwnerHoldFilter.HOLDING
 				? Sort.Direction.ASC
 				: Sort.Direction.DESC;
 		return Sort.by(direction, "expiresAt").and(Sort.by(direction, "id"));

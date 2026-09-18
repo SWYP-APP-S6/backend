@@ -8,7 +8,7 @@ import com.swyp.backend.hold.dto.OwnerHoldCancelCandidatesResponse;
 import com.swyp.backend.hold.dto.OwnerHoldCancelRequest;
 import com.swyp.backend.hold.dto.OwnerHoldDetailResponse;
 import com.swyp.backend.hold.dto.OwnerHoldListResponse;
-import com.swyp.backend.hold.dto.OwnerHoldStatus;
+import com.swyp.backend.hold.dto.OwnerHoldFilter;
 import com.swyp.backend.hold.exception.HoldErrorCode;
 import com.swyp.backend.hold.service.OwnerHoldCancelService;
 import com.swyp.backend.hold.service.OwnerHoldService;
@@ -42,7 +42,7 @@ public class OwnerHoldController {
 	@PageQueryParams
 	public ApiResponse<OwnerHoldListResponse> getOwnerHolds(
 			@AuthenticationPrincipal Long ownerId,
-			@RequestParam(required = false) OwnerHoldStatus status,
+			@RequestParam(required = false) OwnerHoldFilter status,
 			@Parameter(hidden = true) @PageableDefault(size = 20) Pageable pageable) {
 		return ApiResponse.of(SuccessCode.OK, ownerHoldService.getHolds(ownerId, status, pageable));
 	}
