@@ -14,6 +14,7 @@ import com.swyp.backend.admin.repository.AdminRepository;
 import com.swyp.backend.hold.repository.HoldRepository;
 import com.swyp.backend.product.repository.ProductRepository;
 import com.swyp.backend.store.entity.Store;
+import com.swyp.backend.notification.repository.NotificationRepository;
 import com.swyp.backend.store.repository.StoreRepository;
 import com.swyp.backend.user.entity.User;
 import com.swyp.backend.user.entity.UserRole;
@@ -38,6 +39,9 @@ class AdminUserControllerTest {
 
 	private static final String EMAIL = "user-list-admin@swyp.test";
 	private static final String PASSWORD = "user-list-admin-1234";
+
+	@Autowired
+	NotificationRepository notificationRepository;
 
 	@Autowired
 	MockMvc mockMvc;
@@ -70,6 +74,7 @@ class AdminUserControllerTest {
 		holdRepository.deleteAll();
 		productRepository.deleteAll();
 		storeRepository.deleteAll();
+		notificationRepository.deleteAll();
 		userRepository.deleteAll();
 		userRepository.save(new User(UserRole.CONSUMER, "소비자하나", "01011112222", true, Instant.now()));
 		userRepository.save(new User(UserRole.CONSUMER, "소비자둘", null, false, Instant.now()));
