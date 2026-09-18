@@ -15,9 +15,7 @@ paths:
 - **응답 record 컴포넌트는 기본이 "항상 온다"이다.** `RecordRequiredModelConverter`가 모든 컴포넌트를
   OpenAPI `required`로 올리므로, 코틀린 코드젠에서 `String`(non-null)이 된다. **실제로 null이 될 수
   있는 필드에는 `@Nullable`(JSpecify)을 붙인다** — 안 붙이면 앱이 non-null로 받고 파싱 단계에서
-  깨진다. 붙이면 코틀린에서 `String?`이 되어 앱이 분기하게 된다. **한 응답이 갈래마다 다른 필드를
-  채운다면 그 필드는 전부 `@Nullable`이다** — `KakaoLoginResponse`는 기존 회원에겐 토큰을, 신규에겐
-  가입 토큰을 채우므로 어느 쪽이든 나머지가 null로 나간다.
+  깨진다. 붙이면 코틀린에서 `String?`이 되어 앱이 분기하게 된다.
 - **시간 타입은 `.claude/rules/entity.md`의 구분을 그대로 응답까지 가져간다** — 절대시각은 `Instant`,
   사람이 읽는 벽시계는 `LocalDateTime`. 후자는 오프셋이 없어 OpenAPI `date-time`과 의미가 다르다
   (§`docs/` 참고). 상대시간 문자열("30분 뒤 마감")은 서버가 만들지 않는다 — 절대시각만 주고 앱이 그린다.

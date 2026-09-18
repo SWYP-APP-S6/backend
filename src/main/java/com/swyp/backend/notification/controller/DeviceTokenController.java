@@ -1,13 +1,10 @@
 package com.swyp.backend.notification.controller;
 
-import com.swyp.backend.common.openapi.ApiErrorCodes;
 import com.swyp.backend.common.response.ApiResponse;
 import com.swyp.backend.common.response.SuccessCode;
 import com.swyp.backend.notification.dto.DeviceTokenDeleteRequest;
 import com.swyp.backend.notification.dto.DeviceTokenRegisterRequest;
-import com.swyp.backend.notification.exception.NotificationErrorCode;
 import com.swyp.backend.notification.service.DeviceTokenService;
-import com.swyp.backend.user.exception.UserAuthErrorCode;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -27,8 +24,6 @@ public class DeviceTokenController {
 	private final DeviceTokenService deviceTokenService;
 
 	@PostMapping
-	@ApiErrorCodes(in = NotificationErrorCode.class, codes = "DEVICE_TOKEN_CONFLICT")
-	@ApiErrorCodes(in = UserAuthErrorCode.class, codes = "USER_NOT_FOUND")
 	public ApiResponse<Void> registerDeviceToken(
 			@AuthenticationPrincipal Long userId,
 			@Valid @RequestBody DeviceTokenRegisterRequest request) {

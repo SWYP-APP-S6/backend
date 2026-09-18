@@ -1,13 +1,11 @@
 package com.swyp.backend.notification.controller;
 
-import com.swyp.backend.common.openapi.ApiErrorCodes;
 import com.swyp.backend.common.openapi.PageQueryParams;
 import com.swyp.backend.common.response.ApiResponse;
 import com.swyp.backend.common.response.SuccessCode;
 import com.swyp.backend.notification.dto.NotificationResponse;
 import com.swyp.backend.notification.dto.NotificationsReadResponse;
 import com.swyp.backend.notification.dto.NotificationsResponse;
-import com.swyp.backend.notification.exception.NotificationErrorCode;
 import com.swyp.backend.notification.service.NotificationService;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -39,7 +37,6 @@ public class NotificationController {
 	}
 
 	@PatchMapping("/{notificationId}/read")
-	@ApiErrorCodes(in = NotificationErrorCode.class, codes = "NOTIFICATION_NOT_FOUND")
 	public ApiResponse<NotificationResponse> readNotification(
 			@AuthenticationPrincipal Long userId, @PathVariable Long notificationId) {
 		return ApiResponse.of(SuccessCode.OK, notificationService.read(userId, notificationId));
