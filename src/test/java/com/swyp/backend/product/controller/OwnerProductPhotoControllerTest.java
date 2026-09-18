@@ -21,8 +21,10 @@ import com.swyp.backend.user.repository.UserRepository;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalTime;
+import java.util.EnumSet;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -61,10 +63,12 @@ class OwnerProductPhotoControllerTest {
 		appDataCleaner.clear();
 		User owner = userRepository.saveAndFlush(
 			new User(UserRole.OWNER, "테스트점주", null, false, Instant.now()));
-		storeRepository.saveAndFlush(new Store(
+		Store store = new Store(
 			owner, "테스트가게", "04524", "서울특별시 강남구 역삼로 1", null, "0212345678",
 			new BigDecimal("37.500000"), new BigDecimal("127.030000"),
-			LocalTime.of(9, 0), LocalTime.of(21, 0)));
+			LocalTime.of(9, 0), LocalTime.of(21, 0));
+		store.replaceBusinessDays(EnumSet.allOf(DayOfWeek.class));
+		storeRepository.saveAndFlush(store);
 		token = tokenProvider.createAccessToken(TokenRealm.USER, owner.getId(), UserRole.OWNER.name());
 	}
 
