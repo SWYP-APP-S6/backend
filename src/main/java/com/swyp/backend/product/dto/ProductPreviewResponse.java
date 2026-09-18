@@ -1,8 +1,9 @@
 package com.swyp.backend.product.dto;
 
 import com.swyp.backend.product.entity.Product;
+import com.swyp.backend.recipe.dto.IngredientTagResponse;
 import java.time.LocalDateTime;
-import java.util.Set;
+import java.util.List;
 
 public record ProductPreviewResponse(
 		String name,
@@ -14,9 +15,10 @@ public record ProductPreviewResponse(
 		short discountRate,
 		LocalDateTime pickupStartAt,
 		LocalDateTime pickupEndAt,
-		Set<Integer> ingredientTags) {
+		List<IngredientTagResponse> ingredientTags) {
 
-	public static ProductPreviewResponse from(Product product) {
+	public static ProductPreviewResponse from(
+			Product product, List<IngredientTagResponse> ingredientTags) {
 		return new ProductPreviewResponse(
 				product.getName(),
 				product.getCategory().name(),
@@ -27,6 +29,6 @@ public record ProductPreviewResponse(
 				product.getDiscountRate(),
 				product.getPickupStartAt(),
 				product.getPickupEndAt(),
-				product.getIngredientIds());
+				ingredientTags);
 	}
 }

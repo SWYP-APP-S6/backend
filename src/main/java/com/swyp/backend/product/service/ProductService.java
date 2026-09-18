@@ -18,6 +18,7 @@ import com.swyp.backend.product.entity.ProductCategory;
 import com.swyp.backend.product.entity.ProductStatus;
 import com.swyp.backend.product.exception.ProductErrorCode;
 import com.swyp.backend.product.function.ProductFunction;
+import com.swyp.backend.recipe.dto.IngredientTagResponse;
 import com.swyp.backend.recipe.function.RecipeFunction;
 import com.swyp.backend.store.entity.Store;
 import com.swyp.backend.store.function.StoreFunction;
@@ -55,11 +56,13 @@ public class ProductService {
 	public ProductDetailResponse registerProduct(Long ownerId, ProductRegisterRequest request) {
 		Product product = buildProduct(ownerId, request);
 		productFunction.save(product);
-		return ProductDetailResponse.from(product, 0L, LocalDateTime.now(clock));
+		return ProductDetailResponse.from(
+				product, 0L, LocalDateTime.now(clock), ingredientTagsOf(product));
 	}
 
 	public ProductPreviewResponse previewProduct(Long ownerId, ProductRegisterRequest request) {
-		return ProductPreviewResponse.from(buildProduct(ownerId, request));
+		Product product = buildProduct(ownerId, request);
+		return ProductPreviewResponse.from(product, ingredientTagsOf(product));
 	}
 
 	public ProductPhotoResponse uploadPhoto(Long ownerId, MultipartFile file) {
@@ -126,7 +129,10 @@ public class ProductService {
 		Store store = storeFunction.getByOwnerId(ownerId);
 		Product product = productFunction.getByIdAndStoreId(productId, store.getId());
 		return ProductDetailResponse.from(
-				product, completedQtyOf(productId), LocalDateTime.now(clock));
+				product,
+				completedQtyOf(productId),
+				LocalDateTime.now(clock),
+				ingredientTagsOf(product));
 	}
 
 	@Transactional
@@ -146,7 +152,8 @@ public class ProductService {
 		}
 
 		product.restock(request.stockQty());
-		return ProductDetailResponse.from(product, completedQtyOf(productId), now);
+		return ProductDetailResponse.from(
+				product, completedQtyOf(productId), now, ingredientTagsOf(product));
 	}
 
 	@Transactional
@@ -174,7 +181,16 @@ public class ProductService {
 			product.denyStockConfirmation(now);
 		}
 		return ProductDetailResponse.from(
-				product, completedQtyOf(productId), LocalDateTime.now(clock));
+				product,
+				completedQtyOf(productId),
+				LocalDateTime.now(clock),
+				ingredientTagsOf(product));
+	}
+
+	private List<IngredientTagResponse> ingredientTagsOf(Product product) {
+		return recipeFunction.findIngredientsByIds(product.getIngredientIds()).stream()
+				.map(IngredientTagResponse::from)
+				.toList();
 	}
 
 	private long completedQtyOf(Long productId) {
