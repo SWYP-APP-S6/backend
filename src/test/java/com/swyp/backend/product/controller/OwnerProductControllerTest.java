@@ -23,6 +23,7 @@ import com.swyp.backend.notification.repository.NotificationRepository;
 import com.swyp.backend.product.PhotoFixture;
 import com.swyp.backend.product.entity.Product;
 import com.swyp.backend.product.entity.ProductCategory;
+import com.swyp.backend.product.entity.ProductStatus;
 import com.swyp.backend.product.repository.ProductRepository;
 import com.swyp.backend.product.service.ProductCloseService;
 import com.swyp.backend.store.entity.Store;
@@ -289,7 +290,7 @@ class OwnerProductControllerTest {
 	}
 
 	@Test
-	void stockEdits_pastThePickupEnd_areRejectedBeforeTheBatchEvenGetsToIt() throws Exception {
+	void pastThePickupEnd_theOwnerSeesItClosedAndCannotEditIt_beforeTheBatchEvenGetsToIt() throws Exception {
 		Product product = productRepository.saveAndFlush(new Product(
 			store, "방금 마감한 당근", ProductCategory.VEGETABLE, 10, 1000, 800,
 			LocalDateTime.now().minusHours(2), LocalDateTime.now().minusMinutes(1),
@@ -300,9 +301,16 @@ class OwnerProductControllerTest {
 		mockMvc.perform(get("/owner/products/" + product.getId())
 				.header("Authorization", "Bearer " + token))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.status").value("ON_SALE"))
-			.andExpect(jsonPath("$.data.stockEditable")
-				.value(false));
+			.andExpect(jsonPath("$.data.status").value("CLOSED"))
+			.andExpect(jsonPath("$.data.stockEditable").value(false));
+
+		mockMvc.perform(get("/owner/products").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.products.content[0].status").value("CLOSED"));
+
+		assertThat(productRepository.findById(product.getId()).orElseThrow().getStatus())
+			.as("the row still reads ON_SALE until the batch runs; the owner's screens already don't")
+			.isEqualTo(ProductStatus.ON_SALE);
 
 		mockMvc.perform(patch("/owner/products/" + product.getId() + "/stock")
 				.header("Authorization", "Bearer " + token)
