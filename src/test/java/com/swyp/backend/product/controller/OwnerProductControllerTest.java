@@ -23,7 +23,9 @@ import com.swyp.backend.notification.repository.NotificationRepository;
 import com.swyp.backend.product.PhotoFixture;
 import com.swyp.backend.product.entity.Product;
 import com.swyp.backend.product.entity.ProductCategory;
+import com.swyp.backend.product.entity.ProductStatus;
 import com.swyp.backend.product.repository.ProductRepository;
+import com.swyp.backend.product.service.ProductCloseService;
 import com.swyp.backend.store.entity.Store;
 import com.swyp.backend.store.repository.StoreRepository;
 import com.swyp.backend.user.entity.User;
@@ -72,6 +74,9 @@ class OwnerProductControllerTest {
 
 	@Autowired
 	JwtTokenProvider tokenProvider;
+
+	@Autowired
+	ProductCloseService productCloseService;
 
 	private User owner;
 	private Store store;
@@ -290,6 +295,50 @@ class OwnerProductControllerTest {
 	}
 
 	@Test
+	void pastThePickupEnd_theOwnerSeesItClosedAndCannotEditIt_beforeTheBatchEvenGetsToIt() throws Exception {
+		Product product = productRepository.saveAndFlush(new Product(
+			store, "방금 마감한 당근", ProductCategory.VEGETABLE, 10, 1000, 800,
+			LocalDateTime.now().minusHours(2), LocalDateTime.now().minusMinutes(1),
+			"https://example.com/a.jpg"));
+		product.markReconfirmSent(Instant.now());
+		productRepository.saveAndFlush(product);
+
+		mockMvc.perform(get("/owner/products/" + product.getId())
+				.header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.status").value("CLOSED"))
+			.andExpect(jsonPath("$.data.stockEditable").value(false));
+
+		mockMvc.perform(get("/owner/products").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.products.content[0].status").value("CLOSED"));
+
+		assertThat(productRepository.findById(product.getId()).orElseThrow().getStatus())
+			.as("the row still reads ON_SALE until the batch runs; the owner's screens already don't")
+			.isEqualTo(ProductStatus.ON_SALE);
+
+		mockMvc.perform(patch("/owner/products/" + product.getId() + "/stock")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"stockQty":4}"""))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("PRODUCT_CLOSED"));
+
+		mockMvc.perform(post("/owner/products/" + product.getId() + "/stock-reconfirm")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"confirmed":true}"""))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("PRODUCT_CLOSED"));
+
+		assertThat(productRepository.findById(product.getId()).orElseThrow().getStockQty())
+			.as("the close batch runs once a minute; the sale ends at the pickup end, not at the scan")
+			.isEqualTo(10);
+	}
+
+	@Test
 	void stockReconfirm_answeredTwice_isRejected() throws Exception {
 		Product product = askedToReconfirm("당근", 10);
 
@@ -315,7 +364,7 @@ class OwnerProductControllerTest {
 	}
 
 	@Test
-	void stockReconfirm_confirmingIt_stopsLockingOncePickupHasClosed() throws Exception {
+	void stockReconfirm_confirmedProductPastItsPickupEnd_isClosedAndStaysAsHistory() throws Exception {
 		Product product = productRepository.saveAndFlush(new Product(
 			store, "지난 당근", ProductCategory.VEGETABLE, 10, 1000, 800,
 			LocalDateTime.now().minusHours(2), LocalDateTime.now().minusMinutes(1),
@@ -324,18 +373,26 @@ class OwnerProductControllerTest {
 		product.confirmStock(Instant.now());
 		productRepository.saveAndFlush(product);
 
+		productCloseService.closeEndedProducts();
+
 		mockMvc.perform(get("/owner/products/" + product.getId())
 				.header("Authorization", "Bearer " + token))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.stockEditable").value(true));
+			.andExpect(jsonPath("$.data.status").value("CLOSED"))
+			.andExpect(jsonPath("$.data.stockEditable").value(false));
 
 		mockMvc.perform(patch("/owner/products/" + product.getId() + "/stock")
 				.header("Authorization", "Bearer " + token)
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
 					{"stockQty":4}"""))
-			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.stockQty").value(4));
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("PRODUCT_CLOSED"));
+
+		assertThat(productRepository.findById(product.getId()).orElseThrow().getStockQty())
+			.as("the confirmation lock lifting at pickup end no longer opens the stock up -- "
+					+ "the sale is over and its numbers are kept as they were")
+			.isEqualTo(10);
 	}
 
 	@Test
@@ -696,11 +753,66 @@ class OwnerProductControllerTest {
 	}
 
 	@Test
-	void getMyProducts_soldOut_countsWhatIsGone_evenAfterItClosed() throws Exception {
-		createProduct("당근", 10);
-		Product gone = createProduct("다 팔린 상추", 5);
-		gone.restock(0);
-		productRepository.saveAndFlush(gone);
+	void getMyProducts_onSale_listsWhatIsStillSelling_leavingTheSoldOutToTheirOwnTab() throws Exception {
+		shelfOfEveryTab();
+
+		mockMvc.perform(get("/owner/products?filter=ON_SALE").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.products.totalElements").value(2))
+			.andExpect(jsonPath("$.data.products.content[0].name").value("두 개 남은 오이"))
+			.andExpect(jsonPath("$.data.products.content[0].status").value("ON_SALE"))
+			.andExpect(jsonPath("$.data.products.content[1].name").value("당근"))
+			.andExpect(jsonPath("$.data.products.content[1].status").value("ON_SALE"));
+	}
+
+	@Test
+	void getMyProducts_runningLow_isTheSellingShelfAboutToRunOut() throws Exception {
+		shelfOfEveryTab();
+
+		mockMvc.perform(get("/owner/products?filter=RUNNING_LOW").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.products.totalElements").value(1))
+			.andExpect(jsonPath("$.data.products.content[0].name").value("두 개 남은 오이"))
+			.andExpect(jsonPath("$.data.products.content[0].availableQty").value(2));
+	}
+
+	@Test
+	void getMyProducts_soldOut_listsWhatIsGoneWhileItsPickupWindowIsOpen() throws Exception {
+		shelfOfEveryTab();
+
+		mockMvc.perform(get("/owner/products?filter=SOLD_OUT").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.products.totalElements").value(1))
+			.andExpect(jsonPath("$.data.products.content[0].name").value("다 팔린 상추"))
+			.andExpect(jsonPath("$.data.products.content[0].status").value("SOLD_OUT"));
+	}
+
+	@Test
+	void getMyProducts_closed_takesWhatIsPastItsPickupEnd_beforeTheBatchClosesIt() throws Exception {
+		shelfOfEveryTab();
+
+		mockMvc.perform(get("/owner/products?filter=CLOSED").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.products.totalElements").value(2))
+			.andExpect(jsonPath("$.data.products.content[0].name").value("닫힌 감자"))
+			.andExpect(jsonPath("$.data.products.content[0].status").value("CLOSED"))
+			.andExpect(jsonPath("$.data.products.content[1].name").value("방금 마감한 애호박"))
+			.andExpect(jsonPath("$.data.products.content[1].status").value("CLOSED"));
+	}
+
+	@Test
+	void getMyProducts_onSaleSoldOutAndClosedSplitTheWholeShelf_andAllIsTheDefault() throws Exception {
+		shelfOfEveryTab();
+
+		for (String all : java.util.List.of("", "?filter=ALL")) {
+			mockMvc.perform(get("/owner/products" + all).header("Authorization", "Bearer " + token))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.products.totalElements").value(5));
+		}
+	}
+
+	@Test
+	void getMyProducts_soldOut_leavesAShelfThatSoldOutAndClosedToTheClosedTab() throws Exception {
 		Product goneAndClosed = createProduct("어제 다 팔린 애호박", 5);
 		goneAndClosed.restock(0);
 		goneAndClosed.close();
@@ -708,9 +820,12 @@ class OwnerProductControllerTest {
 
 		mockMvc.perform(get("/owner/products?filter=SOLD_OUT").header("Authorization", "Bearer " + token))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.products.totalElements").value(2))
-			.andExpect(jsonPath("$.data.products.content[0].name").value("어제 다 팔린 애호박"))
-			.andExpect(jsonPath("$.data.products.content[1].name").value("다 팔린 상추"));
+			.andExpect(jsonPath("$.data.products.totalElements").value(0));
+
+		mockMvc.perform(get("/owner/products?filter=CLOSED").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.products.totalElements").value(1))
+			.andExpect(jsonPath("$.data.products.content[0].name").value("어제 다 팔린 애호박"));
 	}
 
 	@Test
@@ -767,6 +882,21 @@ class OwnerProductControllerTest {
 			.andExpect(jsonPath("$.data.products.totalElements").value(1))
 			.andExpect(jsonPath("$.data.products.content[0].name").value("두 개 남은 당근"))
 			.andExpect(jsonPath("$.data.products.content[0].availableQty").value(2));
+	}
+
+	private void shelfOfEveryTab() {
+		createProduct("당근", 10);
+		Product low = createProduct("두 개 남은 오이", 10);
+		low.restock(2);
+		productRepository.saveAndFlush(low);
+		Product gone = createProduct("다 팔린 상추", 5);
+		gone.restock(0);
+		productRepository.saveAndFlush(gone);
+		createProduct("방금 마감한 애호박", 5,
+			LocalDateTime.now().minusHours(3), LocalDateTime.now().minusMinutes(1));
+		Product closed = createProduct("닫힌 감자", 5);
+		closed.close();
+		productRepository.saveAndFlush(closed);
 	}
 
 	@Test

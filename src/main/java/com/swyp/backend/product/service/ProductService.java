@@ -15,7 +15,6 @@ import com.swyp.backend.product.dto.StockReconfirmRequest;
 import com.swyp.backend.product.dto.StockUpdateRequest;
 import com.swyp.backend.product.entity.Product;
 import com.swyp.backend.product.entity.ProductCategory;
-import com.swyp.backend.product.entity.ProductStatus;
 import com.swyp.backend.product.exception.ProductErrorCode;
 import com.swyp.backend.product.function.ProductFunction;
 import com.swyp.backend.recipe.function.RecipeFunction;
@@ -116,11 +115,13 @@ public class ProductService {
 				products.getContent().stream()
 						.filter(product -> product.shortfallQty() > 0)
 						.collect(Collectors.toMap(Product::getId, Product::getStockQty)));
+		LocalDateTime now = LocalDateTime.now(clock);
 		List<OwnerProductSummaryResponse> content = products.getContent().stream()
 				.map(product -> OwnerProductSummaryResponse.from(
 						product,
 						activeHoldQtyByProduct.getOrDefault(product.getId(), 0L),
-						shortfallCustomersByProduct.getOrDefault(product.getId(), 0L)))
+						shortfallCustomersByProduct.getOrDefault(product.getId(), 0L),
+						now))
 				.toList();
 		return new OwnerProductListResponse(Instant.now(clock), PageResponse.of(content, products));
 	}
@@ -140,10 +141,10 @@ public class ProductService {
 		if (!product.getStore().getId().equals(store.getId())) {
 			throw new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND);
 		}
-		if (product.getStatus() == ProductStatus.CLOSED) {
+		LocalDateTime now = LocalDateTime.now(clock);
+		if (product.isClosedAt(now)) {
 			throw new BusinessException(ProductErrorCode.PRODUCT_CLOSED);
 		}
-		LocalDateTime now = LocalDateTime.now(clock);
 		if (product.isStockLocked(now)) {
 			throw new BusinessException(ProductErrorCode.STOCK_LOCKED);
 		}
@@ -160,7 +161,7 @@ public class ProductService {
 		if (!product.getStore().getId().equals(store.getId())) {
 			throw new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND);
 		}
-		if (product.getStatus() == ProductStatus.CLOSED) {
+		if (product.isClosedAt(LocalDateTime.now(clock))) {
 			throw new BusinessException(ProductErrorCode.PRODUCT_CLOSED);
 		}
 		if (!product.isStockReconfirmPending()) {

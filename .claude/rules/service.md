@@ -17,6 +17,9 @@ paths:
   레퍼런스: `HoldExpiryService.expireOverdueHolds`(`OverdueHold` 프로젝션 → 락).
 - **여러 row를 잠그는 경로는 모두 같은 순서로 잠근다** — 현재 순서는 **product → hold**
   (`HoldService.create`, `HoldExpiryService`). 한 경로만 뒤집어도 데드락이 난다.
+  **여러 row를 한 번에 바꾸는 UPDATE도 이 규칙 대상이다** — 스캔 순서(힙·인덱스)대로 잠그므로 id 순이
+  아니다. `where id in (select id … order by id for update)`로 잠금 순서를 고정한다(PostgreSQL은
+  정렬 뒤에 잠근다). 레퍼런스: `ProductRepository.closeEndedAsOf`.
 - **외부 API 호출을 트랜잭션 안에 두지 않는다** — 특히 그 트랜잭션이 `FOR UPDATE`를 쥐고 있으면
   타임아웃(`spring.http.clients.read-timeout`)만큼 남의 요청이 그 row에서 대기한다. 커밋 뒤에
   보내야 하는 일(푸시 등)은 상태 컬럼에 적어 두고 배치가 가져간다(`notifications.push_state`).

@@ -67,7 +67,7 @@ public class OwnerProductController {
 	@ApiErrorCodes(in = StoreErrorCode.class, codes = "STORE_NOT_REGISTERED")
 	public ApiResponse<OwnerProductListResponse> getMyProducts(
 			@AuthenticationPrincipal Long ownerId,
-			@RequestParam(required = false) OwnerProductFilter filter,
+			@RequestParam(defaultValue = "ALL") OwnerProductFilter filter,
 			@Parameter(hidden = true) @PageableDefault(size = 20) Pageable pageable) {
 		return ApiResponse.of(SuccessCode.OK, productService.getMyProducts(ownerId, filter, pageable));
 	}

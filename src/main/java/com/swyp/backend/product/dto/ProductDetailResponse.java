@@ -48,7 +48,7 @@ public record ProductDetailResponse(
 				product.getPickupEndAt(),
 				product.getPhotoUrl(),
 				product.getIngredientIds(),
-				product.getStatus().name(),
+				product.statusAt(now).name(),
 				product.getReconfirmSentAt(),
 				product.getReconfirmAnsweredAt(),
 				product.isStockReconfirmPending(),

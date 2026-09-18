@@ -23,7 +23,7 @@ public record OwnerProductSummaryResponse(
 		Instant createdAt) {
 
 	public static OwnerProductSummaryResponse from(
-			Product product, long activeHoldQty, long shortfallCustomerCount) {
+			Product product, long activeHoldQty, long shortfallCustomerCount, LocalDateTime now) {
 		return new OwnerProductSummaryResponse(
 				product.getId(),
 				product.getName(),
@@ -38,7 +38,7 @@ public record OwnerProductSummaryResponse(
 				product.getSalePrice(),
 				product.getDiscountRate(),
 				product.getPickupEndAt(),
-				product.getStatus().name(),
+				product.statusAt(now).name(),
 				product.isStockReconfirmPending(),
 				product.getCreatedAt());
 	}

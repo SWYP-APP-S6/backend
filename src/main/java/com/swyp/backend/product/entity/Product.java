@@ -198,8 +198,16 @@ public class Product extends BaseTimeEntity {
 		return stockConfirmedAt != null && now.isBefore(pickupEndAt);
 	}
 
+	public boolean isClosedAt(LocalDateTime now) {
+		return status == ProductStatus.CLOSED || !now.isBefore(pickupEndAt);
+	}
+
+	public ProductStatus statusAt(LocalDateTime now) {
+		return isClosedAt(now) ? ProductStatus.CLOSED : status;
+	}
+
 	public boolean isStockEditableAt(LocalDateTime now) {
-		return status != ProductStatus.CLOSED && !isStockLocked(now);
+		return !isClosedAt(now) && !isStockLocked(now);
 	}
 
 	public void confirmStock(Instant confirmedAt) {

@@ -7,6 +7,7 @@ import com.swyp.backend.product.entity.ProductStatus;
 import jakarta.persistence.LockModeType;
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
@@ -96,9 +97,14 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 	@Query("""
 			select p from Product p
 			where p.store.id = :storeId
-				and p.availableQty = 0
+				and p.status = :status
+				and p.pickupEndAt > :now
 			""")
-	Page<Product> findStoreProductsSoldOut(@Param("storeId") Long storeId, Pageable pageable);
+	Page<Product> findStoreProductsInWindowByStatus(
+			@Param("storeId") Long storeId,
+			@Param("status") ProductStatus status,
+			@Param("now") LocalDateTime now,
+			Pageable pageable);
 
 	@Query("""
 			select p from Product p
@@ -113,8 +119,26 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 			@Param("now") LocalDateTime now,
 			Pageable pageable);
 
-	List<Product> findByStatusNotAndPickupEndAtLessThanEqual(
-			ProductStatus status, LocalDateTime pickupEndAt);
+	@Query("""
+			select p from Product p
+			where p.store.id = :storeId
+				and (p.status = com.swyp.backend.product.entity.ProductStatus.CLOSED
+					or p.pickupEndAt <= :now)
+			""")
+	Page<Product> findStoreProductsClosed(
+			@Param("storeId") Long storeId, @Param("now") LocalDateTime now, Pageable pageable);
+
+	@Modifying
+	@Query(nativeQuery = true, value = """
+			update products
+			set status = 'CLOSED', updated_at = :closedAt
+			where id in (
+				select id from products
+				where status <> 'CLOSED' and pickup_end_at <= :now
+				order by id
+				for update)
+			""")
+	int closeEndedAsOf(@Param("now") LocalDateTime now, @Param("closedAt") Instant closedAt);
 
 	boolean existsByStoreIdAndReconfirmSentAtIsNotNullAndReconfirmAnsweredAtIsNull(Long storeId);
 
