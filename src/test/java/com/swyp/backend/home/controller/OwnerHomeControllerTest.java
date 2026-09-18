@@ -98,7 +98,7 @@ class OwnerHomeControllerTest {
 	}
 
 	@Test
-	void getOwnerHome_summarizesVisitsCompletedTodayAndQtyOnSale() throws Exception {
+	void getOwnerHome_summarizesVisitsCompletedTodayAndProductsOnSale() throws Exception {
 		Product carrot = createProduct("당근", 10);
 		Product potato = createProduct("감자", 5);
 		User consumer = createConsumer();
@@ -111,7 +111,20 @@ class OwnerHomeControllerTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.summary.upcomingVisitCount").value(1))
 			.andExpect(jsonPath("$.data.summary.completedTodayCount").value(1))
-			.andExpect(jsonPath("$.data.summary.onSaleQty").value(13));
+			.andExpect(jsonPath("$.data.summary.onSaleProductCount").value(2));
+	}
+
+	@Test
+	void getOwnerHome_countsASoldOutProductOnTheShelfAsOnSale() throws Exception {
+		createProduct("당근", 10);
+		Product emptied = createProduct("감자", 5);
+		emptied.restock(0);
+		productRepository.saveAndFlush(emptied);
+
+		mockMvc.perform(get("/owner/home").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.products.length()").value(2))
+			.andExpect(jsonPath("$.data.summary.onSaleProductCount").value(2));
 	}
 
 	@Test
@@ -273,7 +286,7 @@ class OwnerHomeControllerTest {
 		mockMvc.perform(get("/owner/home").header("Authorization", "Bearer " + token))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.products.length()").value(0))
-			.andExpect(jsonPath("$.data.summary.onSaleQty").value(0))
+			.andExpect(jsonPath("$.data.summary.onSaleProductCount").value(0))
 			.andExpect(jsonPath("$.data.hasRegisteredProduct").value(true));
 	}
 
@@ -313,7 +326,7 @@ class OwnerHomeControllerTest {
 			.andExpect(jsonPath("$.data.products.length()").value(1))
 			.andExpect(jsonPath("$.data.products[0].name").value("당근"))
 			.andExpect(jsonPath("$.data.upcomingVisits.length()").value(0))
-			.andExpect(jsonPath("$.data.summary.onSaleQty").value(10));
+			.andExpect(jsonPath("$.data.summary.onSaleProductCount").value(1));
 	}
 
 	@Test
