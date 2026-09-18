@@ -18,10 +18,10 @@ import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "Auth", description = "앱 인증")
@@ -65,9 +65,9 @@ public class UserAuthController {
 	}
 
 	@PostMapping("/signup")
-	public ResponseEntity<ApiResponse<TokenResponse>> signup(@Valid @RequestBody SignupRequest request) {
-		return ResponseEntity.status(HttpStatus.CREATED)
-			.body(ApiResponse.of(SuccessCode.CREATED, userAuthService.signup(request)));
+	@ResponseStatus(HttpStatus.CREATED)
+	public ApiResponse<TokenResponse> signup(@Valid @RequestBody SignupRequest request) {
+		return ApiResponse.of(SuccessCode.CREATED, userAuthService.signup(request));
 	}
 
 	@PostMapping("/refresh")

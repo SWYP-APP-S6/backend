@@ -8,7 +8,9 @@ paths:
 - 클래스: `@RestController @RequiredArgsConstructor @RequestMapping("/{feature-plural}")`.
 - **얇게 유지**: 라우팅 / 입력 검증 / 응답 래핑만. 비즈니스는 service로 위임(repository 직접 호출 금지).
 - 성공 응답은 **`ApiResponse<T>` envelope**로 감싼다: `ApiResponse.of(SuccessCode.OK, data)`.
-  상태코드가 필요하면 `ResponseEntity.status(...).body(ApiResponse.of(...))`.
+  **200이 아닌 성공 상태는 `@ResponseStatus(HttpStatus.CREATED)`로 단다** — `ResponseEntity.status(...)`는
+  런타임 상태만 바꾸고 명세에는 200으로 남아, 앱은 오지 않는 200을 기다리는 클라이언트를 생성한다
+  (`OpenApiContractTest`가 `@ResponseStatus(201)`과 명세를 대조한다).
 - 에러는 **던지기만** 한다: `throw new BusinessException(ApiCode)`. 응답 포맷/상태 매핑은
   `GlobalExceptionHandler`가 담당(직접 에러 응답 조립 금지).
 - 요청 검증: Request DTO에 Bean Validation(`@NotBlank` 등) + 파라미터/바디에 `@Valid`.
