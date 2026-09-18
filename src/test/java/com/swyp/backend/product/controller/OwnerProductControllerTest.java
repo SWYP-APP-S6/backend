@@ -24,6 +24,7 @@ import com.swyp.backend.product.PhotoFixture;
 import com.swyp.backend.product.entity.Product;
 import com.swyp.backend.product.entity.ProductCategory;
 import com.swyp.backend.product.repository.ProductRepository;
+import com.swyp.backend.product.service.ProductCloseService;
 import com.swyp.backend.store.entity.Store;
 import com.swyp.backend.store.repository.StoreRepository;
 import com.swyp.backend.user.entity.User;
@@ -69,6 +70,9 @@ class OwnerProductControllerTest {
 
 	@Autowired
 	JwtTokenProvider tokenProvider;
+
+	@Autowired
+	ProductCloseService productCloseService;
 
 	private User owner;
 	private Store store;
@@ -285,6 +289,43 @@ class OwnerProductControllerTest {
 	}
 
 	@Test
+	void stockEdits_pastThePickupEnd_areRejectedBeforeTheBatchEvenGetsToIt() throws Exception {
+		Product product = productRepository.saveAndFlush(new Product(
+			store, "방금 마감한 당근", ProductCategory.VEGETABLE, 10, 1000, 800,
+			LocalDateTime.now().minusHours(2), LocalDateTime.now().minusMinutes(1),
+			"https://example.com/a.jpg"));
+		product.markReconfirmSent(Instant.now());
+		productRepository.saveAndFlush(product);
+
+		mockMvc.perform(get("/owner/products/" + product.getId())
+				.header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.status").value("ON_SALE"))
+			.andExpect(jsonPath("$.data.stockEditable")
+				.value(false));
+
+		mockMvc.perform(patch("/owner/products/" + product.getId() + "/stock")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"stockQty":4}"""))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("PRODUCT_CLOSED"));
+
+		mockMvc.perform(post("/owner/products/" + product.getId() + "/stock-reconfirm")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"confirmed":true}"""))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("PRODUCT_CLOSED"));
+
+		assertThat(productRepository.findById(product.getId()).orElseThrow().getStockQty())
+			.as("the close batch runs once a minute; the sale ends at the pickup end, not at the scan")
+			.isEqualTo(10);
+	}
+
+	@Test
 	void stockReconfirm_answeredTwice_isRejected() throws Exception {
 		Product product = askedToReconfirm("당근", 10);
 
@@ -310,7 +351,7 @@ class OwnerProductControllerTest {
 	}
 
 	@Test
-	void stockReconfirm_confirmingIt_stopsLockingOncePickupHasClosed() throws Exception {
+	void stockReconfirm_confirmedProductPastItsPickupEnd_isClosedAndStaysAsHistory() throws Exception {
 		Product product = productRepository.saveAndFlush(new Product(
 			store, "지난 당근", ProductCategory.VEGETABLE, 10, 1000, 800,
 			LocalDateTime.now().minusHours(2), LocalDateTime.now().minusMinutes(1),
@@ -319,18 +360,26 @@ class OwnerProductControllerTest {
 		product.confirmStock(Instant.now());
 		productRepository.saveAndFlush(product);
 
+		productCloseService.closeEndedProducts();
+
 		mockMvc.perform(get("/owner/products/" + product.getId())
 				.header("Authorization", "Bearer " + token))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.stockEditable").value(true));
+			.andExpect(jsonPath("$.data.status").value("CLOSED"))
+			.andExpect(jsonPath("$.data.stockEditable").value(false));
 
 		mockMvc.perform(patch("/owner/products/" + product.getId() + "/stock")
 				.header("Authorization", "Bearer " + token)
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
 					{"stockQty":4}"""))
-			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.stockQty").value(4));
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("PRODUCT_CLOSED"));
+
+		assertThat(productRepository.findById(product.getId()).orElseThrow().getStockQty())
+			.as("the confirmation lock lifting at pickup end no longer opens the stock up -- "
+					+ "the sale is over and its numbers are kept as they were")
+			.isEqualTo(10);
 	}
 
 	@Test
