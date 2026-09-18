@@ -14,6 +14,7 @@ import com.swyp.backend.product.PhotoFixture;
 import com.swyp.backend.product.entity.Product;
 import com.swyp.backend.product.repository.ProductRepository;
 import com.swyp.backend.store.entity.Store;
+import com.swyp.backend.notification.repository.NotificationRepository;
 import com.swyp.backend.store.repository.StoreRepository;
 import com.swyp.backend.user.entity.User;
 import com.swyp.backend.user.entity.UserRole;
@@ -45,6 +46,9 @@ class OwnerProductDefaultPickupWindowTest {
 	private static final LocalTime CLOSE_TIME = LocalTime.of(21, 0);
 
 	@Autowired
+	NotificationRepository notificationRepository;
+
+	@Autowired
 	MockMvc mockMvc;
 
 	@Autowired
@@ -70,6 +74,7 @@ class OwnerProductDefaultPickupWindowTest {
 		holdRepository.deleteAll();
 		productRepository.deleteAll();
 		storeRepository.deleteAll();
+		notificationRepository.deleteAll();
 		userRepository.deleteAll();
 
 		User owner = userRepository.saveAndFlush(new User(UserRole.OWNER, "테스트점주", null, false, Instant.now()));

@@ -18,4 +18,8 @@ public final class DeepLinks {
 	public static String ownerProduct(Long productId) {
 		return SCHEME + "owner/products/" + productId;
 	}
+
+	public static String ownerStore() {
+		return SCHEME + "owner/stores/me";
+	}
 }

@@ -15,6 +15,7 @@ import com.swyp.backend.common.security.TokenRealm;
 import com.swyp.backend.store.entity.Store;
 import com.swyp.backend.store.entity.StoreCategory;
 import com.swyp.backend.store.exception.StoreErrorCode;
+import com.swyp.backend.notification.repository.NotificationRepository;
 import com.swyp.backend.store.repository.StoreRepository;
 import com.swyp.backend.store.service.GeocodingClient;
 import com.swyp.backend.user.entity.User;
@@ -56,6 +57,9 @@ class OwnerStoreControllerTest {
 	private static final String ADDRESS = "서울특별시 강남구 역삼로 123";
 
 	@Autowired
+	NotificationRepository notificationRepository;
+
+	@Autowired
 	MockMvc mockMvc;
 
 	@Autowired
@@ -74,6 +78,7 @@ class OwnerStoreControllerTest {
 	void setUp() {
 		geocodingClient.clear();
 		storeRepository.deleteAll();
+		notificationRepository.deleteAll();
 		userRepository.deleteAll();
 	}
 

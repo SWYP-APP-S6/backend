@@ -2,6 +2,9 @@ package com.swyp.backend.store.service;
 
 import com.swyp.backend.common.exception.BusinessException;
 import com.swyp.backend.common.response.PageResponse;
+import com.swyp.backend.notification.DeepLinks;
+import com.swyp.backend.notification.entity.NotificationType;
+import com.swyp.backend.notification.function.NotificationFunction;
 import com.swyp.backend.store.dto.StoreDetailResponse;
 import com.swyp.backend.store.dto.StoreRegisterRequest;
 import com.swyp.backend.store.dto.StoreSummaryResponse;
@@ -28,6 +31,7 @@ public class StoreService {
 
 	private final StoreFunction storeFunction;
 	private final UserFunction userFunction;
+	private final NotificationFunction notificationFunction;
 	private final GeocodingClient geocodingClient;
 
 	@Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -80,11 +84,37 @@ public class StoreService {
 	public void updateStatus(Long storeId, StoreStatus status) {
 		Store store = storeFunction.getById(storeId);
 		switch (status) {
-			case APPROVED -> store.approve();
-			case REJECTED -> store.reject();
+			case APPROVED -> approveStore(store);
+			case REJECTED -> rejectStore(store);
 			// 되돌리기는 승인 취소에 가까워 반려와 의미가 다르다. 필요해지면 별도로 설계한다.
 			case PENDING -> throw new BusinessException(StoreErrorCode.CANNOT_REVERT_TO_PENDING);
 		}
+	}
+
+	private void approveStore(Store store) {
+		if (store.getStatus() == StoreStatus.APPROVED) {
+			return;
+		}
+		store.approve();
+		notificationFunction.notify(
+				store.getOwner(),
+				NotificationType.STORE_APPROVED,
+				"가게 심사가 승인됐어요",
+				store.getName() + " 가게가 승인됐어요. 이제 등록한 상품이 손님에게 보여요.",
+				DeepLinks.ownerStore());
+	}
+
+	private void rejectStore(Store store) {
+		if (store.getStatus() == StoreStatus.REJECTED) {
+			return;
+		}
+		store.reject();
+		notificationFunction.notify(
+				store.getOwner(),
+				NotificationType.STORE_REJECTED,
+				"가게 심사가 반려됐어요",
+				store.getName() + " 가게 등록이 반려됐어요. 가게 정보를 확인한 뒤 다시 문의해주세요.",
+				DeepLinks.ownerStore());
 	}
 
 }
