@@ -14,6 +14,10 @@ import com.swyp.backend.admin.entity.Admin;
 import com.swyp.backend.admin.entity.AdminType;
 import com.swyp.backend.admin.repository.AdminRepository;
 import com.swyp.backend.hold.repository.HoldRepository;
+import com.swyp.backend.notification.entity.Notification;
+import com.swyp.backend.notification.entity.NotificationPushState;
+import com.swyp.backend.notification.entity.NotificationType;
+import com.swyp.backend.notification.repository.NotificationRepository;
 import com.swyp.backend.product.repository.ProductRepository;
 import com.swyp.backend.store.entity.Store;
 import com.swyp.backend.store.entity.StoreStatus;
@@ -61,9 +65,14 @@ class AdminStoreControllerTest {
 	HoldRepository holdRepository;
 
 	@Autowired
+	NotificationRepository notificationRepository;
+
+	@Autowired
 	PasswordEncoder passwordEncoder;
 
 	private Long pendingStoreId;
+	private Long approvedStoreId;
+	private Long pendingOwnerId;
 
 	@BeforeEach
 	void setUp() {
@@ -74,17 +83,19 @@ class AdminStoreControllerTest {
 		holdRepository.deleteAll();
 		productRepository.deleteAll();
 		storeRepository.deleteAll();
+		notificationRepository.deleteAll();
 		userRepository.deleteAll();
 
 		User owner = userRepository.save(
 			new User(UserRole.OWNER, "심사대기점주", "01012345678", false, Instant.now()));
+		pendingOwnerId = owner.getId();
 		pendingStoreId = storeRepository.save(newStore(owner, "심사대기 가게")).getId();
 
 		User approvedOwner = userRepository.save(
 			new User(UserRole.OWNER, "승인된점주", "01087654321", false, Instant.now()));
 		Store approved = storeRepository.save(newStore(approvedOwner, "승인된 가게"));
 		approved.approve();
-		storeRepository.save(approved);
+		approvedStoreId = storeRepository.save(approved).getId();
 	}
 
 	private Store newStore(User owner, String name) {
@@ -156,6 +167,50 @@ class AdminStoreControllerTest {
 			.get()
 			.extracting(Store::getStatus)
 			.isEqualTo(StoreStatus.REJECTED);
+	}
+
+	@Test
+	void approving_tellsTheOwnerAndLeavesThePushForTheOutbox() throws Exception {
+		mockMvc.perform(patch("/admin/stores/{id}/status", pendingStoreId)
+				.header("Authorization", "Bearer " + accessToken())
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(statusBody("APPROVED")))
+			.andExpect(status().isOk());
+
+		assertThat(notificationRepository.findAll())
+			.singleElement()
+			.satisfies(notification -> {
+				assertThat(notification.getUser().getId()).isEqualTo(pendingOwnerId);
+				assertThat(notification.getType()).isEqualTo(NotificationType.STORE_APPROVED);
+				assertThat(notification.getBody()).contains("심사대기 가게");
+				assertThat(notification.getDeepLink()).isEqualTo("mangro://owner/stores/me");
+				assertThat(notification.getPushState()).isEqualTo(NotificationPushState.PENDING);
+			});
+	}
+
+	@Test
+	void rejecting_tellsTheOwner() throws Exception {
+		mockMvc.perform(patch("/admin/stores/{id}/status", pendingStoreId)
+				.header("Authorization", "Bearer " + accessToken())
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(statusBody("REJECTED")))
+			.andExpect(status().isOk());
+
+		assertThat(notificationRepository.findAll())
+			.singleElement()
+			.extracting(Notification::getType)
+			.isEqualTo(NotificationType.STORE_REJECTED);
+	}
+
+	@Test
+	void approvingWhatIsAlreadyApproved_doesNotTellTheOwnerAgain() throws Exception {
+		mockMvc.perform(patch("/admin/stores/{id}/status", approvedStoreId)
+				.header("Authorization", "Bearer " + accessToken())
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(statusBody("APPROVED")))
+			.andExpect(status().isOk());
+
+		assertThat(notificationRepository.findAll()).isEmpty();
 	}
 
 	@Test
