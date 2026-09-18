@@ -112,11 +112,13 @@ public class ProductService {
 				products.getContent().stream()
 						.filter(product -> product.shortfallQty() > 0)
 						.collect(Collectors.toMap(Product::getId, Product::getStockQty)));
+		LocalDateTime now = LocalDateTime.now(clock);
 		List<OwnerProductSummaryResponse> content = products.getContent().stream()
 				.map(product -> OwnerProductSummaryResponse.from(
 						product,
 						activeHoldQtyByProduct.getOrDefault(product.getId(), 0L),
-						shortfallCustomersByProduct.getOrDefault(product.getId(), 0L)))
+						shortfallCustomersByProduct.getOrDefault(product.getId(), 0L),
+						now))
 				.toList();
 		return new OwnerProductListResponse(Instant.now(clock), PageResponse.of(content, products));
 	}

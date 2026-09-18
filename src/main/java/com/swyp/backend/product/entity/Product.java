@@ -202,6 +202,10 @@ public class Product extends BaseTimeEntity {
 		return status == ProductStatus.CLOSED || !now.isBefore(pickupEndAt);
 	}
 
+	public ProductStatus statusAt(LocalDateTime now) {
+		return isClosedAt(now) ? ProductStatus.CLOSED : status;
+	}
+
 	public boolean isStockEditableAt(LocalDateTime now) {
 		return !isClosedAt(now) && !isStockLocked(now);
 	}
