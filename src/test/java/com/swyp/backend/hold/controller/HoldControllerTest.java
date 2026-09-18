@@ -751,6 +751,27 @@ class HoldControllerTest {
 				"https://cdn.example.com/" + name + ".jpg"));
 	}
 
+	private void pickedUp(Product target, int qty) {
+		Hold hold = holding(anotherConsumer("가져간손님"), target, qty, Instant.now().plus(Duration.ofMinutes(15)));
+		target.completeHold(qty);
+		productRepository.saveAndFlush(target);
+		hold.complete(Instant.now());
+		holdRepository.saveAndFlush(hold);
+	}
+
+	private User anotherConsumer(String nickname) {
+		return userRepository.saveAndFlush(new User(UserRole.CONSUMER, nickname, null, false, Instant.now()));
+	}
+
+	private java.util.List<com.swyp.backend.notification.entity.Notification> reconfirmRequestsTo(Product target) {
+		return notificationRepository.findByUserId(
+				target.getStore().getOwner().getId(), org.springframework.data.domain.Pageable.unpaged())
+			.stream()
+			.filter(notification -> notification.getType()
+				== com.swyp.backend.notification.entity.NotificationType.STOCK_RECONFIRM_REQUEST)
+			.toList();
+	}
+
 	private Hold settledHold(HoldStatus status, Instant expiresAt) {
 		Hold finished = holdRepository.saveAndFlush(
 				HoldFixture.hold(consumer, product, 1, expiresAt));
@@ -809,6 +830,32 @@ class HoldControllerTest {
 			.singleElement()
 			.satisfies(notification -> assertThat(notification.getDeepLink())
 				.isEqualTo(DeepLinks.ownerProduct(product.getId())));
+	}
+
+	@Test
+	void theOwnerIsAskedToRecheckStock_oncePickupsAndHoldsTogetherReachSixtyPercent() throws Exception {
+		Product spinach = sellableProduct(10, LocalDateTime.now().plusHours(5));
+		pickedUp(spinach, 3);
+		holding(anotherConsumer("방문예정손님"), spinach, 2, Instant.now().plus(Duration.ofMinutes(15)));
+
+		holdAndReturnId(spinach, 1);
+
+		assertThat(reconfirmRequestsTo(spinach))
+			.singleElement()
+			.satisfies(notification -> {
+				assertThat(notification.getBody()).contains("찜과 픽업 완료", "60%");
+				assertThat(notification.getDeepLink()).isEqualTo(DeepLinks.ownerProduct(spinach.getId()));
+			});
+	}
+
+	@Test
+	void theOwnerIsNotAskedToRecheckStock_whilePickupsAndHoldsStayBelowSixtyPercent() throws Exception {
+		Product spinach = sellableProduct(10, LocalDateTime.now().plusHours(5));
+		pickedUp(spinach, 3);
+
+		holdAndReturnId(spinach, 2);
+
+		assertThat(reconfirmRequestsTo(spinach)).isEmpty();
 	}
 
 	@Test

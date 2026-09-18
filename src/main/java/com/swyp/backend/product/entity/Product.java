@@ -186,8 +186,8 @@ public class Product extends BaseTimeEntity {
 				/ RECONFIRM_THRESHOLD_DENOMINATOR;
 	}
 
-	public boolean needsStockReconfirm() {
-		return reconfirmSentAt == null && heldQty >= reconfirmThresholdQty();
+	public boolean needsStockReconfirm(long completedQty) {
+		return reconfirmSentAt == null && heldQty + completedQty >= reconfirmThresholdQty();
 	}
 
 	public boolean isStockReconfirmPending() {
