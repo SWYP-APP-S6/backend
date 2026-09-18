@@ -11,10 +11,12 @@ public record OwnerHomeProductCard(
 		int availableQty,
 		long activeHoldQty,
 		int shortfallQty,
+		long shortfallCustomerCount,
 		String status,
 		boolean reconfirmPending) {
 
-	public static OwnerHomeProductCard from(Product product, long activeHoldQty) {
+	public static OwnerHomeProductCard from(
+			Product product, long activeHoldQty, long shortfallCustomerCount) {
 		return new OwnerHomeProductCard(
 				product.getId(),
 				product.getName(),
@@ -24,6 +26,7 @@ public record OwnerHomeProductCard(
 				product.getAvailableQty(),
 				activeHoldQty,
 				product.shortfallQty(),
+				shortfallCustomerCount,
 				product.getStatus().name(),
 				product.getReconfirmSentAt() != null && product.getReconfirmAnsweredAt() == null);
 	}

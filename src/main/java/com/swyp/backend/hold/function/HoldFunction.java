@@ -17,9 +17,11 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -156,6 +158,42 @@ public class HoldFunction {
 
 	public List<Hold> findHoldingOfProducts(List<Long> productIds) {
 		return productIds.isEmpty() ? List.of() : holdRepository.findHoldingWithUserOfProducts(productIds);
+	}
+
+	public Set<Long> holdsThatDoNotFit(int stockQty, List<Hold> inHeldOrder) {
+		int remaining = stockQty;
+		Set<Long> overflow = new HashSet<>();
+		for (Hold hold : inHeldOrder) {
+			if (hold.getQty() <= remaining) {
+				remaining -= hold.getQty();
+			} else {
+				overflow.add(hold.getId());
+			}
+		}
+		return overflow;
+	}
+
+	public Map<Long, Long> customersNotServedByProduct(Map<Long, Integer> stockQtyByProduct) {
+		if (stockQtyByProduct.isEmpty()) {
+			return Map.of();
+		}
+		Map<Long, List<Hold>> holdsByProduct =
+				findHoldingOfProducts(List.copyOf(stockQtyByProduct.keySet())).stream()
+						.collect(Collectors.groupingBy(hold -> hold.getProduct().getId()));
+		Map<Long, Long> countByProduct = new HashMap<>();
+		stockQtyByProduct.forEach((productId, stockQty) -> {
+			List<Hold> inHeldOrder = holdsByProduct.getOrDefault(productId, List.of());
+			Set<Long> overflow = holdsThatDoNotFit(stockQty, inHeldOrder);
+			long customers = inHeldOrder.stream()
+					.filter(hold -> overflow.contains(hold.getId()))
+					.map(hold -> hold.getUser().getId())
+					.distinct()
+					.count();
+			if (customers > 0) {
+				countByProduct.put(productId, customers);
+			}
+		});
+		return countByProduct;
 	}
 
 	public Map<Long, Integer> heldOrderOfProducts(List<Long> productIds) {

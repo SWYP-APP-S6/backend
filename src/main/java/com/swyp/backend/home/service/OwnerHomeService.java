@@ -40,9 +40,13 @@ public class OwnerHomeService {
 
 		List<Product> products = productFunction.findSellingNowOfStore(storeId);
 		Map<Long, Long> activeHoldQtyByProduct = holdFunction.activeQtyByProductOfStore(storeId);
+		Map<Long, Long> shortfallCustomersByProduct =
+				holdFunction.customersNotServedByProduct(stockQtyOfShortProducts(products));
 		List<OwnerHomeProductCard> productCards = products.stream()
 				.map(product -> OwnerHomeProductCard.from(
-						product, activeHoldQtyByProduct.getOrDefault(product.getId(), 0L)))
+						product,
+						activeHoldQtyByProduct.getOrDefault(product.getId(), 0L),
+						shortfallCustomersByProduct.getOrDefault(product.getId(), 0L)))
 				.toList();
 
 		List<OwnerHomeVisit> upcomingVisits = holdFunction.findHoldingOfStore(storeId).stream()
@@ -73,6 +77,12 @@ public class OwnerHomeService {
 				hasRegisteredProduct,
 				upcomingVisits,
 				productCards);
+	}
+
+	private static Map<Long, Integer> stockQtyOfShortProducts(List<Product> products) {
+		return products.stream()
+				.filter(product -> product.shortfallQty() > 0)
+				.collect(Collectors.toMap(Product::getId, Product::getStockQty));
 	}
 
 	private static int sumAvailableQty(List<OwnerHomeProductCard> productCards) {
