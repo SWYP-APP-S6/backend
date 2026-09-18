@@ -30,12 +30,14 @@ public class UserController {
 	private final UserDeletionService userDeletionService;
 
 	@GetMapping("/me")
+	@ApiErrorCodes(in = UserAuthErrorCode.class, codes = "USER_NOT_FOUND")
 	public ApiResponse<MeResponse> getMe(@AuthenticationPrincipal Long userId) {
 		return ApiResponse.of(SuccessCode.OK, userService.getMe(userId));
 	}
 
 	@DeleteMapping("/me")
-	@ApiErrorCodes(in = UserAuthErrorCode.class, codes = {"HOLDING_HOLDS_REMAIN", "STORE_HOLDING_HOLDS_REMAIN"})
+	@ApiErrorCodes(in = UserAuthErrorCode.class,
+			codes = {"USER_NOT_FOUND", "HOLDING_HOLDS_REMAIN", "STORE_HOLDING_HOLDS_REMAIN"})
 	public ApiResponse<Void> deleteMe(@AuthenticationPrincipal Long userId) {
 		userDeletionService.delete(userId);
 		return ApiResponse.of(SuccessCode.OK);
@@ -47,6 +49,7 @@ public class UserController {
 	}
 
 	@PutMapping("/me/location")
+	@ApiErrorCodes(in = UserAuthErrorCode.class, codes = "USER_NOT_FOUND")
 	public ApiResponse<MyLocationResponse> setMyLocation(
 			@AuthenticationPrincipal Long userId,
 			@Valid @RequestBody MyLocationUpdateRequest request) {

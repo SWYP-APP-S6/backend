@@ -1,11 +1,13 @@
 package com.swyp.backend.recipe.controller;
 
+import com.swyp.backend.common.openapi.ApiErrorCodes;
 import com.swyp.backend.common.openapi.PageQueryParams;
 import com.swyp.backend.common.response.ApiResponse;
 import com.swyp.backend.common.response.PageResponse;
 import com.swyp.backend.common.response.SuccessCode;
 import com.swyp.backend.recipe.dto.RecipeDetailResponse;
 import com.swyp.backend.recipe.dto.RecipeSummaryResponse;
+import com.swyp.backend.recipe.exception.RecipeErrorCode;
 import com.swyp.backend.recipe.service.RecipeService;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,6 +30,7 @@ public class RecipeController {
 	private final RecipeService recipeService;
 
 	@GetMapping("/{id}")
+	@ApiErrorCodes(in = RecipeErrorCode.class, codes = "RECIPE_NOT_FOUND")
 	public ApiResponse<RecipeDetailResponse> getRecipe(@PathVariable Long id) {
 		return ApiResponse.of(SuccessCode.OK, recipeService.getRecipe(id));
 	}

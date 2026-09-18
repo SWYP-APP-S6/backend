@@ -8,7 +8,9 @@ paths:
 - 클래스: `@RestController @RequiredArgsConstructor @RequestMapping("/{feature-plural}")`.
 - **얇게 유지**: 라우팅 / 입력 검증 / 응답 래핑만. 비즈니스는 service로 위임(repository 직접 호출 금지).
 - 성공 응답은 **`ApiResponse<T>` envelope**로 감싼다: `ApiResponse.of(SuccessCode.OK, data)`.
-  상태코드가 필요하면 `ResponseEntity.status(...).body(ApiResponse.of(...))`.
+  **200이 아닌 성공 상태는 `@ResponseStatus(HttpStatus.CREATED)`로 단다** — `ResponseEntity.status(...)`는
+  런타임 상태만 바꾸고 명세에는 200으로 남아, 앱은 오지 않는 200을 기다리는 클라이언트를 생성한다
+  (`OpenApiContractTest`가 `@ResponseStatus(201)`과 명세를 대조한다).
 - 에러는 **던지기만** 한다: `throw new BusinessException(ApiCode)`. 응답 포맷/상태 매핑은
   `GlobalExceptionHandler`가 담당(직접 에러 응답 조립 금지).
 - 요청 검증: Request DTO에 Bean Validation(`@NotBlank` 등) + 파라미터/바디에 `@Valid`.
@@ -32,7 +34,8 @@ paths:
     `Pageable`을 받는 모든 핸들러를 `OpenApiContractTest`가 검사한다.
   - **비즈니스 실패는 `@ApiErrorCodes`로 선언한다.** 모든 오퍼레이션에 붙는 5종
     (400·401·403·429·500) 밖의 실패 — 409 충돌이나 404 — 은 선언하지 않으면 명세에 아예 없고, 앱은
-    그 분기를 코드젠 결과로 받지 못한다.
+    그 분기를 코드젠 결과로 받지 못한다. **5종과 같은 상태코드라도 앱이 `code`로 분기해야 하면
+    선언한다**(로그인의 401 `INVALID_OAUTH_TOKEN` 등) — 공통 설명은 지워지지 않고 그 위에 남는다.
     `@ApiErrorCodes(in = HoldErrorCode.class, codes = {"HOLD_NOT_FOUND", …})`로 **그 오퍼레이션이
     실제로 던지는 코드만** 적고(다른 feature의 코드도 던지면 애노테이션을 여러 번 단다), 문구는
     enum의 `message`에서 그대로 온다 — 손으로 옮겨 적지 않는다. 없는 이름을 적으면 명세 생성이

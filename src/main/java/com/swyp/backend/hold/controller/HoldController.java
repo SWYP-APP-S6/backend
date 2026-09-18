@@ -1,5 +1,6 @@
 package com.swyp.backend.hold.controller;
 
+import com.swyp.backend.common.openapi.ApiErrorCodes;
 import com.swyp.backend.common.openapi.PageQueryParams;
 import com.swyp.backend.common.response.ApiResponse;
 import com.swyp.backend.common.response.SuccessCode;
@@ -7,7 +8,10 @@ import com.swyp.backend.hold.dto.ActiveHoldResponse;
 import com.swyp.backend.hold.dto.HoldCreateRequest;
 import com.swyp.backend.hold.dto.HoldDetailResponse;
 import com.swyp.backend.hold.dto.HoldHistoryResponse;
+import com.swyp.backend.hold.exception.HoldErrorCode;
 import com.swyp.backend.hold.service.HoldService;
+import com.swyp.backend.product.exception.ProductErrorCode;
+import com.swyp.backend.user.exception.UserAuthErrorCode;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -15,13 +19,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "Hold", description = "찜")
@@ -33,11 +37,15 @@ public class HoldController {
 	private final HoldService holdService;
 
 	@PostMapping
-	public ResponseEntity<ApiResponse<HoldDetailResponse>> createHold(
+	@ResponseStatus(HttpStatus.CREATED)
+	@ApiErrorCodes(in = HoldErrorCode.class, codes = {"HOLD_LIMIT_EXCEEDED", "INSUFFICIENT_QTY",
+			"PRODUCT_NOT_SELLABLE", "STORE_CLOSED_TODAY", "OTHER_STORE_HOLD_ACTIVE",
+			"CANCEL_LIMIT_EXCEEDED"})
+	@ApiErrorCodes(in = ProductErrorCode.class, codes = "PRODUCT_NOT_FOUND")
+	@ApiErrorCodes(in = UserAuthErrorCode.class, codes = "USER_NOT_FOUND")
+	public ApiResponse<HoldDetailResponse> createHold(
 			@AuthenticationPrincipal Long userId, @Valid @RequestBody HoldCreateRequest request) {
-		HoldDetailResponse response = holdService.create(userId, request);
-		return ResponseEntity.status(HttpStatus.CREATED)
-				.body(ApiResponse.of(SuccessCode.CREATED, response));
+		return ApiResponse.of(SuccessCode.CREATED, holdService.create(userId, request));
 	}
 
 	@GetMapping
@@ -54,12 +62,15 @@ public class HoldController {
 	}
 
 	@GetMapping("/{holdId}")
+	@ApiErrorCodes(in = HoldErrorCode.class, codes = "HOLD_NOT_FOUND")
 	public ApiResponse<HoldDetailResponse> getHold(
 			@AuthenticationPrincipal Long userId, @PathVariable Long holdId) {
 		return ApiResponse.of(SuccessCode.OK, holdService.getHold(userId, holdId));
 	}
 
 	@PostMapping("/{holdId}/cancel")
+	@ApiErrorCodes(in = HoldErrorCode.class,
+			codes = {"HOLD_NOT_FOUND", "HOLD_ALREADY_RESOLVED", "HOLD_ALREADY_EXPIRED"})
 	public ApiResponse<HoldDetailResponse> cancelHold(
 			@AuthenticationPrincipal Long userId, @PathVariable Long holdId) {
 		return ApiResponse.of(SuccessCode.OK, holdService.cancel(userId, holdId));

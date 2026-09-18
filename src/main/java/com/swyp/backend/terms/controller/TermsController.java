@@ -1,9 +1,11 @@
 package com.swyp.backend.terms.controller;
 
+import com.swyp.backend.common.openapi.ApiErrorCodes;
 import com.swyp.backend.common.response.ApiResponse;
 import com.swyp.backend.common.response.SuccessCode;
 import com.swyp.backend.terms.dto.TermsDocumentResponse;
 import com.swyp.backend.terms.dto.TermsDocumentsResponse;
+import com.swyp.backend.terms.exception.TermsErrorCode;
 import com.swyp.backend.terms.service.TermsService;
 import com.swyp.backend.user.entity.UserRole;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,6 +30,7 @@ public class TermsController {
 	}
 
 	@GetMapping("/{termsDocumentId}")
+	@ApiErrorCodes(in = TermsErrorCode.class, codes = "TERMS_DOCUMENT_NOT_FOUND")
 	public ApiResponse<TermsDocumentResponse> getTermsDocument(@PathVariable Long termsDocumentId) {
 		return ApiResponse.of(SuccessCode.OK, termsService.getDocument(termsDocumentId));
 	}
