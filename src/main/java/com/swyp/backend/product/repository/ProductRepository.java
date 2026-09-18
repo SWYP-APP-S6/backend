@@ -3,6 +3,7 @@ package com.swyp.backend.product.repository;
 import com.swyp.backend.product.dto.StoreProductSummary;
 import com.swyp.backend.product.entity.Product;
 import com.swyp.backend.product.entity.ProductCategory;
+import com.swyp.backend.product.entity.ProductStatus;
 import jakarta.persistence.LockModeType;
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
@@ -96,9 +97,14 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 	@Query("""
 			select p from Product p
 			where p.store.id = :storeId
-				and p.availableQty = 0
+				and p.status = :status
+				and p.pickupEndAt > :now
 			""")
-	Page<Product> findStoreProductsSoldOut(@Param("storeId") Long storeId, Pageable pageable);
+	Page<Product> findStoreProductsInWindowByStatus(
+			@Param("storeId") Long storeId,
+			@Param("status") ProductStatus status,
+			@Param("now") LocalDateTime now,
+			Pageable pageable);
 
 	@Query("""
 			select p from Product p
@@ -112,6 +118,15 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 			@Param("runningLowQty") int runningLowQty,
 			@Param("now") LocalDateTime now,
 			Pageable pageable);
+
+	@Query("""
+			select p from Product p
+			where p.store.id = :storeId
+				and (p.status = com.swyp.backend.product.entity.ProductStatus.CLOSED
+					or p.pickupEndAt <= :now)
+			""")
+	Page<Product> findStoreProductsClosed(
+			@Param("storeId") Long storeId, @Param("now") LocalDateTime now, Pageable pageable);
 
 	@Modifying
 	@Query(nativeQuery = true, value = """

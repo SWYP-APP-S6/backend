@@ -8,6 +8,7 @@ import com.swyp.backend.product.dto.SellableStoreGroup;
 import com.swyp.backend.product.dto.StoreProductSummary;
 import com.swyp.backend.product.entity.Product;
 import com.swyp.backend.product.entity.ProductCategory;
+import com.swyp.backend.product.entity.ProductStatus;
 import com.swyp.backend.product.exception.ProductErrorCode;
 import com.swyp.backend.product.repository.ProductRepository;
 import com.swyp.backend.store.entity.StoreStatus;
@@ -69,16 +70,16 @@ public class ProductFunction {
 				pageable.getPageNumber(),
 				pageable.getPageSize(),
 				Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by(Sort.Direction.DESC, "id")));
-		if (filter == null) {
-			return productRepository.findStoreProducts(storeId, newestFirst);
-		}
+		LocalDateTime now = LocalDateTime.now(clock);
 		return switch (filter) {
-			case SOLD_OUT -> productRepository.findStoreProductsSoldOut(storeId, newestFirst);
+			case ALL -> productRepository.findStoreProducts(storeId, newestFirst);
+			case ON_SALE -> productRepository.findStoreProductsInWindowByStatus(
+					storeId, ProductStatus.ON_SALE, now, newestFirst);
 			case RUNNING_LOW -> productRepository.findStoreProductsRunningLow(
-					storeId,
-					productProperties.runningLowQty(),
-					LocalDateTime.now(clock),
-					newestFirst);
+					storeId, productProperties.runningLowQty(), now, newestFirst);
+			case SOLD_OUT -> productRepository.findStoreProductsInWindowByStatus(
+					storeId, ProductStatus.SOLD_OUT, now, newestFirst);
+			case CLOSED -> productRepository.findStoreProductsClosed(storeId, now, newestFirst);
 		};
 	}
 
