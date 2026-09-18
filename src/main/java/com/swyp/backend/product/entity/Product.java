@@ -202,10 +202,6 @@ public class Product extends BaseTimeEntity {
 		return status != ProductStatus.CLOSED && !isStockLocked(now);
 	}
 
-	public int minAdjustableQty() {
-		return reconfirmSentAt == null ? Math.min(reconfirmThresholdQty(), stockQty) : 0;
-	}
-
 	public void confirmStock(Instant confirmedAt) {
 		this.reconfirmAnsweredAt = confirmedAt;
 		this.stockConfirmedAt = confirmedAt;

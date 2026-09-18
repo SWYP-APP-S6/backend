@@ -144,9 +144,6 @@ public class ProductService {
 		if (product.isStockLocked(now)) {
 			throw new BusinessException(ProductErrorCode.STOCK_LOCKED);
 		}
-		if (request.stockQty() < product.minAdjustableQty()) {
-			throw new BusinessException(ProductErrorCode.QTY_BELOW_MINIMUM);
-		}
 
 		product.restock(request.stockQty());
 		return ProductDetailResponse.from(product, completedQtyOf(productId), now);
