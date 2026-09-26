@@ -3,6 +3,7 @@ package com.swyp.backend.product.function;
 import com.swyp.backend.common.Distance;
 import com.swyp.backend.common.exception.BusinessException;
 import com.swyp.backend.product.ProductProperties;
+import com.swyp.backend.product.dto.AdminProductFilter;
 import com.swyp.backend.product.dto.OwnerProductFilter;
 import com.swyp.backend.product.dto.SellableStoreGroup;
 import com.swyp.backend.product.dto.StoreProductSummary;
@@ -85,6 +86,24 @@ public class ProductFunction {
 			case SOLD_OUT -> productRepository.findStoreProductsInWindowByStatus(
 					storeId, ProductStatus.SOLD_OUT, now, newestFirst);
 			case CLOSED -> productRepository.findStoreProductsClosed(storeId, now, newestFirst);
+		};
+	}
+
+	public Page<Product> findForAdmin(Long storeId, AdminProductFilter filter, Pageable pageable) {
+		PageRequest newestFirst = PageRequest.of(
+				pageable.getPageNumber(),
+				pageable.getPageSize(),
+				Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by(Sort.Direction.DESC, "id")));
+		LocalDateTime now = LocalDateTime.now(clock);
+		return switch (filter) {
+			case ALL -> productRepository.findAllForAdmin(storeId, newestFirst);
+			case ON_SALE -> productRepository.findInWindowByStatusForAdmin(
+					storeId, ProductStatus.ON_SALE, now, newestFirst);
+			case SOLD_OUT -> productRepository.findInWindowByStatusForAdmin(
+					storeId, ProductStatus.SOLD_OUT, now, newestFirst);
+			case CLOSED -> productRepository.findClosedForAdmin(storeId, now, newestFirst);
+			case HIDDEN -> productRepository.findHiddenForAdmin(
+					storeId, now, now.getDayOfWeek(), newestFirst);
 		};
 	}
 

@@ -55,6 +55,76 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 	@Query("select p from Product p join fetch p.store where p.id = :id")
 	Optional<Product> findWithStoreById(@Param("id") Long id);
 
+	@Query(value = """
+			select p from Product p
+			join fetch p.store s
+			where (:storeId is null or s.id = :storeId)
+			""",
+			countQuery = """
+			select count(p) from Product p
+			where (:storeId is null or p.store.id = :storeId)
+			""")
+	Page<Product> findAllForAdmin(@Param("storeId") Long storeId, Pageable pageable);
+
+	@Query(value = """
+			select p from Product p
+			join fetch p.store s
+			where (:storeId is null or s.id = :storeId)
+				and p.status = :status
+				and p.pickupEndAt > :now
+			""",
+			countQuery = """
+			select count(p) from Product p
+			where (:storeId is null or p.store.id = :storeId)
+				and p.status = :status
+				and p.pickupEndAt > :now
+			""")
+	Page<Product> findInWindowByStatusForAdmin(
+			@Param("storeId") Long storeId,
+			@Param("status") ProductStatus status,
+			@Param("now") LocalDateTime now,
+			Pageable pageable);
+
+	@Query(value = """
+			select p from Product p
+			join fetch p.store s
+			where (:storeId is null or s.id = :storeId)
+				and (p.status = com.swyp.backend.product.entity.ProductStatus.CLOSED
+					or p.pickupEndAt <= :now)
+			""",
+			countQuery = """
+			select count(p) from Product p
+			where (:storeId is null or p.store.id = :storeId)
+				and (p.status = com.swyp.backend.product.entity.ProductStatus.CLOSED
+					or p.pickupEndAt <= :now)
+			""")
+	Page<Product> findClosedForAdmin(
+			@Param("storeId") Long storeId, @Param("now") LocalDateTime now, Pageable pageable);
+
+	String WHERE_HIDDEN_FROM_CONSUMERS = """
+			and not (s.status = com.swyp.backend.store.entity.StoreStatus.APPROVED
+				and :today member of s.businessDays
+				and p.status = com.swyp.backend.product.entity.ProductStatus.ON_SALE
+				and p.availableQty >= 1
+				and p.pickupEndAt > :now)
+			""";
+
+	@Query(value = """
+			select p from Product p
+			join fetch p.store s
+			where (:storeId is null or s.id = :storeId)
+			""" + WHERE_HIDDEN_FROM_CONSUMERS,
+			countQuery = """
+			select count(p) from Product p
+			join p.store s
+			where (:storeId is null or s.id = :storeId)
+			""" + WHERE_HIDDEN_FROM_CONSUMERS)
+	Page<Product> findHiddenForAdmin(
+			@Param("storeId") Long storeId,
+			@Param("now") LocalDateTime now,
+			@Param("today") DayOfWeek today,
+			Pageable pageable);
+
 	@Query("""
 			select p from Product p
 			where p.store.id = :storeId
