@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.swyp.backend.AppDataCleaner;
 import com.swyp.backend.RedisTestcontainersConfiguration;
 import com.swyp.backend.TestcontainersConfiguration;
 import com.swyp.backend.common.exception.BusinessException;
@@ -36,6 +37,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -74,12 +76,18 @@ class OwnerStoreControllerTest {
 	@Autowired
 	StubGeocodingClient geocodingClient;
 
+	@Autowired
+	AppDataCleaner appDataCleaner;
+
 	@BeforeEach
 	void setUp() {
 		geocodingClient.clear();
-		storeRepository.deleteAll();
-		notificationRepository.deleteAll();
-		userRepository.deleteAll();
+		appDataCleaner.clear();
+	}
+
+	@AfterEach
+	void tearDown() {
+		appDataCleaner.clear();
 	}
 
 	private User createUser(UserRole role) {

@@ -1,5 +1,7 @@
 package com.swyp.backend.hold.service;
 
+import com.swyp.backend.analytics.entity.DomainEventType;
+import com.swyp.backend.analytics.function.DomainEventFunction;
 import com.swyp.backend.common.exception.BusinessException;
 import com.swyp.backend.common.response.PageResponse;
 import com.swyp.backend.hold.dto.OwnerHoldCounts;
@@ -18,6 +20,7 @@ import com.swyp.backend.notification.DeepLinks;
 import com.swyp.backend.notification.entity.NotificationType;
 import com.swyp.backend.notification.function.NotificationFunction;
 import com.swyp.backend.product.entity.Product;
+import com.swyp.backend.product.entity.ProductStatus;
 import com.swyp.backend.product.function.ProductFunction;
 import com.swyp.backend.store.entity.Store;
 import com.swyp.backend.store.function.StoreFunction;
@@ -38,6 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class OwnerHoldService {
 
 	private final HoldFunction holdFunction;
+	private final DomainEventFunction domainEventFunction;
 	private final StoreFunction storeFunction;
 	private final ProductFunction productFunction;
 	private final NotificationFunction notificationFunction;
@@ -99,7 +103,8 @@ public class OwnerHoldService {
 		boolean chargedAsNoShow = false;
 		for (Hold hold : group) {
 			Product product = locked.get(hold.getProduct().getId());
-			if (hold.getStatus() == HoldStatus.EXPIRED) {
+			boolean fromExpired = hold.getStatus() == HoldStatus.EXPIRED;
+			if (fromExpired) {
 				requireStockLeft(product, hold.getQty());
 				product.takeFromStock(hold.getQty());
 			} else {
@@ -107,6 +112,14 @@ public class OwnerHoldService {
 			}
 			chargedAsNoShow |= hold.wasChargedAsNoShow();
 			hold.complete(now);
+			domainEventFunction.record(DomainEventType.PICKUP_COMPLETE, hold, Map.of(
+					"fromExpired", fromExpired,
+					"salePrice", product.getSalePrice(),
+					"amount", product.getSalePrice() * hold.getQty()));
+			if (fromExpired && product.getStatus() == ProductStatus.SOLD_OUT) {
+				domainEventFunction.record(DomainEventType.PRODUCT_SOLD_OUT, product, ownerId, Map.of(
+						"cause", "PICKUP"));
+			}
 		}
 		if (chargedAsNoShow) {
 			giveBackNoShowCredit(requested, now);

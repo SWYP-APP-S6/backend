@@ -1,5 +1,7 @@
 package com.swyp.backend.hold.service;
 
+import com.swyp.backend.analytics.entity.DomainEventType;
+import com.swyp.backend.analytics.function.DomainEventFunction;
 import com.swyp.backend.common.exception.BusinessException;
 import com.swyp.backend.hold.HoldProperties;
 import com.swyp.backend.hold.dto.HoldCreateRequest;
@@ -35,6 +37,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class HoldCreator {
 
 	private final HoldFunction holdFunction;
+	private final DomainEventFunction domainEventFunction;
 	private final HoldCancelCreditSettler holdCancelCreditSettler;
 	private final NotificationFunction notificationFunction;
 	private final ProductFunction productFunction;
@@ -72,6 +75,14 @@ public class HoldCreator {
 		askOwnerToReconfirmStock(product, now);
 		holdFunction.flush();
 		List<Hold> group = holdFunction.findHoldingOfGroup(slot.groupId());
+		domainEventFunction.record(DomainEventType.HOLD_CREATE, holdOf(group, product), Map.of(
+				"addedQty", request.qty(),
+				"merged", existing.isPresent(),
+				"expiresAt", slot.expiresAt().toString()));
+		if (product.getStatus() == ProductStatus.SOLD_OUT) {
+			domainEventFunction.record(DomainEventType.PRODUCT_SOLD_OUT, product, userId, Map.of(
+					"cause", "HOLD"));
+		}
 		if (opensAPickup) {
 			notificationFunction.notify(
 					product.getStore().getOwner(),
@@ -97,6 +108,13 @@ public class HoldCreator {
 			return;
 		}
 		product.markReconfirmSent(now);
+		domainEventFunction.record(
+				DomainEventType.STOCK_RECONFIRM_TRIGGER, product, product.getStore().getOwner().getId(),
+				Map.of(
+						"heldQty", product.getHeldQty(),
+						"stockQty", product.getStockQty(),
+						"initialQty", product.getInitialQty(),
+						"thresholdQty", product.reconfirmThresholdQty()));
 		notificationFunction.notify(
 				product.getStore().getOwner(),
 				NotificationType.STOCK_RECONFIRM_REQUEST,
@@ -144,6 +162,7 @@ public class HoldCreator {
 		for (Hold hold : expiring) {
 			locked.get(hold.getProduct().getId()).releaseHold(hold.getQty());
 			hold.expire();
+			domainEventFunction.record(DomainEventType.HOLD_EXPIRE, hold, Map.of("via", "NEXT_HOLD"));
 		}
 		holdFunction.flush();
 		tellTheVisitExpired(expiring.getFirst());

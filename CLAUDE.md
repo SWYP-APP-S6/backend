@@ -66,6 +66,11 @@
   **딥링크는 `notification.DeepLinks`에서만 만든다** — `mangro://` + 그 화면이 부르는 API 경로
   (`holds/{id}` · `owner/holds/{id}` · `owner/products/{id}`)라 앱이 경로를 그대로 조회에 쓴다.
   `notify()`에 `null`을 넘기면 푸시를 탭해도 앱이 열 화면을 모른다.
+- **행동 로그는 `domain_events`에 `DomainEventFunction.record()`로만 남긴다** — 상태를 바꾸는 service가 같은
+  트랜잭션 안에서 기록하고, 이름(nickname·storeName·productName)은 payload에 기록 시점 스냅샷으로 넣는다.
+  조회는 `GET /admin/events`. 거절된 찜(`HOLD_FAIL`)만 예외라 `HoldService.create`가 `NOT_SUPPORTED`로
+  `HoldCreator.create`(트랜잭션) 바깥에서 롤백 뒤에 기록한다 — 그래서 찜 생성은 `@Transactional` 테스트에서
+  못 부른다(`.claude/rules/testing.md`).
 - **제약 메시지는 `src/main/resources/ValidationMessages.properties`가 소유한다** — 없으면 Hibernate
   Validator 기본 번들이 **JVM 로케일에 따라** 골라져 로컬(ko)은 한국어, 운영 컨테이너
   (`eclipse-temurin`의 `LANG=en_US.UTF-8`)는 영어가 나간다. 이 번들은 로케일 접미사가 없어 모든

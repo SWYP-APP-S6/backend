@@ -1,5 +1,7 @@
 package com.swyp.backend.hold.service;
 
+import com.swyp.backend.analytics.entity.DomainEventType;
+import com.swyp.backend.analytics.function.DomainEventFunction;
 import com.swyp.backend.hold.entity.Hold;
 import com.swyp.backend.hold.entity.HoldStatus;
 import com.swyp.backend.hold.function.HoldFunction;
@@ -20,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class HoldExpirer {
 
 	private final HoldFunction holdFunction;
+	private final DomainEventFunction domainEventFunction;
 	private final ProductFunction productFunction;
 	private final NotificationFunction notificationFunction;
 
@@ -35,6 +38,7 @@ public class HoldExpirer {
 		}
 		hold.expire();
 		locked.get(hold.getProduct().getId()).releaseHold(hold.getQty());
+		domainEventFunction.record(DomainEventType.HOLD_EXPIRE, hold, Map.of("via", "SCAN"));
 		holdFunction.flush();
 		if (!holdFunction.findHoldingOfGroup(hold.getGroupId()).isEmpty()) {
 			return true;

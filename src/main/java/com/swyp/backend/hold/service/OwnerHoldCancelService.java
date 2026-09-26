@@ -1,11 +1,14 @@
 package com.swyp.backend.hold.service;
 
+import com.swyp.backend.analytics.entity.DomainEventType;
+import com.swyp.backend.analytics.function.DomainEventFunction;
 import com.swyp.backend.common.exception.BusinessException;
 import com.swyp.backend.hold.dto.OwnerHoldCancelCandidatesResponse;
 import com.swyp.backend.hold.dto.OwnerHoldCancelCandidatesResponse.OwnerHoldCancelCandidate;
 import com.swyp.backend.hold.dto.OwnerHoldCancelCandidatesResponse.OwnerHoldCancelProduct;
 import com.swyp.backend.hold.dto.OwnerHoldCancelRequest;
 import com.swyp.backend.hold.entity.Hold;
+import com.swyp.backend.hold.entity.HoldCanceledBy;
 import com.swyp.backend.hold.entity.HoldStatus;
 import com.swyp.backend.hold.exception.HoldErrorCode;
 import com.swyp.backend.hold.function.HoldFunction;
@@ -42,6 +45,7 @@ public class OwnerHoldCancelService {
 	private final StoreFunction storeFunction;
 	private final ProductFunction productFunction;
 	private final HoldFunction holdFunction;
+	private final DomainEventFunction domainEventFunction;
 	private final NotificationFunction notificationFunction;
 	private final Clock clock;
 
@@ -78,6 +82,9 @@ public class OwnerHoldCancelService {
 		for (Hold hold : holds) {
 			hold.cancelByOwner(now, OWNER_SHORTAGE_REASON);
 			locked.get(productIdByHold.get(hold.getId())).releaseHold(hold.getQty());
+			domainEventFunction.record(DomainEventType.HOLD_CANCEL, hold, Map.of(
+					"canceledBy", HoldCanceledBy.OWNER.name(),
+					"reason", OWNER_SHORTAGE_REASON));
 			notificationFunction.notify(
 					hold.getUser(),
 					NotificationType.HOLD_CANCELED_BY_OWNER,

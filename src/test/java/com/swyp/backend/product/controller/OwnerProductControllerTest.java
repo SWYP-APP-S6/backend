@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
+import com.swyp.backend.AppDataCleaner;
 import com.swyp.backend.RedisTestcontainersConfiguration;
 import com.swyp.backend.TestcontainersConfiguration;
 import com.swyp.backend.common.ClockConfig;
@@ -40,6 +41,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.EnumSet;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,6 +58,9 @@ class OwnerProductControllerTest {
 
 	@Autowired
 	MockMvc mockMvc;
+
+	@Autowired
+	AppDataCleaner appDataCleaner;
 
 	@Autowired
 	UserRepository userRepository;
@@ -83,13 +88,14 @@ class OwnerProductControllerTest {
 	private String token;
 	private String photoUrl;
 
+	@AfterEach
+	void tearDown() {
+		appDataCleaner.clear();
+	}
+
 	@BeforeEach
 	void setUp() throws Exception {
-		holdRepository.deleteAll();
-		notificationRepository.deleteAll();
-		productRepository.deleteAll();
-		storeRepository.deleteAll();
-		userRepository.deleteAll();
+		appDataCleaner.clear();
 
 		owner = userRepository.saveAndFlush(new User(UserRole.OWNER, "테스트점주", null, false, Instant.now()));
 		Store newStore = new Store(

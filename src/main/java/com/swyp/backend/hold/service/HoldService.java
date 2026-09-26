@@ -1,5 +1,8 @@
 package com.swyp.backend.hold.service;
 
+import com.swyp.backend.analytics.entity.DomainEvent;
+import com.swyp.backend.analytics.entity.DomainEventType;
+import com.swyp.backend.analytics.function.DomainEventFunction;
 import com.swyp.backend.common.exception.BusinessException;
 import com.swyp.backend.common.response.PageResponse;
 import com.swyp.backend.hold.HoldProperties;
@@ -11,17 +14,20 @@ import com.swyp.backend.hold.dto.HoldSummaryResponse;
 import com.swyp.backend.hold.entity.Hold;
 import com.swyp.backend.hold.entity.HoldCancelCredit;
 import com.swyp.backend.hold.entity.HoldCancelCreditReason;
+import com.swyp.backend.hold.entity.HoldCanceledBy;
 import com.swyp.backend.hold.entity.HoldStatus;
 import com.swyp.backend.hold.exception.HoldErrorCode;
 import com.swyp.backend.hold.function.HoldCancelCreditFunction;
 import com.swyp.backend.hold.function.HoldFunction;
 import com.swyp.backend.product.entity.Product;
+import com.swyp.backend.product.exception.ProductErrorCode;
 import com.swyp.backend.product.function.ProductFunction;
 import com.swyp.backend.user.entity.User;
 import com.swyp.backend.user.function.UserFunction;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.Optional;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -38,6 +44,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class HoldService {
 
 	private final HoldCreator holdCreator;
+	private final DomainEventFunction domainEventFunction;
 	private final HoldFunction holdFunction;
 	private final HoldCancelCreditFunction holdCancelCreditFunction;
 	private final HoldCancelCreditSettler holdCancelCreditSettler;
@@ -48,7 +55,33 @@ public class HoldService {
 
 	@Transactional(propagation = Propagation.NOT_SUPPORTED)
 	public HoldDetailResponse create(Long userId, HoldCreateRequest request) {
-		return holdCreator.create(userId, request);
+		try {
+			return holdCreator.create(userId, request);
+		} catch (BusinessException e) {
+			if (e.getCode() != ProductErrorCode.PRODUCT_NOT_FOUND) {
+				recordFailure(userId, request, e);
+			}
+			throw e;
+		}
+	}
+
+	private void recordFailure(Long userId, HoldCreateRequest request, BusinessException e) {
+		Optional<Product> product = productFunction.findWithStoreById(request.productId());
+		Map<String, Object> payload = new LinkedHashMap<>();
+		payload.put("code", e.getCode().name());
+		payload.put("qty", request.qty());
+		product.ifPresent(p -> {
+			payload.put("storeName", p.getStore().getName());
+			payload.put("productName", p.getName());
+			payload.put("availableQty", p.getAvailableQty());
+		});
+		domainEventFunction.record(DomainEvent.builder()
+				.eventType(DomainEventType.HOLD_FAIL)
+				.userId(userId)
+				.storeId(product.map(p -> p.getStore().getId()).orElse(null))
+				.productId(request.productId())
+				.payload(payload)
+				.build());
 	}
 
 	@Transactional
@@ -63,19 +96,23 @@ public class HoldService {
 
 		locked.get(productId).releaseHold(hold.getQty());
 		hold.cancelByUser(now);
-		chargeUnlessMisTap(hold, user, now);
+		boolean charged = chargeUnlessMisTap(hold, user, now);
+		domainEventFunction.record(DomainEventType.HOLD_CANCEL, hold, Map.of(
+				"canceledBy", HoldCanceledBy.USER.name(),
+				"charged", charged));
 		return HoldDetailResponse.of(List.of(hold), now, clock.getZone());
 	}
 
-	private void chargeUnlessMisTap(Hold hold, User user, Instant now) {
+	private boolean chargeUnlessMisTap(Hold hold, User user, Instant now) {
 		if (hold.getCreatedAt().plus(holdProperties.freeCancelWindow()).isAfter(now)) {
-			return;
+			return false;
 		}
 		int spent = holdCancelCreditSettler.settle(user, now).spend(1);
 		if (spent > 0) {
 			holdCancelCreditFunction.record(
 					user, hold, HoldCancelCreditReason.CANCEL, -spent, now);
 		}
+		return spent > 0;
 	}
 
 	public HoldDetailResponse getHold(Long userId, Long holdId) {

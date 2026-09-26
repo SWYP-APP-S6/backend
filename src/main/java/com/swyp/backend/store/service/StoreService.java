@@ -1,5 +1,7 @@
 package com.swyp.backend.store.service;
 
+import com.swyp.backend.analytics.entity.DomainEventType;
+import com.swyp.backend.analytics.function.DomainEventFunction;
 import com.swyp.backend.common.exception.BusinessException;
 import com.swyp.backend.common.response.PageResponse;
 import com.swyp.backend.notification.DeepLinks;
@@ -17,6 +19,7 @@ import com.swyp.backend.user.entity.UserRole;
 import com.swyp.backend.user.function.UserFunction;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -30,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class StoreService {
 
 	private final StoreFunction storeFunction;
+	private final DomainEventFunction domainEventFunction;
 	private final UserFunction userFunction;
 	private final NotificationFunction notificationFunction;
 	private final GeocodingClient geocodingClient;
@@ -60,6 +64,9 @@ public class StoreService {
 		store.replaceBusinessDays(request.businessDays());
 		store.submitApplication(request.businessRegistrationNumber(), request.applicationNote());
 		storeFunction.save(store);
+		domainEventFunction.record(DomainEventType.STORE_REGISTER, store, Map.of(
+				"categories", store.getCategories().stream().map(Enum::name).toList(),
+				"address", store.getAddress()));
 		return StoreDetailResponse.from(store);
 	}
 
