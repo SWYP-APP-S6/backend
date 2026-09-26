@@ -9,6 +9,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.swyp.backend.AppDataCleaner;
 import com.swyp.backend.RedisTestcontainersConfiguration;
+import com.swyp.backend.analytics.entity.DomainEventType;
+import com.swyp.backend.analytics.repository.DomainEventRepository;
 import com.swyp.backend.TestcontainersConfiguration;
 import com.swyp.backend.common.exception.BusinessException;
 import com.swyp.backend.common.security.JwtTokenProvider;
@@ -79,6 +81,9 @@ class OwnerStoreControllerTest {
 	@Autowired
 	AppDataCleaner appDataCleaner;
 
+	@Autowired
+	DomainEventRepository domainEventRepository;
+
 	@BeforeEach
 	void setUp() {
 		geocodingClient.clear();
@@ -134,7 +139,16 @@ class OwnerStoreControllerTest {
 				.content(registerBody("[\"VEGETABLE\"]", "\"\"", "[\"MONDAY\"]")))
 			.andExpect(status().isCreated());
 
-		assertThat(storeRepository.findByOwnerId(owner.getId()).orElseThrow().getPostalCode()).isNull();
+		Store store = storeRepository.findByOwnerId(owner.getId()).orElseThrow();
+		assertThat(store.getPostalCode()).isNull();
+		assertThat(domainEventRepository.findAll())
+			.filteredOn(event -> event.getEventType() == DomainEventType.STORE_REGISTER)
+			.singleElement()
+			.satisfies(event -> {
+				assertThat(event.getStoreId()).isEqualTo(store.getId());
+				assertThat(event.getUserId()).isEqualTo(owner.getId());
+				assertThat(event.getPayload()).containsEntry("storeName", "청과왕");
+			});
 	}
 
 	@Test
