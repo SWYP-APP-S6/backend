@@ -22,4 +22,8 @@ paths:
   - `@AutoConfigureTestDatabase` = `org.springframework.boot.jdbc.test.autoconfigure.*`
   - `TestEntityManager` = `org.springframework.boot.jpa.test.autoconfigure.*` (note: different module/package
     root than `@DataJpaTest` above — not `.data.jpa.test.`)
+- **`@Transactional` 테스트 안에서 `POST /holds`·`HoldService.create`를 부르지 않는다.** 생성은
+  `NOT_SUPPORTED`로 테스트 트랜잭션을 밀어내고 자기 트랜잭션을 열기 때문에 미커밋 픽스처가 보이지 않아 404가
+  난다. 그런 테스트는 `AppDataCleaner.clear()`를 `@BeforeEach`/`@AfterEach`에 두고 커밋된 데이터로 돈다.
+  이때 `LocalTime.MAX`는 PostgreSQL `time`에서 24:00:00으로 올림돼 영업시간 판정이 틀어지므로 `23:59`를 쓴다.
 - 완료 판정은 `./gradlew build`(컴파일+테스트) 초록으로.

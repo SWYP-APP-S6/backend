@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.swyp.backend.AppDataCleaner;
 import com.swyp.backend.RedisTestcontainersConfiguration;
 import com.swyp.backend.TestcontainersConfiguration;
 import com.swyp.backend.common.security.JwtTokenProvider;
@@ -36,6 +37,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.EnumSet;
 import java.util.Set;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,13 +46,14 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import({TestcontainersConfiguration.class, RedisTestcontainersConfiguration.class})
-@Transactional
 class HoldControllerTest {
+
+	@Autowired
+	AppDataCleaner appDataCleaner;
 
 	@Autowired
 	MockMvc mockMvc;
@@ -84,19 +87,20 @@ class HoldControllerTest {
 
 	@BeforeEach
 	void setUp() {
-		holdRepository.deleteAll();
-		notificationRepository.deleteAll();
-		productRepository.deleteAll();
-		storeRepository.deleteAll();
-		userRepository.deleteAll();
+		appDataCleaner.clear();
 
 		consumer = userRepository.saveAndFlush(
 				new User(UserRole.CONSUMER, "소비자", null, false, Instant.now()));
 		product = sellableProduct(3, LocalDateTime.now().plusHours(5));
 	}
 
+	@AfterEach
+	void tearDown() {
+		appDataCleaner.clear();
+	}
+
 	private Product sellableProduct(int qty, LocalDateTime pickupEndAt) {
-		return sellableProduct(qty, pickupEndAt, LocalTime.MIN, LocalTime.MAX,
+		return sellableProduct(qty, pickupEndAt, LocalTime.of(0, 0), LocalTime.of(23, 59),
 				EnumSet.allOf(DayOfWeek.class));
 	}
 

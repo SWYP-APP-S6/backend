@@ -2,6 +2,9 @@ package com.swyp.backend;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.connection.RedisConnection;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -10,7 +13,7 @@ public class AppDataCleaner {
 
 	private static final String TRUNCATE = """
 			truncate table
-				user_terms_agreements, terms_documents,
+				domain_events, user_terms_agreements, terms_documents,
 				holds, hold_cancel_credit_events, hold_cancel_credits,
 				notifications, user_device_tokens, products, stores, user_locations, users
 			restart identity cascade
@@ -19,10 +22,16 @@ public class AppDataCleaner {
 	@PersistenceContext
 	private EntityManager entityManager;
 
+	@Autowired
+	private RedisConnectionFactory redisConnectionFactory;
+
 	@Transactional
 	public void clear() {
 		entityManager.flush();
 		entityManager.clear();
 		entityManager.createNativeQuery(TRUNCATE).executeUpdate();
+		try (RedisConnection connection = redisConnectionFactory.getConnection()) {
+			connection.serverCommands().flushDb();
+		}
 	}
 }

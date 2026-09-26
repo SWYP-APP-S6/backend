@@ -7,7 +7,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.swyp.backend.AppDataCleaner;
 import com.swyp.backend.RedisTestcontainersConfiguration;
+import com.swyp.backend.analytics.entity.DomainEventType;
+import com.swyp.backend.analytics.repository.DomainEventRepository;
 import com.swyp.backend.TestcontainersConfiguration;
 import com.swyp.backend.common.exception.BusinessException;
 import com.swyp.backend.common.security.JwtTokenProvider;
@@ -36,6 +39,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -74,12 +78,21 @@ class OwnerStoreControllerTest {
 	@Autowired
 	StubGeocodingClient geocodingClient;
 
+	@Autowired
+	AppDataCleaner appDataCleaner;
+
+	@Autowired
+	DomainEventRepository domainEventRepository;
+
 	@BeforeEach
 	void setUp() {
 		geocodingClient.clear();
-		storeRepository.deleteAll();
-		notificationRepository.deleteAll();
-		userRepository.deleteAll();
+		appDataCleaner.clear();
+	}
+
+	@AfterEach
+	void tearDown() {
+		appDataCleaner.clear();
 	}
 
 	private User createUser(UserRole role) {
@@ -126,7 +139,16 @@ class OwnerStoreControllerTest {
 				.content(registerBody("[\"VEGETABLE\"]", "\"\"", "[\"MONDAY\"]")))
 			.andExpect(status().isCreated());
 
-		assertThat(storeRepository.findByOwnerId(owner.getId()).orElseThrow().getPostalCode()).isNull();
+		Store store = storeRepository.findByOwnerId(owner.getId()).orElseThrow();
+		assertThat(store.getPostalCode()).isNull();
+		assertThat(domainEventRepository.findAll())
+			.filteredOn(event -> event.getEventType() == DomainEventType.STORE_REGISTER)
+			.singleElement()
+			.satisfies(event -> {
+				assertThat(event.getStoreId()).isEqualTo(store.getId());
+				assertThat(event.getUserId()).isEqualTo(owner.getId());
+				assertThat(event.getPayload()).containsEntry("storeName", "청과왕");
+			});
 	}
 
 	@Test

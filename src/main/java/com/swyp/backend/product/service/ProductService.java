@@ -1,5 +1,7 @@
 package com.swyp.backend.product.service;
 
+import com.swyp.backend.analytics.entity.DomainEventType;
+import com.swyp.backend.analytics.function.DomainEventFunction;
 import com.swyp.backend.common.exception.BusinessException;
 import com.swyp.backend.common.response.PageResponse;
 import com.swyp.backend.common.storage.ImageStorage;
@@ -14,6 +16,7 @@ import com.swyp.backend.product.dto.ProductRegisterRequest;
 import com.swyp.backend.product.dto.StockReconfirmRequest;
 import com.swyp.backend.product.dto.StockUpdateRequest;
 import com.swyp.backend.product.entity.Product;
+import com.swyp.backend.product.entity.ProductStatus;
 import com.swyp.backend.product.entity.ProductCategory;
 import com.swyp.backend.product.exception.ProductErrorCode;
 import com.swyp.backend.product.function.ProductFunction;
@@ -44,6 +47,7 @@ public class ProductService {
 	private static final String PHOTO_CATEGORY = "products";
 
 	private final ProductFunction productFunction;
+	private final DomainEventFunction domainEventFunction;
 	private final HoldFunction holdFunction;
 	private final StoreFunction storeFunction;
 	private final RecipeFunction recipeFunction;
@@ -54,6 +58,13 @@ public class ProductService {
 	public ProductDetailResponse registerProduct(Long ownerId, ProductRegisterRequest request) {
 		Product product = buildProduct(ownerId, request);
 		productFunction.save(product);
+		domainEventFunction.record(DomainEventType.PRODUCT_REGISTER, product, ownerId, Map.of(
+				"category", product.getCategory().name(),
+				"initialQty", product.getInitialQty(),
+				"originalPrice", product.getOriginalPrice(),
+				"salePrice", product.getSalePrice(),
+				"discountRate", product.getDiscountRate(),
+				"pickupEndAt", product.getPickupEndAt().toString()));
 		return ProductDetailResponse.from(product, 0L, LocalDateTime.now(clock));
 	}
 
@@ -149,7 +160,24 @@ public class ProductService {
 			throw new BusinessException(ProductErrorCode.STOCK_LOCKED);
 		}
 
+		int stockBefore = product.getStockQty();
+		ProductStatus statusBefore = product.getStatus();
 		product.restock(request.stockQty());
+		domainEventFunction.record(DomainEventType.STOCK_ADJUST, product, ownerId, Map.of(
+				"stockBefore", stockBefore,
+				"stockAfter", product.getStockQty(),
+				"heldQty", product.getHeldQty(),
+				"availableAfter", product.getAvailableQty()));
+		if (product.shortfallQty() > 0) {
+			domainEventFunction.record(DomainEventType.OVERSELL_DETECTED, product, ownerId, Map.of(
+					"stockQty", product.getStockQty(),
+					"heldQty", product.getHeldQty(),
+					"shortfallQty", product.shortfallQty()));
+		}
+		if (statusBefore != ProductStatus.SOLD_OUT && product.getStatus() == ProductStatus.SOLD_OUT) {
+			domainEventFunction.record(DomainEventType.PRODUCT_SOLD_OUT, product, ownerId, Map.of(
+					"cause", "RESTOCK"));
+		}
 		return ProductDetailResponse.from(product, completedQtyOf(productId), now);
 	}
 
@@ -177,6 +205,12 @@ public class ProductService {
 		} else {
 			product.denyStockConfirmation(now);
 		}
+		domainEventFunction.record(
+				request.confirmed()
+						? DomainEventType.STOCK_RECONFIRM_YES
+						: DomainEventType.STOCK_RECONFIRM_NO,
+				product, ownerId,
+				Map.of("stockQty", product.getStockQty(), "heldQty", product.getHeldQty()));
 		return ProductDetailResponse.from(
 				product, completedQtyOf(productId), LocalDateTime.now(clock));
 	}
