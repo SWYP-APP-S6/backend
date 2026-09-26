@@ -5,6 +5,7 @@ import com.swyp.backend.hold.dto.ActiveHoldQty;
 import com.swyp.backend.hold.dto.HoldRef;
 import com.swyp.backend.hold.dto.HoldStatusCount;
 import com.swyp.backend.hold.dto.OverdueHold;
+import com.swyp.backend.hold.dto.AdminHoldQuery;
 import com.swyp.backend.hold.dto.OwnerHoldFilter;
 import com.swyp.backend.hold.dto.OwnerHoldStatus;
 import com.swyp.backend.hold.dto.ProductHoldId;
@@ -231,6 +232,18 @@ public class HoldFunction {
 				filter == null ? null : filter.status(),
 				filter == null ? null : filter.canceledBy(),
 				PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sortFor(filter)));
+	}
+
+	public Page<Hold> findForAdmin(AdminHoldQuery query, Pageable pageable) {
+		return holdRepository.findForAdmin(
+				query.storeId(),
+				query.productId(),
+				query.userId(),
+				query.status(),
+				PageRequest.of(
+						pageable.getPageNumber(),
+						pageable.getPageSize(),
+						Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by(Sort.Direction.DESC, "id"))));
 	}
 
 	public Page<Hold> findUserHolds(Long userId, Pageable pageable) {

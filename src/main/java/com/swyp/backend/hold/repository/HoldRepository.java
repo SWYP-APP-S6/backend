@@ -236,6 +236,30 @@ public interface HoldRepository extends JpaRepository<Hold, Long> {
 			@Param("canceledBy") HoldCanceledBy canceledBy,
 			Pageable pageable);
 
+	@Query(value = """
+			select h from Hold h
+			join fetch h.user
+			join fetch h.store
+			join fetch h.product
+			where (:storeId is null or h.store.id = :storeId)
+				and (:productId is null or h.product.id = :productId)
+				and (:userId is null or h.user.id = :userId)
+				and (:status is null or h.status = :status)
+			""",
+			countQuery = """
+			select count(h) from Hold h
+			where (:storeId is null or h.store.id = :storeId)
+				and (:productId is null or h.product.id = :productId)
+				and (:userId is null or h.user.id = :userId)
+				and (:status is null or h.status = :status)
+			""")
+	Page<Hold> findForAdmin(
+			@Param("storeId") Long storeId,
+			@Param("productId") Long productId,
+			@Param("userId") Long userId,
+			@Param("status") HoldStatus status,
+			Pageable pageable);
+
 	@Query("""
 			select h from Hold h
 			join fetch h.user
