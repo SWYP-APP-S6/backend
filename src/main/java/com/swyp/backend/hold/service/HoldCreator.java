@@ -78,7 +78,7 @@ public class HoldCreator {
 		domainEventFunction.record(DomainEventType.HOLD_CREATE, holdOf(group, product), Map.of(
 				"addedQty", request.qty(),
 				"merged", existing.isPresent(),
-				"expiresAt", slot.expiresAt().toString()));
+				"expiresAt", slot.expiresAt().atZone(clock.getZone()).toOffsetDateTime().toString()));
 		if (product.getStatus() == ProductStatus.SOLD_OUT) {
 			domainEventFunction.record(DomainEventType.PRODUCT_SOLD_OUT, product, userId, Map.of(
 					"cause", "HOLD"));
