@@ -71,6 +71,12 @@ public class HoldCancelCredit extends BaseTimeEntity {
 		return credits - before;
 	}
 
+	public int adjust(int delta, int max) {
+		int before = credits;
+		credits = Math.max(0, Math.min(max, credits + delta));
+		return credits - before;
+	}
+
 	public boolean isEmpty() {
 		return credits == 0;
 	}

@@ -4,5 +4,6 @@ public enum HoldCancelCreditReason {
 	CANCEL,
 	NO_SHOW,
 	REFILL,
-	GIVE_BACK
+	GIVE_BACK,
+	ADMIN_ADJUST
 }

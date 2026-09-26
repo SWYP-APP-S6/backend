@@ -39,6 +39,10 @@ public class TermsFunction {
 		return userTermsAgreementRepository.saveAll(agreements);
 	}
 
+	public List<UserTermsAgreement> findAgreementsOf(Long userId) {
+		return userTermsAgreementRepository.findAllOfUser(userId);
+	}
+
 	public void deleteAgreementsOf(Long userId) {
 		userTermsAgreementRepository.deleteByUserId(userId);
 	}

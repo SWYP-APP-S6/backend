@@ -226,6 +226,14 @@ public class HoldFunction {
 						Long::sum));
 	}
 
+	public Map<OwnerHoldStatus, Long> countUserHoldsByOwnerStatus(Long userId) {
+		return holdRepository.countUserHoldsByStatus(userId).stream()
+				.collect(Collectors.toMap(
+						count -> OwnerHoldStatus.of(count.status(), count.canceledBy()),
+						HoldStatusCount::count,
+						Long::sum));
+	}
+
 	public Page<Hold> findStoreHolds(Long storeId, OwnerHoldFilter filter, Pageable pageable) {
 		return holdRepository.findStoreHolds(
 				storeId,
