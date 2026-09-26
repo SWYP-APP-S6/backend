@@ -17,6 +17,14 @@ public interface HoldCancelCreditEventRepository
 			""")
 	List<Long> findChargedHoldIds(@Param("holdIds") Collection<Long> holdIds);
 
+	@Query("""
+			select e from HoldCancelCreditEvent e
+			left join fetch e.hold
+			where e.user.id = :userId
+			order by e.createdAt desc, e.id desc
+			""")
+	List<HoldCancelCreditEvent> findAllOfUser(@Param("userId") Long userId);
+
 	@Modifying
 	@Query("""
 			delete from HoldCancelCreditEvent e

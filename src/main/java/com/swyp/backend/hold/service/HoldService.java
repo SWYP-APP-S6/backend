@@ -7,12 +7,12 @@ import com.swyp.backend.common.exception.BusinessException;
 import com.swyp.backend.common.response.PageResponse;
 import com.swyp.backend.hold.HoldProperties;
 import com.swyp.backend.hold.dto.ActiveHoldResponse;
+import com.swyp.backend.hold.dto.CancelCreditBalance;
 import com.swyp.backend.hold.dto.HoldCreateRequest;
 import com.swyp.backend.hold.dto.HoldDetailResponse;
 import com.swyp.backend.hold.dto.HoldHistoryResponse;
 import com.swyp.backend.hold.dto.HoldSummaryResponse;
 import com.swyp.backend.hold.entity.Hold;
-import com.swyp.backend.hold.entity.HoldCancelCredit;
 import com.swyp.backend.hold.entity.HoldCancelCreditReason;
 import com.swyp.backend.hold.entity.HoldCanceledBy;
 import com.swyp.backend.hold.entity.HoldStatus;
@@ -139,27 +139,12 @@ public class HoldService {
 
 	public ActiveHoldResponse getActiveHold(Long userId) {
 		Instant now = Instant.now(clock);
-		HoldCancelCredit credit = creditsAsOf(userId, now);
+		CancelCreditBalance credit = holdCancelCreditFunction.balanceAsOf(userId, now);
 		List<Hold> active = holdFunction.findActiveGroupOf(userId, now);
 		return new ActiveHoldResponse(
 				active.isEmpty() ? null : HoldDetailResponse.of(active, now, clock.getZone()),
-				credit.getCredits(),
-				credit.nextRefillAt(
-						holdProperties.cancelCreditRefill(), holdProperties.cancelCreditMax()));
-	}
-
-	private HoldCancelCredit creditsAsOf(Long userId, Instant now) {
-		HoldCancelCredit credit = holdCancelCreditFunction.findOf(userId)
-				.orElseGet(() -> new HoldCancelCredit(
-						null, holdProperties.cancelCreditMax(), now));
-		credit.refill(now, holdProperties.cancelCreditRefill(), holdProperties.cancelCreditMax());
-		credit.spend((int) holdFunction
-				.findUnchargedNoShows(userId, now.minus(holdProperties.noShowGrace()))
-				.stream()
-				.map(Hold::getGroupId)
-				.distinct()
-				.count());
-		return credit;
+				credit.credits(),
+				credit.nextRefillAt());
 	}
 
 	private Map<Long, Product> lockProducts(List<Long> productIds) {

@@ -216,6 +216,14 @@ public interface HoldRepository extends JpaRepository<Hold, Long> {
 			""")
 	List<HoldStatusCount> countStoreHoldsByStatus(@Param("storeId") Long storeId);
 
+	@Query("""
+			select new com.swyp.backend.hold.dto.HoldStatusCount(h.status, h.canceledBy, count(h))
+			from Hold h
+			where h.user.id = :userId
+			group by h.status, h.canceledBy
+			""")
+	List<HoldStatusCount> countUserHoldsByStatus(@Param("userId") Long userId);
+
 	@Query(value = """
 			select h from Hold h
 			join fetch h.user
