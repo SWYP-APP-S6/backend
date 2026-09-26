@@ -63,6 +63,11 @@ public class FcmPushSender implements PushSender {
 	}
 
 	@Override
+	public boolean isEnabled() {
+		return credentials != null;
+	}
+
+	@Override
 	public Result send(String fcmToken, PushMessage message) {
 		if (credentials == null) {
 			return Result.DISABLED;

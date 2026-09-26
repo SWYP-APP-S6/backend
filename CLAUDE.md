@@ -62,7 +62,9 @@
   `PushSender`(FCM HTTP v1 — `google-auth-library`로 토큰만 받고 `messages:send`는 `RestClient`)가
   한다. 키(`fcm.*`)가 없으면 **발송만 꺼지고** 알림함은 그대로다(fail-closed). 수신처는
   `user_device_tokens`이고 앱이 `POST`/`DELETE /notifications/device-tokens`로 등록·해제한다 —
-  로그아웃 때 지우지 않으면 그 기기를 이어 쓰는 다음 사람이 남의 푸시를 받는다.
+  로그아웃 때 지우지 않으면 그 기기를 이어 쓰는 다음 사람이 남의 푸시를 받는다. 관리자는
+  `GET /admin/notifications/push-summary`로 상태별 건수를 보고 `POST /admin/notifications/{id}/push-retry`로
+  FAILED·SKIPPED만 즉시 다시 보낸다(배치 밖에서 `deliver`를 직접 부르므로 stale 기한을 타지 않는다).
   **딥링크는 `notification.DeepLinks`에서만 만든다** — `mangro://` + 그 화면이 부르는 API 경로
   (`holds/{id}` · `owner/holds/{id}` · `owner/products/{id}`)라 앱이 경로를 그대로 조회에 쓴다.
   `notify()`에 `null`을 넘기면 푸시를 탭해도 앱이 열 화면을 모른다.

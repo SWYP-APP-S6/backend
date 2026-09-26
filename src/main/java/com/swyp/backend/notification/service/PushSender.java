@@ -6,6 +6,10 @@ public interface PushSender {
 
 	Result send(String fcmToken, PushMessage message);
 
+	default boolean isEnabled() {
+		return true;
+	}
+
 	enum Result {
 		DELIVERED,
 		TOKEN_GONE,

@@ -1,6 +1,9 @@
 package com.swyp.backend.notification.repository;
 
 import com.swyp.backend.notification.dto.PendingPush;
+import java.time.Instant;
+import com.swyp.backend.notification.entity.NotificationType;
+import com.swyp.backend.notification.dto.PushStateCount;
 import com.swyp.backend.notification.entity.Notification;
 import com.swyp.backend.notification.entity.NotificationPushState;
 import java.util.List;
@@ -31,6 +34,39 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
 			""")
 	List<PendingPush> findPendingPushes(
 			@Param("pushState") NotificationPushState pushState, Pageable pageable);
+
+	@Query("""
+			select new com.swyp.backend.notification.dto.PushStateCount(n.pushState, count(n))
+			from Notification n
+			where n.createdAt >= :since
+			group by n.pushState
+			""")
+	List<PushStateCount> countByPushStateSince(@Param("since") Instant since);
+
+	@Query("""
+			select min(n.createdAt) from Notification n
+			where n.pushState = com.swyp.backend.notification.entity.NotificationPushState.PENDING
+			""")
+	Optional<Instant> findOldestPendingCreatedAt();
+
+	@Query(value = """
+			select n from Notification n
+			join fetch n.user
+			where (:pushState is null or n.pushState = :pushState)
+				and (:userId is null or n.user.id = :userId)
+				and (:type is null or n.type = :type)
+			""",
+			countQuery = """
+			select count(n) from Notification n
+			where (:pushState is null or n.pushState = :pushState)
+				and (:userId is null or n.user.id = :userId)
+				and (:type is null or n.type = :type)
+			""")
+	Page<Notification> findForAdmin(
+			@Param("pushState") NotificationPushState pushState,
+			@Param("userId") Long userId,
+			@Param("type") NotificationType type,
+			Pageable pageable);
 
 	@Modifying
 	@Query("delete from Notification n where n.user.id = :userId")
