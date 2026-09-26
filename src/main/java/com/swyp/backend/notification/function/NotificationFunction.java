@@ -1,7 +1,9 @@
 package com.swyp.backend.notification.function;
 
 import com.swyp.backend.common.exception.BusinessException;
+import com.swyp.backend.notification.dto.AdminNotificationQuery;
 import com.swyp.backend.notification.dto.PendingPush;
+import com.swyp.backend.notification.dto.PushStateCount;
 import com.swyp.backend.notification.entity.Notification;
 import com.swyp.backend.notification.entity.NotificationPushState;
 import com.swyp.backend.notification.entity.NotificationType;
@@ -9,6 +11,10 @@ import com.swyp.backend.notification.exception.NotificationErrorCode;
 import com.swyp.backend.notification.repository.NotificationRepository;
 import com.swyp.backend.user.entity.User;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.Optional;
+import java.util.Map;
+import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -42,6 +48,26 @@ public class NotificationFunction {
 	public List<PendingPush> findPendingPushes(int batchSize) {
 		return notificationRepository.findPendingPushes(
 				NotificationPushState.PENDING, PageRequest.of(0, batchSize));
+	}
+
+	public Map<NotificationPushState, Long> countByPushStateSince(Instant since) {
+		return notificationRepository.countByPushStateSince(since).stream()
+				.collect(Collectors.toMap(PushStateCount::state, PushStateCount::count));
+	}
+
+	public Optional<Instant> findOldestPendingAt() {
+		return notificationRepository.findOldestPendingCreatedAt();
+	}
+
+	public Page<Notification> findForAdmin(AdminNotificationQuery query, Pageable pageable) {
+		return notificationRepository.findForAdmin(
+				query.pushState(),
+				query.userId(),
+				query.type(),
+				PageRequest.of(
+						pageable.getPageNumber(),
+						pageable.getPageSize(),
+						Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by(Sort.Direction.DESC, "id"))));
 	}
 
 	public Notification getById(Long notificationId) {

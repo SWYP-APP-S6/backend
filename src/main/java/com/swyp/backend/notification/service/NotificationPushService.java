@@ -1,7 +1,11 @@
 package com.swyp.backend.notification.service;
 
 import com.swyp.backend.notification.NotificationPushProperties;
+import com.swyp.backend.common.exception.BusinessException;
 import com.swyp.backend.notification.dto.PendingPush;
+import com.swyp.backend.notification.entity.Notification;
+import com.swyp.backend.notification.entity.NotificationPushState;
+import com.swyp.backend.notification.exception.NotificationErrorCode;
 import com.swyp.backend.notification.entity.UserDeviceToken;
 import com.swyp.backend.notification.function.DeviceTokenFunction;
 import com.swyp.backend.notification.function.NotificationFunction;
@@ -41,6 +45,28 @@ public class NotificationPushService {
 			log.info("Pushed {} notifications", delivered);
 		}
 		return delivered;
+	}
+
+	public void resend(Long notificationId) {
+		Notification notification = notificationFunction.getById(notificationId);
+		if (notification.getPushState() != NotificationPushState.FAILED
+				&& notification.getPushState() != NotificationPushState.SKIPPED) {
+			throw new BusinessException(NotificationErrorCode.PUSH_NOT_RESENDABLE);
+		}
+		PendingPush pending = new PendingPush(
+				notification.getId(),
+				notification.getUser().getId(),
+				notification.getType(),
+				notification.getTitle(),
+				notification.getBody(),
+				notification.getDeepLink(),
+				notification.getCreatedAt());
+		List<UserDeviceToken> deviceTokens = deviceTokenFunction.findTokensOf(pending.userId());
+		if (deviceTokens.isEmpty()) {
+			notificationPusher.skip(pending.notificationId());
+			return;
+		}
+		deliver(pending, deviceTokens);
 	}
 
 	private boolean dispatchQuietly(PendingPush pending, Instant staleBefore) {
