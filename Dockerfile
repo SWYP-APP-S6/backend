@@ -9,7 +9,7 @@ COPY settings.gradle.kts build.gradle.kts ./
 RUN ./gradlew --no-daemon dependencies --quiet || true
 
 COPY src ./src
-# Skip tests here: they run a real MySQL/Redis via Testcontainers (Docker), unavailable inside this
+# Skip tests here: they run a real PostgreSQL/Redis via Testcontainers (Docker), unavailable inside this
 # build container. Tests are gated in CI (./gradlew build), not in the image build.
 RUN ./gradlew --no-daemon clean bootJar -x test
 
