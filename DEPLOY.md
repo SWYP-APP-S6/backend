@@ -4,7 +4,7 @@ Naver Cloud Platform 단일 VM 위에 `docker compose` 로 전체 스택(app + P
 띄운다. 앱은 루프백에만 바인딩되고, 외부 트래픽은 nginx 가 리버스 프록시로 넘긴다.
 
 ```
-인터넷 ──443/80──> nginx (VM) ──127.0.0.1:8080──> app 컨테이너
+인터넷 ──443/80──> nginx (VM) ──127.0.0.1:8080──> app 컨테이너   (dev 스택은 아래 "dev 서버")
                                                     │
                                         도커 네트워크 ├─> postgres 컨테이너
                                                     └─> redis 컨테이너
@@ -12,17 +12,24 @@ Naver Cloud Platform 단일 VM 위에 `docker compose` 로 전체 스택(app + P
 
 ## 배포하는 법
 
+브랜치 흐름은 **feature → `dev` → `main`** 이다. 기능 PR 은 `dev` 로 merge 해 dev 서버에서 확인하고,
+릴리스 때 `dev → main` PR 로 운영에 올린다.
+
 ```bash
 ssh root@<서버 IP>
-deploy
+prod    # 운영: ~/backend     ← main
+dev     # dev:  ~/backend-dev ← dev
 ```
 
-`/usr/local/bin/deploy` 는 서버에 직접 둔 한 줄짜리 래퍼다(레포에는 없다):
+둘 다 서버에 직접 둔 한 줄짜리 래퍼다(레포에는 없다). `/usr/local/bin/prod`:
 
 ```sh
 #!/bin/sh
 exec su - deploy -c /home/deploy/backend/scripts/deploy.sh
 ```
+
+`/usr/local/bin/dev` 는 경로만 `/home/deploy/backend-dev/...` 로 다르다. 예전 이름 `deploy` 래퍼가
+남아 있으면 `mv /usr/local/bin/deploy /usr/local/bin/prod` 로 바꾼다.
 
 **배포는 항상 `deploy` 유저로 돌아야 한다** — root 로 `docker compose` 를 돌리면 컨테이너와
 볼륨이 root 소유로 생겨 기존 것과 섞인다. 래퍼가 `su - deploy` 로 넘기므로 로그인 셸이 새로
@@ -34,7 +41,7 @@ exec su - deploy -c /home/deploy/backend/scripts/deploy.sh
 cd ~/backend && ./scripts/deploy.sh
 ```
 
-[`scripts/deploy.sh`](scripts/deploy.sh) 가 `git pull` → `docker compose --profile app up -d --build`
+[`scripts/deploy.sh`](scripts/deploy.sh) 가 `.env` 의 `DEPLOY_BRANCH`(기본 `main`)로 checkout·pull → `docker compose --profile app up -d --build`
 → `/ping` 헬스체크(최대 200초) → 이미지·빌드캐시 정리까지 한다. 헬스체크가 실패하면 앱 로그를
 남기고 실패로 끝난다.
 
@@ -103,6 +110,10 @@ Killer 가 **관계없는 컨테이너**를 죽인다.
 | postgres | 512m | `shared_buffers` 기본값(128MB) 대비 여유 |
 | redis | 320m | `maxmemory 256mb` 위의 오버헤드 여유분 |
 
+dev 스택을 함께 띄우면(아래 "dev 서버") 상시 사용량이 ~2.1GB → ~3.2GB 로 늘고, 빌드 순간의
+여유는 swap 이 맡는다. 배포가 눈에 띄게 느려지거나 OOM 이 보이면 VM 을 8GB 로 올리는 것을 먼저
+검토한다 — VM 을 하나 더 두는 것보다 싸고, 관리 대상(nginx·인증서·swap·`.env`)이 늘지 않는다.
+
 나머지(~1.9GB)는 OS 와 **배포 중 Gradle 빌드**(순간 1.5~2GB) 몫이다. 이 순간의 안전망으로
 서버에 swap 4GB + `vm.swappiness=10` 을 걸어둔다(OS 레벨이라 레포로 관리되지 않는 서버별 수동 설정).
 
@@ -118,6 +129,57 @@ fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /
 free -h        # Swap 이 4Gi 인지 확인
 ```
 `/etc/fstab` 에 `/swapfile none swap sw 0 0` 이 이미 있으면 재부팅 후에도 유지된다.
+
+## dev 서버
+
+운영과 **같은 VM** 에 compose 프로젝트를 하나 더 띄운다. 실사용자가 적어 dev 가 운영 자원을
+잠깐 나눠 쓰는 위험이 VM 을 하나 더 두는 비용보다 작다고 판단했다. 파일(`compose.yaml`·
+`deploy.sh`)은 운영과 같고, 다른 건 체크아웃 디렉터리와 `.env` 뿐이다.
+
+```
+api.mangro.cloud      ──> nginx ──127.0.0.1:8080──>  ~/backend      (프로젝트 backend)
+dev-api.mangro.cloud  ──> nginx ──127.0.0.1:18080──> ~/backend-dev  (프로젝트 backend-dev)
+```
+
+compose 는 **프로젝트 이름(= 디렉터리 이름)** 으로 볼륨·네트워크·컨테이너를 가르므로 DB·Redis
+데이터는 저절로 분리된다. 겹칠 수 있는 건 호스트 포트와 메모리뿐이라 그 둘만 `.env` 로 바꾼다.
+
+| 서비스 | dev 상한 | 비고 |
+|---|---|---|
+| app | 768m | 힙 ~576MB(`MaxRAMPercentage=75`). 이보다 낮추면 메타스페이스·스레드 몫이 모자라다 |
+| postgres | 256m | 데이터가 적어 `shared_buffers` 기본값(128MB)으로 충분 |
+| redis | 128m | `maxmemory 64mb` |
+
+### 처음 한 번 (서버)
+
+1. **DNS**: `dev-api.mangro.cloud` A 레코드 → 운영과 같은 IP.
+2. **체크아웃** (`deploy` 유저): `git clone https://github.com/SWYP-APP-S6/backend.git ~/backend-dev`.
+   디렉터리 이름이 곧 프로젝트 이름이므로 **`backend-dev` 그대로** 둔다.
+3. **`.env`**: `deploy.env.example` 을 복사하고 맨 아래 dev 블록의 주석을 푼다. 비밀값은 **운영과
+   다른 값으로 새로 만든다** — `JWT_SECRET` 이 같으면 dev 토큰이 운영에서 통한다. 카카오 앱 ID 는
+   같아도 된다. FCM 은 비워 두면 dev 에서 푸시만 꺼진다.
+   `SPRING_PROFILES_ACTIVE` 는 비워 swagger 를 열어 둔다. **`COMPOSE_PROJECT_NAME` 은 운영·dev
+   어느 쪽에도 넣지 않는다** — 운영에 넣으면 볼륨 이름(`backend_postgres-data`)이 바뀌어 빈 DB 로 뜬다.
+4. **업로드 디렉터리**: `/srv/mangro-dev/uploads` 를 운영 업로드 디렉터리와 같은 소유자·권한으로 만든다.
+5. **nginx**: 운영 `server` 블록을 복사해 `server_name` 을 `dev-api.mangro.cloud`, upstream 을
+   `127.0.0.1:18080`, `/uploads` 경로를 `/srv/mangro-dev/uploads` 로 바꾸고 인증서를 발급한다.
+6. **배포 래퍼** `/usr/local/bin/dev` (운영 `prod` 와 경로만 다르다 — 위 "배포하는 법"):
+   ```sh
+   #!/bin/sh
+   exec su - deploy -c /home/deploy/backend-dev/scripts/deploy.sh
+   ```
+7. 첫 배포 후 관리자 계정은 dev DB 에 따로 만든다(`scripts/create_admins.sh`).
+
+### 브랜치 고정
+
+`deploy.sh` 는 체크아웃 상태와 무관하게 `.env` 의 `DEPLOY_BRANCH` 로 checkout 한 뒤 pull 한다 —
+운영 `.env` 에는 이 값이 없어 `main`, dev `.env` 는 `dev`. 서버 체크아웃에서 브랜치를 손으로 바꿔
+둬도 다음 배포가 되돌린다.
+
+dev DB 에 먼저 적용된 마이그레이션이 그 뒤 수정되면 Flyway 체크섬 검증에서 기동이 멈춘다. 운영
+DB 와는 무관하니 `docker compose --profile app down -v` 로 **dev 볼륨만** 지우고 다시 올리면 된다.
+**`down -v` 는 반드시 `~/backend-dev` 에서 실행한다** — 운영 디렉터리에서 실행하면 운영 DB 가
+사라진다.
 
 ## 참고
 

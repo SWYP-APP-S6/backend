@@ -116,7 +116,7 @@
    끝났다고 자동으로 커밋하지 않는다 — 코드 생성과 "커밋 → 푸시 → PR"은 완전히 별개 단계다.
 6. 코드 변경 후 리뷰한다: `./gradlew build`(컴파일+테스트 — Testcontainers가 실제 PostgreSQL을
    띄우므로 **Docker 필요**) 통과 → cross-cutting(인증/인가, 입력 검증, 트랜잭션 경계, 에러 처리,
-   로깅, 보안) → 코드 품질(타입·중복·네이밍·단일 책임). CI가 PR·main push마다 같은 `build`를 돌린다.
+   로깅, 보안) → 코드 품질(타입·중복·네이밍·단일 책임). CI가 `main`·`dev`로 가는 PR·push마다 같은 `build`를 돌린다.
 7. 리팩터 전, 회귀를 잡을 테스트가 있는지 확인한다. 얇으면 테스트를 먼저 쓴다.
 8. 선행 리팩터는 기능과 분리한다 — refactor → review → feature로 쪼갤 수 있게 작업한다.
 9. **리뷰 중 발견한 범위 밖 개선은 묻어두지 않는다** — 발견마다 지금 고칠지/넘어갈지 판단하고 이유와
@@ -157,12 +157,18 @@
 ## Deployment
 
 - **NCP 단일 VM + `docker compose`**(app/postgres/redis) + 앞단 nginx. 배포는 **서버가 끌어온다** —
-  `ssh deploy@<서버>` → `cd ~/backend && ./scripts/deploy.sh`. 절차·필수 env·운영 명령어·메모리
+  `ssh root@<서버>` → `prod`(운영, `main`) / `dev`(dev 서버, `dev`). 브랜치 흐름은
+  **feature → `dev` → `main`**: 기능 PR은 `dev`로(`/pr`의 base), 릴리스는 `dev → main` PR. 절차·필수 env·운영 명령어·메모리
   배분은 [`DEPLOY.md`](DEPLOY.md), 서버 `.env` 템플릿은 `deploy.env.example`.
 - **GitHub Actions로 배포하지 않는다** — 저장소가 public이라 self-hosted runner를 붙이면 fork의 PR이
   배포 호스트에서 코드를 실행할 수 있다(근거는 DEPLOY.md). CI의 `build` job은 PR·push마다 계속 돈다.
 - `compose.yaml`은 **로컬과 운영이 같은 파일**이다 — 운영 전용 값은 서버 `.env`로만 주입하고, 파일에
   적힌 기본값은 전부 로컬용이다.
+- **dev 서버는 같은 VM의 두 번째 compose 프로젝트**다(`~/backend-dev` → `dev-api.mangro.cloud`).
+  `deploy.sh`가 `.env`의 `DEPLOY_BRANCH`(기본 `main`)로 checkout하므로 브랜치는 서버 `.env`가 고정한다.
+  프로젝트 이름(= 디렉터리 이름)이 볼륨·네트워크를 가르고, 겹치는 호스트 포트·`mem_limit`만 `.env`로
+  비켜 간다 — 그래서 `compose.yaml`의 포트·메모리 값은 하드코딩하지 않고 `${VAR:-운영 기본값}`으로
+  둔다. 비밀값(특히 `JWT_SECRET`)은 운영과 공유하지 않는다. 절차는 DEPLOY.md "dev 서버".
 
 ## Language policy
 

@@ -3,6 +3,7 @@ updates:
   # Gradle dependencies (Spring, jjwt, springdoc, archunit, …)
   - package-ecosystem: gradle
     directory: "/"
+    target-branch: dev
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
@@ -14,5 +15,6 @@ updates:
   # GitHub Actions versions used in the workflows
   - package-ecosystem: github-actions
     directory: "/"
+    target-branch: dev
     schedule:
       interval: weekly
