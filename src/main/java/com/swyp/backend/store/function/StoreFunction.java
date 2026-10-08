@@ -5,6 +5,7 @@ import com.swyp.backend.store.entity.Store;
 import com.swyp.backend.store.entity.StoreStatus;
 import com.swyp.backend.store.exception.StoreErrorCode;
 import com.swyp.backend.store.repository.StoreRepository;
+import com.swyp.backend.user.entity.User;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import java.math.BigDecimal;
@@ -61,6 +62,14 @@ public class StoreFunction {
 			BigDecimal maxLongitude) {
 		return storeRepository.findByStatusAndOwnerTesterAndLatitudeBetweenAndLongitudeBetween(
 				StoreStatus.APPROVED, tester, minLatitude, maxLatitude, minLongitude, maxLongitude);
+	}
+
+	public void copyOwnedStoreTo(User owner, User testOwner) {
+		if (storeRepository.existsByOwnerId(testOwner.getId())) {
+			return;
+		}
+		storeRepository.findByOwnerId(owner.getId())
+				.ifPresent(store -> save(store.copyForTesting(testOwner)));
 	}
 
 	public Store save(Store store) {

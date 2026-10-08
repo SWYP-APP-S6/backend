@@ -5,6 +5,7 @@ import com.swyp.backend.common.security.AuthErrorCode;
 import com.swyp.backend.common.security.JwtTokenProvider;
 import com.swyp.backend.common.security.RefreshTokenService;
 import com.swyp.backend.common.security.TokenRealm;
+import com.swyp.backend.store.function.StoreFunction;
 import com.swyp.backend.terms.entity.TermsType;
 import com.swyp.backend.terms.function.TermsFunction;
 import com.swyp.backend.user.dto.KakaoLoginResponse;
@@ -40,6 +41,7 @@ public class UserAuthService {
 	private final JwtTokenProvider tokenProvider;
 	private final RefreshTokenService refreshTokenService;
 	private final TermsFunction termsFunction;
+	private final StoreFunction storeFunction;
 	private final Clock clock;
 
 	public KakaoTokenExchangeResponse exchangeKakaoCode(UserRole role, String code, String redirectUri) {
@@ -99,6 +101,7 @@ public class UserAuthService {
 			}
 			account.enterTestMode();
 			target = userFunction.getOrCreateTestAccountOf(account, Instant.now(clock));
+			storeFunction.copyOwnedStoreTo(account, target);
 		} else {
 			account.leaveTestMode();
 			target = account;

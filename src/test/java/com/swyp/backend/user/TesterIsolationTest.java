@@ -322,6 +322,36 @@ class TesterIsolationTest {
 	}
 
 	@Test
+	void grantingAnOwnerCopiesTheirStoreIntoTheTestAccount() throws Exception {
+		User owner = new User(UserRole.OWNER, "가게 주인", null, false, Instant.now());
+		owner.linkOauthAccount("kakao", "kakao-store-owner");
+		Store original = store(userRepository.saveAndFlush(owner), "성문청과");
+
+		mockMvc.perform(permission(owner, true).header("Authorization", admin()))
+			.andExpect(status().isOk());
+		mockMvc.perform(permission(owner, true).header("Authorization", admin()))
+			.andExpect(status().isOk());
+
+		User testOwner = userRepository.findByOauthProviderAndOauthProviderIdAndRoleAndTester(
+				"kakao", "kakao-store-owner", UserRole.OWNER, true).orElseThrow();
+		Store copy = storeRepository.findByOwnerId(testOwner.getId()).orElseThrow();
+		assertThat(copy.getId()).isNotEqualTo(original.getId());
+		assertThat(copy.getName()).isEqualTo("[테스트] 성문청과");
+		assertThat(copy.getStatus()).isEqualTo(original.getStatus());
+		assertThat(copy.getLatitude()).isEqualByComparingTo(original.getLatitude());
+		assertThat(copy.getLongitude()).isEqualByComparingTo(original.getLongitude());
+
+		mockMvc.perform(get("/stores/" + original.getId() + "/products").header("Authorization", bearer(consumer)))
+			.andExpect(status().isOk());
+		mockMvc.perform(get("/stores/" + copy.getId() + "/products").header("Authorization", bearer(consumer)))
+			.andExpect(status().isNotFound());
+		mockMvc.perform(get("/stores/" + copy.getId() + "/products").header("Authorization", bearer(testerConsumer)))
+			.andExpect(status().isOk());
+		mockMvc.perform(get("/stores/" + original.getId() + "/products").header("Authorization", bearer(testerConsumer)))
+			.andExpect(status().isNotFound());
+	}
+
+	@Test
 	void onlyAKakaoAccountCanBeGranted() throws Exception {
 		mockMvc.perform(permission(consumer, true).header("Authorization", admin()))
 			.andExpect(status().isConflict())

@@ -35,6 +35,8 @@ import lombok.NoArgsConstructor;
 public class Store extends BaseTimeEntity {
 
 	private static final int MAX_CATEGORIES = 3;
+	private static final int NAME_MAX_LENGTH = 100;
+	private static final String TEST_COPY_PREFIX = "[테스트] ";
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -119,6 +121,27 @@ public class Store extends BaseTimeEntity {
 		this.businessOpenTime = businessOpenTime;
 		this.businessCloseTime = businessCloseTime;
 		this.status = StoreStatus.PENDING;
+	}
+
+	public Store copyForTesting(User testOwner) {
+		String copyName = TEST_COPY_PREFIX + name;
+		Store copy = new Store(
+				testOwner,
+				copyName.length() > NAME_MAX_LENGTH ? copyName.substring(0, NAME_MAX_LENGTH) : copyName,
+				postalCode,
+				address,
+				addressDetail,
+				phone,
+				latitude,
+				longitude,
+				businessOpenTime,
+				businessCloseTime);
+		copy.categories.addAll(categories);
+		copy.businessDays.addAll(businessDays);
+		copy.status = status;
+		copy.businessRegistrationNumber = businessRegistrationNumber;
+		copy.applicationNote = applicationNote;
+		return copy;
 	}
 
 	public Set<StoreCategory> getCategories() {
