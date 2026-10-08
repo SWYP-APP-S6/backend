@@ -1,6 +1,7 @@
 package com.swyp.backend.user.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -12,6 +13,8 @@ import com.swyp.backend.AppDataCleaner;
 import com.swyp.backend.RedisTestcontainersConfiguration;
 import com.swyp.backend.TestcontainersConfiguration;
 import com.swyp.backend.common.exception.BusinessException;
+import com.swyp.backend.common.security.JwtTokenProvider;
+import com.swyp.backend.common.security.TokenRealm;
 import com.swyp.backend.terms.entity.TermsDocument;
 import com.swyp.backend.terms.entity.TermsRequirement;
 import com.swyp.backend.terms.entity.TermsType;
@@ -60,6 +63,9 @@ class UserAuthFlowTest {
 
 	@Autowired
 	JdbcTemplate jdbcTemplate;
+
+	@Autowired
+	JwtTokenProvider tokenProvider;
 
 	private ResultActions login(UserRole role, String kakaoToken) throws Exception {
 		String path = role == UserRole.CONSUMER ? "/auth/consumer/kakao" : "/auth/owner/kakao";
@@ -269,6 +275,38 @@ class UserAuthFlowTest {
 			.andExpect(jsonPath("$.data.nickname").value("팀원"));
 		assertThat(userRepository.findByOauthProviderAndOauthProviderIdAndRoleAndTester(
 				"kakao", "kakao-1010", UserRole.CONSUMER, true)).isPresent();
+	}
+
+	@Test
+	void kakaoLogin_afterAnAdminGrant_landsOnTheTestAccount_andBackAfterTheRevoke() throws Exception {
+		signUp(UserRole.OWNER, "token-granted", "kakao-1011", "테스트 점주", "$.data.accessToken");
+		User account = storedUser("kakao-1011", UserRole.OWNER).orElseThrow();
+		String admin = "Bearer " + tokenProvider.createAccessToken(TokenRealm.ADMIN, 1L, "SUPER");
+
+		mockMvc.perform(patch("/admin/users/" + account.getId() + "/tester-permission")
+				.header("Authorization", admin)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"allowed\":true}"))
+			.andExpect(status().isOk());
+		mockMvc.perform(get("/users/me").header("Authorization", bearerFromLogin(UserRole.OWNER, "token-granted")))
+			.andExpect(jsonPath("$.data.testMode").value(true))
+			.andExpect(jsonPath("$.data.id").value(not(account.getId().intValue())));
+
+		mockMvc.perform(patch("/admin/users/" + account.getId() + "/tester-permission")
+				.header("Authorization", admin)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"allowed\":false}"))
+			.andExpect(status().isOk());
+		mockMvc.perform(get("/users/me").header("Authorization", bearerFromLogin(UserRole.OWNER, "token-granted")))
+			.andExpect(jsonPath("$.data.testMode").value(false))
+			.andExpect(jsonPath("$.data.id").value(account.getId().intValue()));
+	}
+
+	private String bearerFromLogin(UserRole role, String kakaoToken) throws Exception {
+		String body = login(role, kakaoToken)
+			.andExpect(jsonPath("$.data.registered").value(true))
+			.andReturn().getResponse().getContentAsString();
+		return "Bearer " + JsonPath.read(body, "$.data.accessToken");
 	}
 
 	@Test

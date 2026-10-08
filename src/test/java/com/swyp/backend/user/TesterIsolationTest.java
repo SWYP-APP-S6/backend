@@ -296,6 +296,39 @@ class TesterIsolationTest {
 	}
 
 	@Test
+	void anAdminGrantMovesTheAccountIntoTestModeAndEndsItsRealSession() throws Exception {
+		User newcomer = new User(UserRole.OWNER, "새 팀원", null, false, Instant.now());
+		newcomer.linkOauthAccount("kakao", "kakao-newcomer");
+		newcomer = userRepository.saveAndFlush(newcomer);
+		String realRefresh = refreshOf(newcomer);
+
+		mockMvc.perform(permission(newcomer, true).header("Authorization", admin()))
+			.andExpect(status().isOk());
+		mockMvc.perform(permission(newcomer, true).header("Authorization", admin()))
+			.andExpect(status().isOk());
+
+		User granted = userRepository.findById(newcomer.getId()).orElseThrow();
+		assertThat(granted.isTesterAllowed()).isTrue();
+		assertThat(granted.isTestMode()).isTrue();
+		User testAccount = userRepository.findByOauthProviderAndOauthProviderIdAndRoleAndTester(
+				"kakao", "kakao-newcomer", UserRole.OWNER, true).orElseThrow();
+		mockMvc.perform(refresh(realRefresh)).andExpect(status().isUnauthorized());
+
+		String testRefresh = refreshOf(testAccount);
+		mockMvc.perform(permission(newcomer, false).header("Authorization", admin()))
+			.andExpect(status().isOk());
+		assertThat(userRepository.findById(newcomer.getId()).orElseThrow().isTestMode()).isFalse();
+		mockMvc.perform(refresh(testRefresh)).andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void onlyAKakaoAccountCanBeGranted() throws Exception {
+		mockMvc.perform(permission(consumer, true).header("Authorization", admin()))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("TESTER_NEEDS_KAKAO_ACCOUNT"));
+	}
+
+	@Test
 	void aTestAccountTakesNoPermission() throws Exception {
 		mockMvc.perform(permission(testerConsumer, true).header("Authorization", admin()))
 			.andExpect(status().isConflict())
