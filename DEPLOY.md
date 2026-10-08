@@ -14,10 +14,10 @@ Naver Cloud Platform 단일 VM 위에 `docker compose` 로 전체 스택(app + P
 
 ```bash
 ssh root@<서버 IP>
-prod
+deploy
 ```
 
-`/usr/local/bin/prod` 는 서버에 직접 둔 한 줄짜리 래퍼다(레포에는 없다):
+`/usr/local/bin/deploy` 는 서버에 직접 둔 한 줄짜리 래퍼다(레포에는 없다):
 
 ```sh
 #!/bin/sh
