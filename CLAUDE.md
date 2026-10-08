@@ -98,17 +98,20 @@
   로그인한 관리자만 부를 수 있게 해서 남는 위험을 "관리자가 고정된 테스트 계정을 흉내낼 수 있다"로
   줄인 것이고, 운영에서도 그 전제로 켜 둔다(`dev.test-token.enabled`). 끄면 컨트롤러 빈 자체가
   만들어지지 않고 `SecurityConfig`의 규칙도 같은 스위치를 보므로 둘이 어긋날 수 없다.
-- **테스터 격리** — 팀원은 운영 DB에서 `users.tester=true`(테스트 모드) 계정으로 테스트한다. 관리자가
-  `PATCH /admin/users/{id}/tester-permission`으로 **허가(`tester_allowed`)만** 주고, 모드는 본인이 앱
-  마이페이지에서 `PATCH /users/me/tester`로 켜고 끈다(허가 없이 켜면 403, DB check 제약이 같은 불변식을
-  지킨다). 허가를 거두면 모드도 꺼진다. `/dev/test-token` 계정은 둘 다 자동으로 켜진다. 전환은
-  `TesterModeService` 한 곳에서만 한다. 가게·상품엔 표시가 없고 **주인의 `tester`를 따라간다** —
-  같은 사실을 테이블마다 다시 적으면 어긋날 자리가 생긴다. 탐색(`/stores/nearby`·`/stores/*/products`·
-  `/products/nearby`·`/products/*`)은 보는 사람과 가게 주인의 `tester`가 같은 것만 보여주고, `HoldCreator`는
-  다르면 `PRODUCT_NOT_SELLABLE`로 막는다(테스터가 실제 재고를 잡지 않게). 보는 사람은
-  `AppUserPrincipal.idOf(authentication)`로 얻는다 — **USER realm일 때만** `users` id이고 guest·admin은
-  null(=일반)이다. 진행 중인 찜(본인 것 또는 자기 가게에 걸린 것)이 있으면 전환을 409로 거절한다 — 바꾸는
-  순간 그 찜이 반대편 가게에 걸린 채 남는다. 회귀는 `TesterIsolationTest`.
+- **테스터 격리 = 계정 행 분리** — 팀원은 운영 DB에서 테스트한다. 같은 카카오 계정·역할에 **실제 행과
+  테스트 행(`users.tester=true`)이 따로 있고**(유니크 `(oauth_provider, oauth_provider_id, role, tester)`),
+  찜·알림·취소권·기기 토큰이 모두 `user_id`에 붙으므로 행이 갈리면 데이터도 통째로 갈린다. **`tester`는
+  행을 만들 때 정해지고 바뀌지 않는다**(`updatable = false` + DB 트리거) — 가게·상품엔 표시가 없고
+  **주인 행의 `tester`를 따라가므로**, 그 값이 바뀌면 테스트 가게가 실사용자에게 드러난다. 관리자는 실제
+  행에 허가(`tester_allowed`)만 준다(`PATCH /admin/users/{id}/tester-permission`). 허가받은 사람이 앱에서
+  `PATCH /users/me/test-mode`(`on` + 지금 refresh 토큰)를 부르면 실제 행의 `test_mode`가 바뀌고, 지금 세션의
+  refresh가 폐기되고, **반대쪽 행의 새 토큰 쌍**이 온다(테스트 행은 처음 켤 때 약관 동의와 함께 생성) —
+  앱은 토큰 교체 + 화면 초기화 + 기기 토큰 재등록만 한다. 카카오 로그인은 `test_mode`를 보고 행을 고르고,
+  `/auth/refresh`는 지금 모드의 행이 아니면 거절한다(허가 회수 시 테스트 세션이 access 만료와 함께 끝난다).
+  `/dev/test-token` 계정은 실제 행 없는 테스트 행이다. 탐색(`/stores/nearby`·`/stores/*/products`·
+  `/products/nearby`·`/products/*`)은 보는 행과 가게 주인 행의 `tester`가 같은 것만 보여주고, `HoldCreator`는
+  다르면 `PRODUCT_NOT_SELLABLE`로 막는다. 보는 사람은 `AppUserPrincipal.idOf(authentication)`로 얻는다 —
+  **USER realm일 때만** `users` id이고 guest·admin은 null(=일반)이다. 회귀는 `TesterIsolationTest`.
 - **새 엔드포인트를 만들면 `SecurityConfig`에 realm과 role을 함께 등록해야 한다** — 빠뜨리면 다른
   주체가 통과한다. 등록 규칙·카카오 검증·가입 2단계·guest·rate limit 상세는
   **`.claude/rules/security.md`**(보안·컨트롤러 파일 작성 시 자동 로드), env 변수는

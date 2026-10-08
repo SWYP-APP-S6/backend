@@ -17,7 +17,7 @@ public enum UserAuthErrorCode implements ApiCode {
 	HOLDING_HOLDS_REMAIN(HttpStatus.CONFLICT, "진행 중인 찜이 있어 탈퇴할 수 없습니다. 찜을 모두 처리한 뒤 다시 시도해 주세요."),
 	STORE_HOLDING_HOLDS_REMAIN(HttpStatus.CONFLICT, "가게에 처리되지 않은 찜이 있어 탈퇴할 수 없습니다. 찜을 모두 처리한 뒤 다시 시도해 주세요."),
 	TESTER_NOT_ALLOWED(HttpStatus.FORBIDDEN, "테스트 모드를 쓸 수 없는 계정입니다. 관리자에게 테스트 허가를 요청해 주세요."),
-	TESTER_CHANGE_BLOCKED_BY_HOLDS(HttpStatus.CONFLICT, "진행 중인 찜이 있어 테스트 모드를 바꿀 수 없습니다. 찜을 모두 처리한 뒤 다시 시도해 주세요."),
+	TESTER_PERMISSION_ON_TEST_ACCOUNT(HttpStatus.CONFLICT, "테스트 계정에는 허가를 줄 수 없습니다. 같은 사람의 실제 계정에 허가해 주세요."),
 	GUEST_ISSUE_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "비회원 토큰 발급 한도를 초과했습니다.");
 
 	private final HttpStatus status;

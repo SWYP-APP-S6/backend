@@ -1,6 +1,7 @@
 package com.swyp.backend.user.service;
 
 import com.swyp.backend.common.exception.BusinessException;
+import com.swyp.backend.common.security.AuthErrorCode;
 import com.swyp.backend.common.security.JwtTokenProvider;
 import com.swyp.backend.common.security.RefreshTokenService;
 import com.swyp.backend.common.security.TokenRealm;
@@ -48,8 +49,8 @@ public class UserAuthService {
 	public KakaoLoginResponse loginWithKakao(UserRole role, String kakaoAccessToken) {
 		KakaoOauthClient.Identity identity = kakaoOauthClient.fetchIdentity(role, kakaoAccessToken);
 		return userFunction
-			.findByOauthIdentity(PROVIDER_KAKAO, identity.providerId(), role)
-			.map(user -> KakaoLoginResponse.registered(issueTokensFor(user)))
+			.findAccount(PROVIDER_KAKAO, identity.providerId(), role)
+			.map(account -> KakaoLoginResponse.registered(issueTokensFor(sessionAccountOf(account))))
 			.orElseGet(() -> KakaoLoginResponse.signupRequired(signupTokenProvider.issue(
 				PROVIDER_KAKAO, identity.providerId(), nicknameFor(identity), role)));
 	}
@@ -57,7 +58,7 @@ public class UserAuthService {
 	@Transactional
 	public TokenResponse signup(SignupRequest request) {
 		SignupTokenProvider.SignupTicket ticket = signupTokenProvider.parse(request.signupToken());
-		if (userFunction.findByOauthIdentity(
+		if (userFunction.findAccount(
 				ticket.provider(), ticket.providerId(), ticket.role()).isPresent()) {
 			throw new BusinessException(UserAuthErrorCode.ALREADY_REGISTERED);
 		}
@@ -72,11 +73,66 @@ public class UserAuthService {
 	public TokenResponse refresh(String refreshToken) {
 		RefreshTokenService.Rotation rotation = refreshTokenService.rotate(TokenRealm.USER, refreshToken);
 		User user = userFunction.getById(rotation.principalId());
+		if (!isSessionAccount(user)) {
+			refreshTokenService.revoke(TokenRealm.USER, rotation.token());
+			throw new BusinessException(AuthErrorCode.INVALID_REFRESH_TOKEN);
+		}
 		return new TokenResponse(accessTokenFor(user), rotation.token());
+	}
+
+	@Transactional
+	public TokenResponse switchTestMode(Long userId, boolean on, String refreshToken) {
+		if (refreshTokenService.principalOf(TokenRealm.USER, refreshToken).filter(userId::equals).isEmpty()) {
+			throw new BusinessException(AuthErrorCode.INVALID_REFRESH_TOKEN);
+		}
+		User current = userFunction.getById(userId);
+		Long accountId = current.isTester()
+				? userFunction.findAccountOf(current)
+						.map(User::getId)
+						.orElseThrow(() -> new BusinessException(UserAuthErrorCode.TESTER_NOT_ALLOWED))
+				: userId;
+		User account = userFunction.getByIdForUpdate(accountId);
+		User target;
+		if (on) {
+			if (!account.isTesterAllowed()) {
+				throw new BusinessException(UserAuthErrorCode.TESTER_NOT_ALLOWED);
+			}
+			account.enterTestMode();
+			target = userFunction.findTestAccountOf(account).orElseGet(() -> createTestAccountOf(account));
+		} else {
+			account.leaveTestMode();
+			target = account;
+		}
+		refreshTokenService.revoke(TokenRealm.USER, refreshToken);
+		return issueTokensFor(target);
 	}
 
 	public void logout(String refreshToken) {
 		refreshTokenService.revoke(TokenRealm.USER, refreshToken);
+	}
+
+	private User sessionAccountOf(User account) {
+		if (!account.isTestMode()) {
+			return account;
+		}
+		return userFunction.findTestAccountOf(account).orElse(account);
+	}
+
+	private boolean isSessionAccount(User user) {
+		if (!user.isTester()) {
+			return !user.isTestMode() || userFunction.findTestAccountOf(user).isEmpty();
+		}
+		return userFunction.findAccountOf(user).map(User::isTestMode).orElse(true);
+	}
+
+	private User createTestAccountOf(User account) {
+		Instant now = Instant.now(clock);
+		User testAccount = userFunction.save(account.newTestAccount(now));
+		Set<TermsType> agreedTypes = EnumSet.noneOf(TermsType.class);
+		termsFunction.findAgreementsOf(account.getId())
+				.forEach(agreement -> agreedTypes.add(agreement.getTermsDocument().getType()));
+		termsFunction.recordAgreements(testAccount, agreedTypes, now);
+		return testAccount;
 	}
 
 	private void recordTermsAgreements(User user, SignupRequest request, Instant agreedAt) {

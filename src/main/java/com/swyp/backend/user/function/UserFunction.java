@@ -33,8 +33,28 @@ public class UserFunction {
 		return userId != null && userRepository.existsByIdAndTesterTrue(userId);
 	}
 
-	public Optional<User> findByOauthIdentity(String provider, String providerId, UserRole role) {
-		return userRepository.findByOauthProviderAndOauthProviderIdAndRole(provider, providerId, role);
+	public Optional<User> findAccount(String provider, String providerId, UserRole role) {
+		return userRepository.findByOauthProviderAndOauthProviderIdAndRoleAndTester(
+				provider, providerId, role, false);
+	}
+
+	public Optional<User> findTestAccount(String provider, String providerId, UserRole role) {
+		return userRepository.findByOauthProviderAndOauthProviderIdAndRoleAndTester(
+				provider, providerId, role, true);
+	}
+
+	public Optional<User> findAccountOf(User testAccount) {
+		if (testAccount.getOauthProviderId() == null) {
+			return Optional.empty();
+		}
+		return findAccount(testAccount.getOauthProvider(), testAccount.getOauthProviderId(), testAccount.getRole());
+	}
+
+	public Optional<User> findTestAccountOf(User account) {
+		if (account.getOauthProviderId() == null) {
+			return Optional.empty();
+		}
+		return findTestAccount(account.getOauthProvider(), account.getOauthProviderId(), account.getRole());
 	}
 
 	public Page<User> findAllByRole(UserRole role, Pageable pageable) {

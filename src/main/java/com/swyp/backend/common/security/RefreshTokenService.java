@@ -3,6 +3,7 @@ package com.swyp.backend.common.security;
 import com.swyp.backend.common.exception.BusinessException;
 import java.time.Duration;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -32,6 +33,10 @@ public class RefreshTokenService {
 			throw new BusinessException(AuthErrorCode.INVALID_REFRESH_TOKEN);
 		}
 		return new Rotation(Long.valueOf(principalId), issue(realm, Long.valueOf(principalId)));
+	}
+
+	public Optional<Long> principalOf(TokenRealm realm, String token) {
+		return Optional.ofNullable(redis.opsForValue().get(key(realm, token))).map(Long::valueOf);
 	}
 
 	public void revoke(TokenRealm realm, String token) {

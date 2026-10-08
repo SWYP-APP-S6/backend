@@ -1,14 +1,16 @@
 package com.swyp.backend.user.controller;
 
 import com.swyp.backend.common.openapi.ApiErrorCodes;
+import com.swyp.backend.common.security.AuthErrorCode;
 import com.swyp.backend.common.response.ApiResponse;
 import com.swyp.backend.common.response.SuccessCode;
 import com.swyp.backend.user.dto.MeResponse;
 import com.swyp.backend.user.dto.MyLocationResponse;
 import com.swyp.backend.user.dto.MyLocationUpdateRequest;
-import com.swyp.backend.user.dto.TesterChangeRequest;
+import com.swyp.backend.user.dto.TestModeSwitchRequest;
+import com.swyp.backend.user.dto.TokenResponse;
 import com.swyp.backend.user.exception.UserAuthErrorCode;
-import com.swyp.backend.user.service.TesterModeService;
+import com.swyp.backend.user.service.UserAuthService;
 import com.swyp.backend.user.service.UserDeletionService;
 import com.swyp.backend.user.service.UserService;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -31,18 +33,20 @@ public class UserController {
 
 	private final UserService userService;
 	private final UserDeletionService userDeletionService;
-	private final TesterModeService testerModeService;
+	private final UserAuthService userAuthService;
 
 	@GetMapping("/me")
 	public ApiResponse<MeResponse> getMe(@AuthenticationPrincipal Long userId) {
 		return ApiResponse.of(SuccessCode.OK, userService.getMe(userId));
 	}
 
-	@PatchMapping("/me/tester")
-	@ApiErrorCodes(in = UserAuthErrorCode.class, codes = {"TESTER_NOT_ALLOWED", "TESTER_CHANGE_BLOCKED_BY_HOLDS"})
-	public ApiResponse<MeResponse> changeMyTesterMode(
-			@AuthenticationPrincipal Long userId, @Valid @RequestBody TesterChangeRequest request) {
-		return ApiResponse.of(SuccessCode.OK, testerModeService.switchMine(userId, request.tester()));
+	@PatchMapping("/me/test-mode")
+	@ApiErrorCodes(in = UserAuthErrorCode.class, codes = {"TESTER_NOT_ALLOWED"})
+	@ApiErrorCodes(in = AuthErrorCode.class, codes = {"INVALID_REFRESH_TOKEN"})
+	public ApiResponse<TokenResponse> switchMyTestMode(
+			@AuthenticationPrincipal Long userId, @Valid @RequestBody TestModeSwitchRequest request) {
+		return ApiResponse.of(
+				SuccessCode.OK, userAuthService.switchTestMode(userId, request.on(), request.refreshToken()));
 	}
 
 	@DeleteMapping("/me")

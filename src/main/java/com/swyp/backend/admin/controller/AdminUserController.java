@@ -11,7 +11,6 @@ import com.swyp.backend.user.dto.TesterPermissionRequest;
 import com.swyp.backend.user.dto.UserSummaryResponse;
 import com.swyp.backend.user.entity.UserRole;
 import com.swyp.backend.user.service.AdminUserService;
-import com.swyp.backend.user.service.TesterModeService;
 import com.swyp.backend.user.service.UserDeletionService;
 import com.swyp.backend.user.service.UserService;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -40,7 +39,6 @@ public class AdminUserController {
 	private final UserDeletionService userDeletionService;
 	private final AdminUserService adminUserService;
 	private final AdminHoldService adminHoldService;
-	private final TesterModeService testerModeService;
 
 	@GetMapping
 	public ApiResponse<PageResponse<UserSummaryResponse>> getUsers(
@@ -65,7 +63,7 @@ public class AdminUserController {
 	@PatchMapping("/{id}/tester-permission")
 	public ApiResponse<Void> changeTesterPermission(
 			@PathVariable Long id, @Valid @RequestBody TesterPermissionRequest request) {
-		testerModeService.changePermission(id, request.allowed());
+		adminUserService.changeTesterPermission(id, request.allowed());
 		return ApiResponse.of(SuccessCode.OK);
 	}
 

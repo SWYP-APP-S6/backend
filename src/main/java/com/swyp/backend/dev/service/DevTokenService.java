@@ -31,7 +31,7 @@ public class DevTokenService {
 	public DevTokenResponse issue(UserRole role) {
 		String providerId = providerId(role);
 		User user = userFunction
-				.findByOauthIdentity(PROVIDER, providerId, role)
+				.findTestAccount(PROVIDER, providerId, role)
 				.orElseGet(() -> createTestUser(role, providerId));
 		String accessToken =
 				tokenProvider.createAccessToken(TokenRealm.USER, user.getId(), user.getRole().name());
@@ -44,10 +44,8 @@ public class DevTokenService {
 	}
 
 	private User createTestUser(UserRole role, String providerId) {
-		User user = new User(role, nickname(role), null, false, Instant.now(clock));
+		User user = User.testAccount(role, nickname(role), null, false, Instant.now(clock));
 		user.linkOauthAccount(PROVIDER, providerId);
-		user.allowTesting();
-		user.changeTester(true);
 		return userFunction.save(user);
 	}
 
