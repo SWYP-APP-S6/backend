@@ -49,7 +49,10 @@ public class User extends BaseTimeEntity {
 	@Column(name = "tester_allowed", nullable = false)
 	private boolean testerAllowed;
 
-	@Column(nullable = false)
+	@Column(name = "test_mode", nullable = false)
+	private boolean testMode;
+
+	@Column(nullable = false, updatable = false)
 	private boolean tester;
 
 	public User(
@@ -63,6 +66,23 @@ public class User extends BaseTimeEntity {
 		this.phone = phone;
 		this.marketingOptIn = marketingOptIn;
 		this.termsAgreedAt = termsAgreedAt;
+	}
+
+	public static User testAccount(
+			UserRole role,
+			String nickname,
+			String phone,
+			boolean marketingOptIn,
+			Instant termsAgreedAt) {
+		User user = new User(role, nickname, phone, marketingOptIn, termsAgreedAt);
+		user.tester = true;
+		return user;
+	}
+
+	public User newTestAccount(Instant termsAgreedAt) {
+		User testAccount = testAccount(role, nickname, phone, marketingOptIn, termsAgreedAt);
+		testAccount.linkOauthAccount(oauthProvider, oauthProviderId);
+		return testAccount;
 	}
 
 	public void linkOauthAccount(String oauthProvider, String oauthProviderId) {
@@ -88,10 +108,14 @@ public class User extends BaseTimeEntity {
 
 	public void revokeTesting() {
 		this.testerAllowed = false;
-		this.tester = false;
+		this.testMode = false;
 	}
 
-	public void changeTester(boolean tester) {
-		this.tester = tester;
+	public void enterTestMode() {
+		this.testMode = true;
+	}
+
+	public void leaveTestMode() {
+		this.testMode = false;
 	}
 }

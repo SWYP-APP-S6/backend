@@ -1,5 +1,6 @@
 package com.swyp.backend.user.service;
 
+import com.swyp.backend.common.exception.BusinessException;
 import com.swyp.backend.hold.function.HoldCancelCreditFunction;
 import com.swyp.backend.hold.function.HoldFunction;
 import com.swyp.backend.notification.function.DeviceTokenFunction;
@@ -8,6 +9,7 @@ import com.swyp.backend.store.function.StoreFunction;
 import com.swyp.backend.terms.function.TermsFunction;
 import com.swyp.backend.user.dto.AdminUserDetailResponse;
 import com.swyp.backend.user.entity.User;
+import com.swyp.backend.user.exception.UserAuthErrorCode;
 import com.swyp.backend.user.function.UserFunction;
 import com.swyp.backend.user.function.UserLocationFunction;
 import java.time.Clock;
@@ -49,5 +51,18 @@ public class AdminUserService {
 				notificationFunction.findInboxOf(userId, PageRequest.of(0, RECENT_NOTIFICATIONS)).getContent(),
 				deviceTokenFunction.findTokensOf(userId),
 				termsFunction.findAgreementsOf(userId));
+	}
+
+	@Transactional
+	public void changeTesterPermission(Long userId, boolean allowed) {
+		User user = userFunction.getByIdForUpdate(userId);
+		if (user.isTester()) {
+			throw new BusinessException(UserAuthErrorCode.TESTER_PERMISSION_ON_TEST_ACCOUNT);
+		}
+		if (allowed) {
+			user.allowTesting();
+		} else {
+			user.revokeTesting();
+		}
 	}
 }

@@ -19,8 +19,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
 	@Query("select u from User u where u.id = :id")
 	Optional<User> findByIdForUpdate(@Param("id") Long id);
 
-	Optional<User> findByOauthProviderAndOauthProviderIdAndRole(
-			String oauthProvider, String oauthProviderId, UserRole role);
+	Optional<User> findByOauthProviderAndOauthProviderIdAndRoleAndTester(
+			String oauthProvider, String oauthProviderId, UserRole role, boolean tester);
 
 	Page<User> findByRole(UserRole role, Pageable pageable);
 }

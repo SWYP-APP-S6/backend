@@ -12,18 +12,18 @@ public record MeResponse(
 		@Nullable String phone,
 		boolean marketingOptIn,
 		boolean testerAllowed,
-		boolean tester,
+		boolean testMode,
 		Instant termsAgreedAt,
 		Instant joinedAt) {
 
-	public static MeResponse from(User user) {
+	public static MeResponse of(User user, boolean testerAllowed) {
 		return new MeResponse(
 				user.getId(),
 				user.getRole(),
 				user.getNickname(),
 				user.getPhone(),
 				user.isMarketingOptIn(),
-				user.isTesterAllowed(),
+				testerAllowed,
 				user.isTester(),
 				user.getTermsAgreedAt(),
 				user.getCreatedAt());

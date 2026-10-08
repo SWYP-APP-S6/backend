@@ -29,7 +29,11 @@ public class UserService {
 	private final StoreFunction storeFunction;
 
 	public MeResponse getMe(Long userId) {
-		return MeResponse.from(userFunction.getById(userId));
+		User user = userFunction.getById(userId);
+		boolean testerAllowed = user.isTester()
+				? userFunction.findAccountOf(user).map(User::isTesterAllowed).orElse(false)
+				: user.isTesterAllowed();
+		return MeResponse.of(user, testerAllowed);
 	}
 
 	public MyLocationResponse getMyLocation(Long userId) {
