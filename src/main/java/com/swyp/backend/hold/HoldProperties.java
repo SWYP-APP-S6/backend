@@ -7,7 +7,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "hold")
 public record HoldProperties(
 		Duration ttl,
-		int userQtyLimit,
 		Duration expiryScanInterval,
 		Duration expiryReminderLead,
 		Duration noShowGrace,
@@ -27,9 +26,6 @@ public record HoldProperties(
 		}
 		if (expiryReminderLead.isNegative() || expiryReminderLead.isZero()) {
 			throw new IllegalArgumentException("hold.expiry-reminder-lead must be positive");
-		}
-		if (userQtyLimit <= 0) {
-			throw new IllegalArgumentException("hold.user-qty-limit must be positive");
 		}
 		if (cancelCreditMax <= 0) {
 			throw new IllegalArgumentException("hold.cancel-credit-max must be positive");

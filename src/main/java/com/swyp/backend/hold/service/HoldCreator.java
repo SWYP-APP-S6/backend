@@ -66,7 +66,6 @@ public class HoldCreator {
 		boolean opensAPickup = current.filter(ref -> ref.expiresAt().isAfter(now)).isEmpty();
 		Optional<Hold> existing = holdFunction.findHoldingIdOf(userId, product.getId())
 				.map(holdFunction::getByIdForUpdate);
-		requireWithinQtyLimit(existing.map(Hold::getQty).orElse(0) + request.qty());
 		requireSellable(product, request.qty(), now);
 		product.hold(request.qty());
 		existing.ifPresentOrElse(
@@ -196,12 +195,6 @@ public class HoldCreator {
 		productIds.stream().distinct().sorted()
 				.forEach(id -> locked.put(id, productFunction.getByIdForUpdate(id)));
 		return locked;
-	}
-
-	private void requireWithinQtyLimit(int qty) {
-		if (qty > holdProperties.userQtyLimit()) {
-			throw new BusinessException(HoldErrorCode.HOLD_LIMIT_EXCEEDED);
-		}
 	}
 
 	private static void requireSameAudience(User user, Product product) {
