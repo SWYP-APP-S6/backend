@@ -3,16 +3,19 @@ package com.swyp.backend.user;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.jayway.jsonpath.JsonPath;
 import com.swyp.backend.AppDataCleaner;
 import com.swyp.backend.RedisTestcontainersConfiguration;
 import com.swyp.backend.TestcontainersConfiguration;
 import com.swyp.backend.common.security.JwtTokenProvider;
+import com.swyp.backend.common.security.RefreshTokenService;
 import com.swyp.backend.common.security.TokenRealm;
 import com.swyp.backend.product.entity.Product;
 import com.swyp.backend.product.entity.ProductCategory;
@@ -37,9 +40,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
-import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DataAccessException;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 @SpringBootTest
@@ -68,8 +73,16 @@ class TesterIsolationTest {
 	@Autowired
 	JwtTokenProvider tokenProvider;
 
+	@Autowired
+	RefreshTokenService refreshTokenService;
+
+	@Autowired
+	JdbcTemplate jdbcTemplate;
+
 	private User consumer;
 	private User testerConsumer;
+	private User teammate;
+	private User ownerAccount;
 	private Store realStore;
 	private Store testStore;
 	private Product realProduct;
@@ -80,8 +93,10 @@ class TesterIsolationTest {
 		appDataCleaner.clear();
 		consumer = user(UserRole.CONSUMER, "소비자", false);
 		testerConsumer = user(UserRole.CONSUMER, "팀원", true);
+		teammate = kakaoAccount(UserRole.CONSUMER, "팀원 본계정", "kakao-teammate", false);
+		ownerAccount = kakaoAccount(UserRole.OWNER, "팀원 점주", "kakao-teammate-owner", true);
 		realStore = store(user(UserRole.OWNER, "점주", false), "청과마을");
-		testStore = store(user(UserRole.OWNER, "테스트 점주", true), "테스트가게");
+		testStore = store(userRepository.saveAndFlush(ownerAccount.newTestAccount(Instant.now())), "테스트가게");
 		realProduct = product(realStore, "복숭아 4입");
 		testProduct = product(testStore, "테스트 배");
 	}
@@ -180,90 +195,111 @@ class TesterIsolationTest {
 	}
 
 	@Test
-	void anAdminAllowsATeammateWhoThenSwitchesTestModeInTheApp() throws Exception {
-		mockMvc.perform(permission(consumer, true).header("Authorization", admin()))
-			.andExpect(status().isOk());
-
-		mockMvc.perform(get("/admin/users/" + consumer.getId()).header("Authorization", admin()))
+	void anAllowedTeammateSwitchesIntoTheTestAccountAndBack() throws Exception {
+		String oldRefresh = refreshOf(teammate);
+		MvcResult on = mockMvc.perform(testMode(true, oldRefresh).header("Authorization", bearer(teammate)))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.testerAllowed").value(true))
-			.andExpect(jsonPath("$.data.tester").value(false));
-		mockMvc.perform(nearbyStores().header("Authorization", bearer(consumer)))
-			.andExpect(jsonPath("$.data.stores[*].storeId").value(contains(realStore.getId().intValue())));
+			.andReturn();
 
-		mockMvc.perform(mySwitch(true).header("Authorization", bearer(consumer)))
-			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.testerAllowed").value(true))
-			.andExpect(jsonPath("$.data.tester").value(true));
-		mockMvc.perform(nearbyStores().header("Authorization", bearer(consumer)))
+		mockMvc.perform(refresh(oldRefresh)).andExpect(status().isUnauthorized());
+		Integer testAccountId = JsonPath.read(
+			mockMvc.perform(get("/users/me").header("Authorization", access(on)))
+				.andExpect(jsonPath("$.data.testMode").value(true))
+				.andExpect(jsonPath("$.data.testerAllowed").value(true))
+				.andReturn().getResponse().getContentAsString(),
+			"$.data.id");
+		assertThat(testAccountId.longValue()).isNotEqualTo(teammate.getId());
+		mockMvc.perform(nearbyStores().header("Authorization", access(on)))
 			.andExpect(jsonPath("$.data.stores[*].storeId").value(contains(testStore.getId().intValue())));
 
-		mockMvc.perform(mySwitch(false).header("Authorization", bearer(consumer)))
-			.andExpect(status().isOk());
-		mockMvc.perform(get("/users/me").header("Authorization", bearer(consumer)))
-			.andExpect(jsonPath("$.data.testerAllowed").value(true))
-			.andExpect(jsonPath("$.data.tester").value(false));
-		mockMvc.perform(nearbyStores().header("Authorization", bearer(consumer)))
+		MvcResult off = mockMvc.perform(testMode(false, refreshOf(on)).header("Authorization", access(on)))
+			.andExpect(status().isOk())
+			.andReturn();
+
+		mockMvc.perform(get("/users/me").header("Authorization", access(off)))
+			.andExpect(jsonPath("$.data.id").value(teammate.getId().intValue()))
+			.andExpect(jsonPath("$.data.testMode").value(false));
+		mockMvc.perform(nearbyStores().header("Authorization", access(off)))
 			.andExpect(jsonPath("$.data.stores[*].storeId").value(contains(realStore.getId().intValue())));
+
+		MvcResult again = mockMvc.perform(testMode(true, refreshOf(off)).header("Authorization", access(off)))
+			.andExpect(status().isOk())
+			.andReturn();
+		mockMvc.perform(get("/users/me").header("Authorization", access(again)))
+			.andExpect(jsonPath("$.data.id").value(testAccountId));
 	}
 
 	@Test
-	void testModeNeedsThePermission() throws Exception {
-		mockMvc.perform(mySwitch(true).header("Authorization", bearer(consumer)))
+	void whatIsDoneInTestModeStaysInTheTestAccount() throws Exception {
+		MvcResult on = mockMvc.perform(testMode(true, refreshOf(teammate)).header("Authorization", bearer(teammate)))
+			.andExpect(status().isOk())
+			.andReturn();
+		mockMvc.perform(holdOf(testProduct).header("Authorization", access(on)))
+			.andExpect(status().isCreated());
+
+		MvcResult off = mockMvc.perform(testMode(false, refreshOf(on)).header("Authorization", access(on)))
+			.andExpect(status().isOk())
+			.andReturn();
+
+		mockMvc.perform(get("/holds/active").header("Authorization", access(off)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.hold").value(nullValue()));
+	}
+
+	@Test
+	void withoutThePermissionTheSwitchIsRefusedAndTheSessionSurvives() throws Exception {
+		String refresh = refreshOf(consumer);
+
+		mockMvc.perform(testMode(true, refresh).header("Authorization", bearer(consumer)))
 			.andExpect(status().isForbidden())
 			.andExpect(jsonPath("$.code").value("TESTER_NOT_ALLOWED"));
-		mockMvc.perform(mySwitch(false).header("Authorization", bearer(consumer)))
-			.andExpect(status().isOk());
 
-		assertThat(userRepository.findById(consumer.getId()).orElseThrow().isTester()).isFalse();
+		mockMvc.perform(refresh(refresh)).andExpect(status().isOk());
 	}
 
 	@Test
-	void theDatabaseRefusesTestModeWithoutThePermission() {
-		User user = new User(UserRole.CONSUMER, "허가 없음", null, false, Instant.now());
-		user.changeTester(true);
-
-		assertThatThrownBy(() -> userRepository.saveAndFlush(user))
-			.isInstanceOf(DataIntegrityViolationException.class);
+	void theSwitchNeedsTheCallersOwnRefreshToken() throws Exception {
+		mockMvc.perform(testMode(true, refreshOf(consumer)).header("Authorization", bearer(teammate)))
+			.andExpect(status().isUnauthorized())
+			.andExpect(jsonPath("$.code").value("INVALID_REFRESH_TOKEN"));
 	}
 
 	@Test
-	void revokingThePermissionTurnsTestModeOff() throws Exception {
-		mockMvc.perform(permission(testerConsumer, false).header("Authorization", admin()))
+	void aTestStoreStaysHiddenWhenItsOwnerLeavesTestMode() throws Exception {
+		User testOwner = testStore.getOwner();
+
+		mockMvc.perform(testMode(false, refreshOf(testOwner)).header("Authorization", bearer(testOwner)))
 			.andExpect(status().isOk());
 
-		User revoked = userRepository.findById(testerConsumer.getId()).orElseThrow();
-		assertThat(revoked.isTesterAllowed()).isFalse();
-		assertThat(revoked.isTester()).isFalse();
-		mockMvc.perform(nearbyStores().header("Authorization", bearer(testerConsumer)))
+		mockMvc.perform(nearbyStores().header("Authorization", bearer(consumer)))
 			.andExpect(jsonPath("$.data.stores[*].storeId").value(contains(realStore.getId().intValue())));
+		assertThat(userRepository.findById(testOwner.getId()).orElseThrow().isTester()).isTrue();
 	}
 
 	@Test
-	void anAccountWithAnOpenHoldKeepsItsSide() throws Exception {
-		User realOwner = realStore.getOwner();
-		mockMvc.perform(permission(consumer, true).header("Authorization", admin()))
-			.andExpect(status().isOk());
-		mockMvc.perform(permission(realOwner, true).header("Authorization", admin()))
-			.andExpect(status().isOk());
-		mockMvc.perform(holdOf(realProduct).header("Authorization", bearer(consumer)))
-			.andExpect(status().isCreated());
-		mockMvc.perform(holdOf(testProduct).header("Authorization", bearer(testerConsumer)))
-			.andExpect(status().isCreated());
+	void aTestStoreStaysHiddenWhenItsOwnerLosesThePermission() throws Exception {
+		String testOwnerRefresh = refreshOf(testStore.getOwner());
 
-		mockMvc.perform(mySwitch(true).header("Authorization", bearer(consumer)))
-			.andExpect(status().isConflict())
-			.andExpect(jsonPath("$.code").value("TESTER_CHANGE_BLOCKED_BY_HOLDS"));
-		mockMvc.perform(mySwitch(true).header("Authorization", bearer(realOwner)))
-			.andExpect(status().isConflict())
-			.andExpect(jsonPath("$.code").value("TESTER_CHANGE_BLOCKED_BY_HOLDS"));
-		mockMvc.perform(permission(testerConsumer, false).header("Authorization", admin()))
-			.andExpect(status().isConflict())
-			.andExpect(jsonPath("$.code").value("TESTER_CHANGE_BLOCKED_BY_HOLDS"));
+		mockMvc.perform(permission(ownerAccount, false).header("Authorization", admin()))
+			.andExpect(status().isOk());
 
-		assertThat(userRepository.findById(consumer.getId()).orElseThrow().isTester()).isFalse();
-		assertThat(userRepository.findById(realOwner.getId()).orElseThrow().isTester()).isFalse();
-		assertThat(userRepository.findById(testerConsumer.getId()).orElseThrow().isTester()).isTrue();
+		mockMvc.perform(nearbyStores().header("Authorization", guest()))
+			.andExpect(jsonPath("$.data.stores[*].storeId").value(contains(realStore.getId().intValue())));
+		mockMvc.perform(refresh(testOwnerRefresh)).andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void aRowNeverChangesSides() {
+		assertThatThrownBy(() -> jdbcTemplate.update(
+				"update users set tester = false where id = ?", testStore.getOwner().getId()))
+			.isInstanceOf(DataAccessException.class);
+	}
+
+	@Test
+	void aTestAccountTakesNoPermission() throws Exception {
+		mockMvc.perform(permission(testerConsumer, true).header("Authorization", admin()))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("TESTER_PERMISSION_ON_TEST_ACCOUNT"));
 	}
 
 	@Test
@@ -296,10 +332,28 @@ class TesterIsolationTest {
 			.content("{\"allowed\":" + allowed + "}");
 	}
 
-	private MockHttpServletRequestBuilder mySwitch(boolean tester) {
-		return patch("/users/me/tester")
+	private MockHttpServletRequestBuilder testMode(boolean on, String refreshToken) {
+		return patch("/users/me/test-mode")
 			.contentType(MediaType.APPLICATION_JSON)
-			.content("{\"tester\":" + tester + "}");
+			.content("{\"on\":" + on + ",\"refreshToken\":\"" + refreshToken + "\"}");
+	}
+
+	private MockHttpServletRequestBuilder refresh(String refreshToken) {
+		return post("/auth/refresh")
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("{\"refreshToken\":\"" + refreshToken + "\"}");
+	}
+
+	private String refreshOf(User user) {
+		return refreshTokenService.issue(TokenRealm.USER, user.getId());
+	}
+
+	private static String refreshOf(MvcResult tokens) throws Exception {
+		return JsonPath.read(tokens.getResponse().getContentAsString(), "$.data.refreshToken");
+	}
+
+	private static String access(MvcResult tokens) throws Exception {
+		return "Bearer " + JsonPath.read(tokens.getResponse().getContentAsString(), "$.data.accessToken");
 	}
 
 	private String admin() {
@@ -316,12 +370,20 @@ class TesterIsolationTest {
 	}
 
 	private User user(UserRole role, String nickname, boolean tester) {
-		User user = new User(role, nickname, null, false, Instant.now());
-		if (tester) {
-			user.allowTesting();
-			user.changeTester(true);
-		}
+		User user = tester
+				? User.testAccount(role, nickname, null, false, Instant.now())
+				: new User(role, nickname, null, false, Instant.now());
 		return userRepository.saveAndFlush(user);
+	}
+
+	private User kakaoAccount(UserRole role, String nickname, String kakaoId, boolean inTestMode) {
+		User account = new User(role, nickname, null, false, Instant.now());
+		account.linkOauthAccount("kakao", kakaoId);
+		account.allowTesting();
+		if (inTestMode) {
+			account.enterTestMode();
+		}
+		return userRepository.saveAndFlush(account);
 	}
 
 	private Store store(User owner, String name) {

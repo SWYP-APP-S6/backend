@@ -2,6 +2,7 @@ package com.swyp.backend.user.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -96,7 +97,7 @@ class UserAuthFlowTest {
 	}
 
 	private Optional<User> storedUser(String providerId, UserRole role) {
-		return userRepository.findByOauthProviderAndOauthProviderIdAndRole("kakao", providerId, role);
+		return userRepository.findByOauthProviderAndOauthProviderIdAndRoleAndTester("kakao", providerId, role, false);
 	}
 
 	@Test
@@ -241,6 +242,33 @@ class UserAuthFlowTest {
 		assertThat(storedUser("kakao-1006", UserRole.CONSUMER))
 			.get()
 			.satisfies(user -> assertThat(user.getNickname()).isEqualTo("맹그로회원1006"));
+	}
+
+	@Test
+	void kakaoLogin_landsOnTheAccountOfTheChosenMode() throws Exception {
+		String signupBody = mockMvc.perform(post("/auth/signup")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(signupBody(signupTokenFor(UserRole.CONSUMER, "token-mode", "kakao-1010", "팀원"), true)))
+			.andExpect(status().isCreated())
+			.andReturn().getResponse().getContentAsString();
+		User account = storedUser("kakao-1010", UserRole.CONSUMER).orElseThrow();
+		account.allowTesting();
+		userRepository.saveAndFlush(account);
+
+		mockMvc.perform(patch("/users/me/test-mode")
+				.header("Authorization", "Bearer " + JsonPath.read(signupBody, "$.data.accessToken"))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"on\":true,\"refreshToken\":\"" + JsonPath.read(signupBody, "$.data.refreshToken") + "\"}"))
+			.andExpect(status().isOk());
+
+		String loginBody = login(UserRole.CONSUMER, "token-mode")
+			.andExpect(jsonPath("$.data.registered").value(true))
+			.andReturn().getResponse().getContentAsString();
+		mockMvc.perform(get("/users/me").header("Authorization", "Bearer " + JsonPath.read(loginBody, "$.data.accessToken")))
+			.andExpect(jsonPath("$.data.testMode").value(true))
+			.andExpect(jsonPath("$.data.nickname").value("팀원"));
+		assertThat(userRepository.findByOauthProviderAndOauthProviderIdAndRoleAndTester(
+				"kakao", "kakao-1010", UserRole.CONSUMER, true)).isPresent();
 	}
 
 	@Test
