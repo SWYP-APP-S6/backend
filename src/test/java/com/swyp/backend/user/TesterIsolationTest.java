@@ -115,6 +115,11 @@ class TesterIsolationTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.stores.content[*].storeId")
 				.value(contains(testStore.getId().intValue())));
+
+		mockMvc.perform(nearbyProducts().header("Authorization", guest()))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.stores.content[*].storeId")
+				.value(contains(realStore.getId().intValue())));
 	}
 
 	@Test
@@ -124,6 +129,9 @@ class TesterIsolationTest {
 			.andExpect(status().isNotFound());
 		mockMvc.perform(get("/stores/" + realStore.getId() + "/products")
 				.header("Authorization", bearer(testerConsumer)))
+			.andExpect(status().isNotFound());
+		mockMvc.perform(get("/stores/" + testStore.getId() + "/products")
+				.header("Authorization", guest()))
 			.andExpect(status().isNotFound());
 
 		mockMvc.perform(get("/stores/" + testStore.getId() + "/products")
@@ -146,10 +154,10 @@ class TesterIsolationTest {
 
 	@Test
 	void anAdminTokenIsNotMistakenForTheAppUserWithTheSameId() throws Exception {
-		String admin = "Bearer " + tokenProvider.createAccessToken(
+		String adminWithATesterId = "Bearer " + tokenProvider.createAccessToken(
 				TokenRealm.ADMIN, testerConsumer.getId(), "SUPER");
 
-		mockMvc.perform(nearbyStores().header("Authorization", admin))
+		mockMvc.perform(nearbyStores().header("Authorization", adminWithATesterId))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.stores[*].storeId").value(contains(realStore.getId().intValue())));
 	}
@@ -171,15 +179,10 @@ class TesterIsolationTest {
 
 	@Test
 	void anAdminTurnsATeammateIntoATester() throws Exception {
-		String admin = "Bearer " + tokenProvider.createAccessToken(TokenRealm.ADMIN, 1L, "SUPER");
-
-		mockMvc.perform(patch("/admin/users/" + consumer.getId() + "/tester")
-				.header("Authorization", admin)
-				.contentType(MediaType.APPLICATION_JSON)
-				.content("{\"tester\":true}"))
+		mockMvc.perform(testerChange(consumer, true).header("Authorization", admin()))
 			.andExpect(status().isOk());
 
-		mockMvc.perform(get("/admin/users/" + consumer.getId()).header("Authorization", admin))
+		mockMvc.perform(get("/admin/users/" + consumer.getId()).header("Authorization", admin()))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.tester").value(true));
 		mockMvc.perform(nearbyStores().header("Authorization", bearer(consumer)))
@@ -188,11 +191,27 @@ class TesterIsolationTest {
 	}
 
 	@Test
+	void anAccountWithAnOpenHoldKeepsItsSide() throws Exception {
+		User realOwner = realStore.getOwner();
+		mockMvc.perform(holdOf(realProduct).header("Authorization", bearer(consumer)))
+			.andExpect(status().isCreated());
+
+		mockMvc.perform(testerChange(consumer, true).header("Authorization", admin()))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("TESTER_CHANGE_BLOCKED_BY_HOLDS"));
+		mockMvc.perform(testerChange(realOwner, true).header("Authorization", admin()))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("TESTER_CHANGE_BLOCKED_BY_HOLDS"));
+		mockMvc.perform(testerChange(consumer, false).header("Authorization", admin()))
+			.andExpect(status().isOk());
+
+		assertThat(userRepository.findById(consumer.getId()).orElseThrow().isTester()).isFalse();
+		assertThat(userRepository.findById(realOwner.getId()).orElseThrow().isTester()).isFalse();
+	}
+
+	@Test
 	void onlyAnAdminCanTurnSomeoneIntoATester() throws Exception {
-		mockMvc.perform(patch("/admin/users/" + consumer.getId() + "/tester")
-				.header("Authorization", bearer(consumer))
-				.contentType(MediaType.APPLICATION_JSON)
-				.content("{\"tester\":true}"))
+		mockMvc.perform(testerChange(consumer, true).header("Authorization", bearer(consumer)))
 			.andExpect(status().isForbidden());
 
 		assertThat(userRepository.findById(consumer.getId()).orElseThrow().isTester()).isFalse();
@@ -212,6 +231,16 @@ class TesterIsolationTest {
 		return post("/holds")
 			.contentType(MediaType.APPLICATION_JSON)
 			.content("{\"productId\":" + product.getId() + ",\"qty\":1}");
+	}
+
+	private MockHttpServletRequestBuilder testerChange(User user, boolean tester) {
+		return patch("/admin/users/" + user.getId() + "/tester")
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("{\"tester\":" + tester + "}");
+	}
+
+	private String admin() {
+		return "Bearer " + tokenProvider.createAccessToken(TokenRealm.ADMIN, 1L, "SUPER");
 	}
 
 	private String bearer(User user) {
