@@ -2,6 +2,7 @@ package com.swyp.backend.store.controller;
 
 import com.swyp.backend.common.response.ApiResponse;
 import com.swyp.backend.common.response.SuccessCode;
+import com.swyp.backend.common.security.AppUserPrincipal;
 import com.swyp.backend.store.dto.NearbyStoresRequest;
 import com.swyp.backend.store.dto.NearbyStoresResponse;
 import com.swyp.backend.store.dto.StoreProductsResponse;
@@ -11,6 +12,7 @@ import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,14 +29,18 @@ public class StoreController {
 
 	@GetMapping("/nearby")
 	public ApiResponse<NearbyStoresResponse> getNearbyStores(
+			Authentication authentication,
 			@Valid @ParameterObject @ModelAttribute NearbyStoresRequest request) {
-		return ApiResponse.of(SuccessCode.OK, storeBrowseService.findNearbyStores(request));
+		return ApiResponse.of(SuccessCode.OK, storeBrowseService.findNearbyStores(
+				request, AppUserPrincipal.idOf(authentication)));
 	}
 
 	@GetMapping("/{storeId}/products")
 	public ApiResponse<StoreProductsResponse> getStoreProducts(
+			Authentication authentication,
 			@PathVariable Long storeId,
 			@Valid @ParameterObject @ModelAttribute StoreProductsRequest request) {
-		return ApiResponse.of(SuccessCode.OK, storeBrowseService.getStoreProducts(storeId, request));
+		return ApiResponse.of(SuccessCode.OK, storeBrowseService.getStoreProducts(
+				storeId, request, AppUserPrincipal.idOf(authentication)));
 	}
 }

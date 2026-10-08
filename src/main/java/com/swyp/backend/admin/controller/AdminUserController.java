@@ -7,6 +7,7 @@ import com.swyp.backend.hold.dto.CancelCreditAdjustRequest;
 import com.swyp.backend.hold.dto.CancelCreditBalance;
 import com.swyp.backend.hold.service.AdminHoldService;
 import com.swyp.backend.user.dto.AdminUserDetailResponse;
+import com.swyp.backend.user.dto.TesterChangeRequest;
 import com.swyp.backend.user.dto.UserSummaryResponse;
 import com.swyp.backend.user.entity.UserRole;
 import com.swyp.backend.user.service.AdminUserService;
@@ -20,6 +21,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -56,6 +58,13 @@ public class AdminUserController {
 			@PathVariable Long id, @Valid @RequestBody CancelCreditAdjustRequest request) {
 		return ApiResponse.of(
 				SuccessCode.OK, adminHoldService.adjustCancelCredits(id, request.delta()));
+	}
+
+	@PatchMapping("/{id}/tester")
+	public ApiResponse<Void> changeTester(
+			@PathVariable Long id, @Valid @RequestBody TesterChangeRequest request) {
+		adminUserService.changeTester(id, request.tester());
+		return ApiResponse.of(SuccessCode.OK);
 	}
 
 	@DeleteMapping("/{id}")

@@ -50,4 +50,9 @@ public class AdminUserService {
 				deviceTokenFunction.findTokensOf(userId),
 				termsFunction.findAgreementsOf(userId));
 	}
+
+	@Transactional
+	public void changeTester(Long userId, boolean tester) {
+		userFunction.getById(userId).changeTester(tester);
+	}
 }

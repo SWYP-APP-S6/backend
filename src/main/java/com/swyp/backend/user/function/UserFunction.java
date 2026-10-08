@@ -8,6 +8,7 @@ import com.swyp.backend.user.repository.UserRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
@@ -26,6 +27,10 @@ public class UserFunction {
 	public User getByIdForUpdate(Long id) {
 		return userRepository.findByIdForUpdate(id)
 				.orElseThrow(() -> new BusinessException(UserAuthErrorCode.USER_NOT_FOUND));
+	}
+
+	public boolean isTester(@Nullable Long userId) {
+		return userId != null && userRepository.existsByIdAndTesterTrue(userId);
 	}
 
 	public Optional<User> findByOauthIdentity(String provider, String providerId, UserRole role) {

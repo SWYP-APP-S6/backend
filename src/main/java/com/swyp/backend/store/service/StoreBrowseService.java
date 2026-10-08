@@ -14,11 +14,13 @@ import com.swyp.backend.store.entity.Store;
 import com.swyp.backend.store.entity.StoreStatus;
 import com.swyp.backend.store.exception.StoreErrorCode;
 import com.swyp.backend.store.function.StoreFunction;
+import com.swyp.backend.user.function.UserFunction;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,14 +31,16 @@ public class StoreBrowseService {
 
 	private final StoreFunction storeFunction;
 	private final ProductFunction productFunction;
+	private final UserFunction userFunction;
 	private final BrowseProperties browseProperties;
 
-	public NearbyStoresResponse findNearbyStores(NearbyStoresRequest request) {
+	public NearbyStoresResponse findNearbyStores(NearbyStoresRequest request, @Nullable Long viewerId) {
 		double centerLatitude = request.centerLat().doubleValue();
 		double centerLongitude = request.centerLng().doubleValue();
 		requireViewportWithinSpan(request, centerLatitude);
 
 		List<Store> stores = storeFunction.findApprovedWithinBounds(
+				userFunction.isTester(viewerId),
 				request.minLat(), request.maxLat(), request.minLng(), request.maxLng());
 		Map<Long, Long> sellableCounts = productFunction.countSellableByStore(
 				stores.stream().map(Store::getId).toList());
@@ -61,8 +65,9 @@ public class StoreBrowseService {
 				markers.size(), markers.size() > limit, markers.stream().limit(limit).toList());
 	}
 
-	public StoreProductsResponse getStoreProducts(Long storeId, StoreProductsRequest request) {
-		Store store = validateAndGetApprovedStore(storeId);
+	public StoreProductsResponse getStoreProducts(
+			Long storeId, StoreProductsRequest request, @Nullable Long viewerId) {
+		Store store = validateAndGetVisibleStore(storeId, userFunction.isTester(viewerId));
 		List<SellableProductResponse> products = productFunction.findSellableByStore(storeId).stream()
 				.map(SellableProductResponse::from)
 				.toList();
@@ -88,9 +93,9 @@ public class StoreBrowseService {
 		}
 	}
 
-	private Store validateAndGetApprovedStore(Long storeId) {
+	private Store validateAndGetVisibleStore(Long storeId, boolean tester) {
 		Store store = storeFunction.getById(storeId);
-		if (store.getStatus() != StoreStatus.APPROVED) {
+		if (store.getStatus() != StoreStatus.APPROVED || store.getOwner().isTester() != tester) {
 			throw new BusinessException(StoreErrorCode.STORE_NOT_FOUND);
 		}
 		return store;

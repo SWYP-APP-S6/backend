@@ -37,6 +37,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 			join fetch p.store s
 			""" + WHERE_SELLABLE_AS_OF_NOW + """
 			and s.status = com.swyp.backend.store.entity.StoreStatus.APPROVED
+			and s.owner.tester = :tester
 			and :today member of s.businessDays
 			and s.latitude between :minLatitude and :maxLatitude
 			and s.longitude between :minLongitude and :maxLongitude
@@ -46,6 +47,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 	List<Product> findSellableWithinBounds(
 			@Param("now") LocalDateTime now,
 			@Param("today") DayOfWeek today,
+			@Param("tester") boolean tester,
 			@Param("category") ProductCategory category,
 			@Param("minLatitude") BigDecimal minLatitude,
 			@Param("maxLatitude") BigDecimal maxLatitude,

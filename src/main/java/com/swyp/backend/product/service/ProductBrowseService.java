@@ -17,6 +17,7 @@ import com.swyp.backend.recipe.dto.RecipeSuggestionResponse;
 import com.swyp.backend.recipe.entity.Recipe;
 import com.swyp.backend.recipe.function.RecipeFunction;
 import com.swyp.backend.store.entity.Store;
+import com.swyp.backend.user.function.UserFunction;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -26,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,11 +41,13 @@ public class ProductBrowseService {
 	private final ProductFunction productFunction;
 	private final RecipeFunction recipeFunction;
 	private final HoldFunction holdFunction;
+	private final UserFunction userFunction;
 	private final BrowseProperties browseProperties;
 	private final Clock clock;
 
-	public NearbyProductsResponse findNearby(NearbyProductsRequest request) {
+	public NearbyProductsResponse findNearby(NearbyProductsRequest request, @Nullable Long viewerId) {
 		List<SellableStoreGroup> nearby = productFunction.findSellableGroupedByStore(
+				userFunction.isTester(viewerId),
 				request.lat(),
 				request.lng(),
 				radiusOf(request),
@@ -80,8 +84,8 @@ public class ProductBrowseService {
 	}
 
 	public ProductBrowseDetailResponse getProductDetail(
-			Long productId, ProductDetailRequest request, Long viewerId) {
-		Product product = productFunction.getBrowsableById(productId);
+			Long productId, ProductDetailRequest request, @Nullable Long viewerId) {
+		Product product = productFunction.getBrowsableById(productId, userFunction.isTester(viewerId));
 		Store store = product.getStore();
 
 		Integer distanceMeters = null;
@@ -91,7 +95,8 @@ public class ProductBrowseService {
 					store.getLatitude().doubleValue(), store.getLongitude().doubleValue()));
 		}
 
-		Optional<HoldRef> activeHold = holdFunction.findHoldingRefOf(viewerId)
+		Optional<HoldRef> activeHold = Optional.ofNullable(viewerId)
+				.flatMap(holdFunction::findHoldingRefOf)
 				.filter(ref -> ref.expiresAt().isAfter(Instant.now(clock)));
 		boolean holdsThisStore = activeHold
 				.filter(ref -> ref.storeId().equals(store.getId()))
