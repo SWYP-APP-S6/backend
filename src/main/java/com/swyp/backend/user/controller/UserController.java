@@ -6,7 +6,9 @@ import com.swyp.backend.common.response.SuccessCode;
 import com.swyp.backend.user.dto.MeResponse;
 import com.swyp.backend.user.dto.MyLocationResponse;
 import com.swyp.backend.user.dto.MyLocationUpdateRequest;
+import com.swyp.backend.user.dto.TesterChangeRequest;
 import com.swyp.backend.user.exception.UserAuthErrorCode;
+import com.swyp.backend.user.service.TesterModeService;
 import com.swyp.backend.user.service.UserDeletionService;
 import com.swyp.backend.user.service.UserService;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -15,6 +17,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -28,10 +31,18 @@ public class UserController {
 
 	private final UserService userService;
 	private final UserDeletionService userDeletionService;
+	private final TesterModeService testerModeService;
 
 	@GetMapping("/me")
 	public ApiResponse<MeResponse> getMe(@AuthenticationPrincipal Long userId) {
 		return ApiResponse.of(SuccessCode.OK, userService.getMe(userId));
+	}
+
+	@PatchMapping("/me/tester")
+	@ApiErrorCodes(in = UserAuthErrorCode.class, codes = {"TESTER_NOT_ALLOWED", "TESTER_CHANGE_BLOCKED_BY_HOLDS"})
+	public ApiResponse<MeResponse> changeMyTesterMode(
+			@AuthenticationPrincipal Long userId, @Valid @RequestBody TesterChangeRequest request) {
+		return ApiResponse.of(SuccessCode.OK, testerModeService.switchMine(userId, request.tester()));
 	}
 
 	@DeleteMapping("/me")

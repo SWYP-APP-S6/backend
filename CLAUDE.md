@@ -98,8 +98,11 @@
   로그인한 관리자만 부를 수 있게 해서 남는 위험을 "관리자가 고정된 테스트 계정을 흉내낼 수 있다"로
   줄인 것이고, 운영에서도 그 전제로 켜 둔다(`dev.test-token.enabled`). 끄면 컨트롤러 빈 자체가
   만들어지지 않고 `SecurityConfig`의 규칙도 같은 스위치를 보므로 둘이 어긋날 수 없다.
-- **테스터 격리** — 팀원은 운영 DB에서 `users.tester=true` 계정으로 테스트한다(`/dev/test-token` 계정은
-  자동, 나머지는 `PATCH /admin/users/{id}/tester`). 가게·상품엔 표시가 없고 **주인의 `tester`를 따라간다** —
+- **테스터 격리** — 팀원은 운영 DB에서 `users.tester=true`(테스트 모드) 계정으로 테스트한다. 관리자가
+  `PATCH /admin/users/{id}/tester-permission`으로 **허가(`tester_allowed`)만** 주고, 모드는 본인이 앱
+  마이페이지에서 `PATCH /users/me/tester`로 켜고 끈다(허가 없이 켜면 403, DB check 제약이 같은 불변식을
+  지킨다). 허가를 거두면 모드도 꺼진다. `/dev/test-token` 계정은 둘 다 자동으로 켜진다. 전환은
+  `TesterModeService` 한 곳에서만 한다. 가게·상품엔 표시가 없고 **주인의 `tester`를 따라간다** —
   같은 사실을 테이블마다 다시 적으면 어긋날 자리가 생긴다. 탐색(`/stores/nearby`·`/stores/*/products`·
   `/products/nearby`·`/products/*`)은 보는 사람과 가게 주인의 `tester`가 같은 것만 보여주고, `HoldCreator`는
   다르면 `PRODUCT_NOT_SELLABLE`로 막는다(테스터가 실제 재고를 잡지 않게). 보는 사람은

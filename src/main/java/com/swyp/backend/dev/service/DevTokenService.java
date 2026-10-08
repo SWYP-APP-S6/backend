@@ -46,6 +46,7 @@ public class DevTokenService {
 	private User createTestUser(UserRole role, String providerId) {
 		User user = new User(role, nickname(role), null, false, Instant.now(clock));
 		user.linkOauthAccount(PROVIDER, providerId);
+		user.allowTesting();
 		user.changeTester(true);
 		return userFunction.save(user);
 	}

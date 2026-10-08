@@ -11,6 +11,8 @@ public record MeResponse(
 		String nickname,
 		@Nullable String phone,
 		boolean marketingOptIn,
+		boolean testerAllowed,
+		boolean tester,
 		Instant termsAgreedAt,
 		Instant joinedAt) {
 
@@ -21,6 +23,8 @@ public record MeResponse(
 				user.getNickname(),
 				user.getPhone(),
 				user.isMarketingOptIn(),
+				user.isTesterAllowed(),
+				user.isTester(),
 				user.getTermsAgreedAt(),
 				user.getCreatedAt());
 	}

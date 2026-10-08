@@ -7,10 +7,11 @@ import com.swyp.backend.hold.dto.CancelCreditAdjustRequest;
 import com.swyp.backend.hold.dto.CancelCreditBalance;
 import com.swyp.backend.hold.service.AdminHoldService;
 import com.swyp.backend.user.dto.AdminUserDetailResponse;
-import com.swyp.backend.user.dto.TesterChangeRequest;
+import com.swyp.backend.user.dto.TesterPermissionRequest;
 import com.swyp.backend.user.dto.UserSummaryResponse;
 import com.swyp.backend.user.entity.UserRole;
 import com.swyp.backend.user.service.AdminUserService;
+import com.swyp.backend.user.service.TesterModeService;
 import com.swyp.backend.user.service.UserDeletionService;
 import com.swyp.backend.user.service.UserService;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -39,6 +40,7 @@ public class AdminUserController {
 	private final UserDeletionService userDeletionService;
 	private final AdminUserService adminUserService;
 	private final AdminHoldService adminHoldService;
+	private final TesterModeService testerModeService;
 
 	@GetMapping
 	public ApiResponse<PageResponse<UserSummaryResponse>> getUsers(
@@ -60,10 +62,10 @@ public class AdminUserController {
 				SuccessCode.OK, adminHoldService.adjustCancelCredits(id, request.delta()));
 	}
 
-	@PatchMapping("/{id}/tester")
-	public ApiResponse<Void> changeTester(
-			@PathVariable Long id, @Valid @RequestBody TesterChangeRequest request) {
-		adminUserService.changeTester(id, request.tester());
+	@PatchMapping("/{id}/tester-permission")
+	public ApiResponse<Void> changeTesterPermission(
+			@PathVariable Long id, @Valid @RequestBody TesterPermissionRequest request) {
+		testerModeService.changePermission(id, request.allowed());
 		return ApiResponse.of(SuccessCode.OK);
 	}
 

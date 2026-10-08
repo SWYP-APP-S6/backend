@@ -70,6 +70,7 @@ public class SecurityConfig {
 	private static final String[] APP_USER_ENDPOINTS = {
 		"/users/me",
 		"/users/me/location",
+		"/users/me/tester",
 		"/notifications",
 		"/notifications/device-tokens",
 		"/notifications/read-all",
