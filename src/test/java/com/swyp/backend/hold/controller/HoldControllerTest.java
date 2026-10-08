@@ -357,15 +357,29 @@ class HoldControllerTest {
 	}
 
 	@Test
-	void aQuantityAboveTheLimitIsRejected() throws Exception {
+	void theRemainingStockIsTheOnlyCapOnQuantity() throws Exception {
 		Product plenty = sellableProduct(20, LocalDateTime.now().plusHours(5));
 
 		mockMvc.perform(post("/holds")
 				.header("Authorization", bearer(consumer))
 				.contentType(MediaType.APPLICATION_JSON)
-				.content(body(plenty.getId(), 4)))
-			.andExpect(status().isBadRequest())
-			.andExpect(jsonPath("$.code").value("HOLD_LIMIT_EXCEEDED"));
+				.content(body(plenty.getId(), 15)))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.data.items[0].qty").value(15));
+
+		mockMvc.perform(post("/holds")
+				.header("Authorization", bearer(consumer))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(body(plenty.getId(), 6)))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("INSUFFICIENT_QTY"));
+
+		mockMvc.perform(post("/holds")
+				.header("Authorization", bearer(consumer))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(body(plenty.getId(), 5)))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.data.items[0].qty").value(20));
 	}
 
 	@Test
