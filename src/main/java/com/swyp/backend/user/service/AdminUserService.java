@@ -61,6 +61,8 @@ public class AdminUserService {
 		}
 		if (allowed) {
 			user.allowTesting();
+			user.enterTestMode();
+			userFunction.getOrCreateTestAccountOf(user, Instant.now(clock));
 		} else {
 			user.revokeTesting();
 		}

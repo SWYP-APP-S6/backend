@@ -98,7 +98,7 @@ public class UserAuthService {
 				throw new BusinessException(UserAuthErrorCode.TESTER_NOT_ALLOWED);
 			}
 			account.enterTestMode();
-			target = userFunction.findTestAccountOf(account).orElseGet(() -> createTestAccountOf(account));
+			target = userFunction.getOrCreateTestAccountOf(account, Instant.now(clock));
 		} else {
 			account.leaveTestMode();
 			target = account;
@@ -123,16 +123,6 @@ public class UserAuthService {
 			return !user.isTestMode() || userFunction.findTestAccountOf(user).isEmpty();
 		}
 		return userFunction.findAccountOf(user).map(User::isTestMode).orElse(true);
-	}
-
-	private User createTestAccountOf(User account) {
-		Instant now = Instant.now(clock);
-		User testAccount = userFunction.save(account.newTestAccount(now));
-		Set<TermsType> agreedTypes = EnumSet.noneOf(TermsType.class);
-		termsFunction.findAgreementsOf(account.getId())
-				.forEach(agreement -> agreedTypes.add(agreement.getTermsDocument().getType()));
-		termsFunction.recordAgreements(testAccount, agreedTypes, now);
-		return testAccount;
 	}
 
 	private void recordTermsAgreements(User user, SignupRequest request, Instant agreedAt) {

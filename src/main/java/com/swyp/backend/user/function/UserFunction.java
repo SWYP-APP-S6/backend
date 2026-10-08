@@ -6,6 +6,7 @@ import com.swyp.backend.user.entity.UserRole;
 import com.swyp.backend.user.exception.UserAuthErrorCode;
 import com.swyp.backend.user.repository.UserRepository;
 import org.springframework.dao.DataIntegrityViolationException;
+import java.time.Instant;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
@@ -48,6 +49,13 @@ public class UserFunction {
 			return Optional.empty();
 		}
 		return findAccount(testAccount.getOauthProvider(), testAccount.getOauthProviderId(), testAccount.getRole());
+	}
+
+	public User getOrCreateTestAccountOf(User account, Instant now) {
+		if (account.getOauthProviderId() == null) {
+			throw new BusinessException(UserAuthErrorCode.TESTER_NEEDS_KAKAO_ACCOUNT);
+		}
+		return findTestAccountOf(account).orElseGet(() -> userRepository.save(account.newTestAccount(now)));
 	}
 
 	public Optional<User> findTestAccountOf(User account) {
