@@ -46,6 +46,9 @@ public class User extends BaseTimeEntity {
 	@Column(name = "terms_agreed_at", nullable = false)
 	private Instant termsAgreedAt;
 
+	@Column(name = "tester_allowed", nullable = false)
+	private boolean testerAllowed;
+
 	@Column(nullable = false)
 	private boolean tester;
 
@@ -77,6 +80,15 @@ public class User extends BaseTimeEntity {
 
 	public void changeMarketingOptIn(boolean marketingOptIn) {
 		this.marketingOptIn = marketingOptIn;
+	}
+
+	public void allowTesting() {
+		this.testerAllowed = true;
+	}
+
+	public void revokeTesting() {
+		this.testerAllowed = false;
+		this.tester = false;
 	}
 
 	public void changeTester(boolean tester) {
