@@ -103,10 +103,12 @@
   찜·알림·취소권·기기 토큰이 모두 `user_id`에 붙으므로 행이 갈리면 데이터도 통째로 갈린다. **`tester`는
   행을 만들 때 정해지고 바뀌지 않는다**(`updatable = false` + DB 트리거) — 가게·상품엔 표시가 없고
   **주인 행의 `tester`를 따라가므로**, 그 값이 바뀌면 테스트 가게가 실사용자에게 드러난다. 관리자는 실제
-  행에 허가(`tester_allowed`)만 준다(`PATCH /admin/users/{id}/tester-permission`). 허가받은 사람이 앱에서
-  `PATCH /users/me/test-mode`(`on` + 지금 refresh 토큰)를 부르면 실제 행의 `test_mode`가 바뀌고, 지금 세션의
-  refresh가 폐기되고, **반대쪽 행의 새 토큰 쌍**이 온다(테스트 행은 처음 켤 때 약관 동의와 함께 생성) —
-  앱은 토큰 교체 + 화면 초기화 + 기기 토큰 재등록만 한다. 카카오 로그인은 `test_mode`를 보고 행을 고르고,
+  행에서 **허가 = 테스트 모드 켜기**다(`PATCH /admin/users/{id}/tester-permission` — `tester_allowed`·`test_mode`를
+  켜고 테스트 행이 없으면 만든다, 해제는 둘 다 끈다). 그래서 앱 수정 없이 **다음 카카오 로그인부터** 테스트
+  행으로 들어가고, 이미 로그인된 실제 행 세션은 refresh가 거절돼 access 만료(≤30분)와 함께 끝난다. 테스트 행엔
+  약관 동의를 복사하지 않는다(동의는 실제 행에 있고, 동의 기록을 막는 데 쓰는 곳이 없다). 앱이 원하면
+  `PATCH /users/me/test-mode`(`on` + 지금 refresh 토큰)로 본인이 바로 전환할 수도 있다 — 지금 세션의 refresh를
+  폐기하고 **반대쪽 행의 새 토큰 쌍**을 준다. 카카오 로그인은 `test_mode`를 보고 행을 고르고,
   `/auth/refresh`는 지금 모드의 행이 아니면 거절한다(허가 회수 시 테스트 세션이 access 만료와 함께 끝난다).
   `/dev/test-token` 계정은 실제 행 없는 테스트 행이다. 탐색(`/stores/nearby`·`/stores/*/products`·
   `/products/nearby`·`/products/*`)은 보는 행과 가게 주인 행의 `tester`가 같은 것만 보여주고, `HoldCreator`는
