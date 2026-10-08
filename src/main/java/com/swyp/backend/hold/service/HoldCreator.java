@@ -60,6 +60,7 @@ public class HoldCreator {
 		Optional<HoldRef> current = holdFunction.findHoldingRefOf(userId);
 		Map<Long, Product> locked = lockProducts(productIdsToLock(current, request.productId()));
 		Product product = locked.get(request.productId());
+		requireSameAudience(user, product);
 
 		GroupSlot slot = resolveGroup(current, product, now, locked);
 		boolean opensAPickup = current.filter(ref -> ref.expiresAt().isAfter(now)).isEmpty();
@@ -200,6 +201,12 @@ public class HoldCreator {
 	private void requireWithinQtyLimit(int qty) {
 		if (qty > holdProperties.userQtyLimit()) {
 			throw new BusinessException(HoldErrorCode.HOLD_LIMIT_EXCEEDED);
+		}
+	}
+
+	private static void requireSameAudience(User user, Product product) {
+		if (product.getStore().getOwner().isTester() != user.isTester()) {
+			throw new BusinessException(HoldErrorCode.PRODUCT_NOT_SELLABLE);
 		}
 	}
 

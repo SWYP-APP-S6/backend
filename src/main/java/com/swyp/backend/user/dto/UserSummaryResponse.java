@@ -13,6 +13,7 @@ public record UserSummaryResponse(
 		@Nullable String oauthProvider,
 		@Nullable String regionName,
 		boolean marketingOptIn,
+		boolean tester,
 		Instant termsAgreedAt,
 		Instant createdAt,
 		@Nullable OwnedStore store) {
@@ -29,6 +30,7 @@ public record UserSummaryResponse(
 				user.getOauthProvider(),
 				regionName,
 				user.isMarketingOptIn(),
+				user.isTester(),
 				user.getTermsAgreedAt(),
 				user.getCreatedAt(),
 				store == null

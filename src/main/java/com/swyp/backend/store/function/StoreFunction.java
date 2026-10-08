@@ -54,12 +54,13 @@ public class StoreFunction {
 	}
 
 	public List<Store> findApprovedWithinBounds(
+			boolean tester,
 			BigDecimal minLatitude,
 			BigDecimal maxLatitude,
 			BigDecimal minLongitude,
 			BigDecimal maxLongitude) {
-		return storeRepository.findByStatusAndLatitudeBetweenAndLongitudeBetween(
-				StoreStatus.APPROVED, minLatitude, maxLatitude, minLongitude, maxLongitude);
+		return storeRepository.findByStatusAndOwnerTesterAndLatitudeBetweenAndLongitudeBetween(
+				StoreStatus.APPROVED, tester, minLatitude, maxLatitude, minLongitude, maxLongitude);
 	}
 
 	public Store save(Store store) {

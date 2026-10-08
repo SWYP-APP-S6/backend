@@ -25,6 +25,8 @@ paths:
 - **조회 엔드포인트(`/recipes/**`·`/products/nearby` 등)는 `BROWSE_ENDPOINTS`에 등록**해 **GET만**
   GUEST·ADMIN·(`REALM_USER`+`ROLE_CONSUMER`) 셋에 연다 — **점주는 제외된다.** realm만 걸면
   `REALM_USER`가 소비자와 점주를 함께 통과시켜, `/owner/**`와 대칭인 구멍이 반대 방향으로 남는다.
+  **남의 가게·상품을 보여주는 조회라면 테스터 필터도 건다**(CLAUDE.md "테스터 격리") — 빠뜨리면 팀원의
+  테스트 가게가 실사용자 지도에 뜬다. `TesterIsolationTest`에 그 엔드포인트를 추가한다.
 - `permitAll`은 `/ping`과 인증 엔드포인트에만 쓴다(익명 대량 요청의 구멍을 남기지 않기 위해). **예외는 약관 조회
   (`GET /terms`, `/terms/*`) 하나다** — 가입 화면은 계정이 생기기 전에 약관을 보여줘야 하는데, 그 시점의 앱에는
   액세스 토큰이 없다(카카오 로그인은 `signupToken`만 준다). 개인정보처리방침은 누구나 볼 수 있어야 하는 문서이기도

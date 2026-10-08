@@ -22,8 +22,9 @@ public interface StoreRepository extends JpaRepository<Store, Long> {
 
 	List<Store> findByOwnerIdIn(Collection<Long> ownerIds);
 
-	List<Store> findByStatusAndLatitudeBetweenAndLongitudeBetween(
+	List<Store> findByStatusAndOwnerTesterAndLatitudeBetweenAndLongitudeBetween(
 			StoreStatus status,
+			boolean ownerTester,
 			BigDecimal minLatitude,
 			BigDecimal maxLatitude,
 			BigDecimal minLongitude,

@@ -2,6 +2,7 @@ package com.swyp.backend.product.controller;
 
 import com.swyp.backend.common.response.ApiResponse;
 import com.swyp.backend.common.response.SuccessCode;
+import com.swyp.backend.common.security.AppUserPrincipal;
 import com.swyp.backend.product.dto.NearbyProductsRequest;
 import com.swyp.backend.product.dto.ProductBrowseDetailResponse;
 import com.swyp.backend.product.dto.ProductDetailRequest;
@@ -11,7 +12,7 @@ import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -28,16 +29,18 @@ public class ProductController {
 
 	@GetMapping("/{productId}")
 	public ApiResponse<ProductBrowseDetailResponse> getProduct(
-			@AuthenticationPrincipal Long viewerId,
+			Authentication authentication,
 			@PathVariable Long productId,
 			@Valid @ParameterObject @ModelAttribute ProductDetailRequest request) {
-		return ApiResponse.of(
-				SuccessCode.OK, productBrowseService.getProductDetail(productId, request, viewerId));
+		return ApiResponse.of(SuccessCode.OK, productBrowseService.getProductDetail(
+				productId, request, AppUserPrincipal.idOf(authentication)));
 	}
 
 	@GetMapping("/nearby")
 	public ApiResponse<NearbyProductsResponse> getNearbyProducts(
+			Authentication authentication,
 			@Valid @ParameterObject @ModelAttribute NearbyProductsRequest request) {
-		return ApiResponse.of(SuccessCode.OK, productBrowseService.findNearby(request));
+		return ApiResponse.of(SuccessCode.OK, productBrowseService.findNearby(
+				request, AppUserPrincipal.idOf(authentication)));
 	}
 }

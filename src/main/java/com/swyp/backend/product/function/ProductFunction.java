@@ -44,10 +44,11 @@ public class ProductFunction {
 				.orElseThrow(() -> new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND));
 	}
 
-	public Product getBrowsableById(Long productId) {
+	public Product getBrowsableById(Long productId, boolean tester) {
 		Product product = productRepository.findWithStoreById(productId)
 				.orElseThrow(() -> new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND));
-		if (product.getStore().getStatus() != StoreStatus.APPROVED) {
+		if (product.getStore().getStatus() != StoreStatus.APPROVED
+				|| product.getStore().getOwner().isTester() != tester) {
 			throw new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND);
 		}
 		return product;
@@ -127,7 +128,11 @@ public class ProductFunction {
 	}
 
 	public List<SellableStoreGroup> findSellableGroupedByStore(
-			BigDecimal latitude, BigDecimal longitude, int radiusMeters, ProductCategory category) {
+			boolean tester,
+			BigDecimal latitude,
+			BigDecimal longitude,
+			int radiusMeters,
+			ProductCategory category) {
 		BigDecimal latitudeDelta = Distance.latitudeDelta(radiusMeters);
 		BigDecimal longitudeDelta = Distance.longitudeDelta(radiusMeters, latitude.doubleValue());
 
@@ -135,6 +140,7 @@ public class ProductFunction {
 		return productRepository.findSellableWithinBounds(
 						now,
 						now.getDayOfWeek(),
+						tester,
 						category,
 						latitude.subtract(latitudeDelta),
 						latitude.add(latitudeDelta),
