@@ -16,6 +16,7 @@ public enum UserAuthErrorCode implements ApiCode {
 	USER_NOT_FOUND(HttpStatus.NOT_FOUND, "회원을 찾을 수 없습니다."),
 	HOLDING_HOLDS_REMAIN(HttpStatus.CONFLICT, "진행 중인 찜이 있어 탈퇴할 수 없습니다. 찜을 모두 처리한 뒤 다시 시도해 주세요."),
 	STORE_HOLDING_HOLDS_REMAIN(HttpStatus.CONFLICT, "가게에 처리되지 않은 찜이 있어 탈퇴할 수 없습니다. 찜을 모두 처리한 뒤 다시 시도해 주세요."),
+	TESTER_CHANGE_BLOCKED_BY_HOLDS(HttpStatus.CONFLICT, "진행 중인 찜이 있어 테스터 여부를 바꿀 수 없습니다. 찜을 모두 처리한 뒤 다시 시도해 주세요."),
 	GUEST_ISSUE_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "비회원 토큰 발급 한도를 초과했습니다.");
 
 	private final HttpStatus status;

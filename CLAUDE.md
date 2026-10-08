@@ -104,7 +104,8 @@
   `/products/nearby`·`/products/*`)은 보는 사람과 가게 주인의 `tester`가 같은 것만 보여주고, `HoldCreator`는
   다르면 `PRODUCT_NOT_SELLABLE`로 막는다(테스터가 실제 재고를 잡지 않게). 보는 사람은
   `AppUserPrincipal.idOf(authentication)`로 얻는다 — **USER realm일 때만** `users` id이고 guest·admin은
-  null(=일반)이다. 회귀는 `TesterIsolationTest`.
+  null(=일반)이다. 진행 중인 찜(본인 것 또는 자기 가게에 걸린 것)이 있으면 전환을 409로 거절한다 — 바꾸는
+  순간 그 찜이 반대편 가게에 걸린 채 남는다. 회귀는 `TesterIsolationTest`.
 - **새 엔드포인트를 만들면 `SecurityConfig`에 realm과 role을 함께 등록해야 한다** — 빠뜨리면 다른
   주체가 통과한다. 등록 규칙·카카오 검증·가입 2단계·guest·rate limit 상세는
   **`.claude/rules/security.md`**(보안·컨트롤러 파일 작성 시 자동 로드), env 변수는

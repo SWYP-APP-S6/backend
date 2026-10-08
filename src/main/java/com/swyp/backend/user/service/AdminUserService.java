@@ -1,5 +1,6 @@
 package com.swyp.backend.user.service;
 
+import com.swyp.backend.common.exception.BusinessException;
 import com.swyp.backend.hold.function.HoldCancelCreditFunction;
 import com.swyp.backend.hold.function.HoldFunction;
 import com.swyp.backend.notification.function.DeviceTokenFunction;
@@ -8,6 +9,7 @@ import com.swyp.backend.store.function.StoreFunction;
 import com.swyp.backend.terms.function.TermsFunction;
 import com.swyp.backend.user.dto.AdminUserDetailResponse;
 import com.swyp.backend.user.entity.User;
+import com.swyp.backend.user.exception.UserAuthErrorCode;
 import com.swyp.backend.user.function.UserFunction;
 import com.swyp.backend.user.function.UserLocationFunction;
 import java.time.Clock;
@@ -53,6 +55,13 @@ public class AdminUserService {
 
 	@Transactional
 	public void changeTester(Long userId, boolean tester) {
-		userFunction.getById(userId).changeTester(tester);
+		User user = userFunction.getByIdForUpdate(userId);
+		if (user.isTester() == tester) {
+			return;
+		}
+		if (holdFunction.hasHoldingOf(userId) || holdFunction.hasHoldingAtStoreOwnedBy(userId)) {
+			throw new BusinessException(UserAuthErrorCode.TESTER_CHANGE_BLOCKED_BY_HOLDS);
+		}
+		user.changeTester(tester);
 	}
 }
