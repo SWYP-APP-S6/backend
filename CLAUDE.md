@@ -165,7 +165,7 @@
 ## Deployment
 
 - **NCP 단일 VM + `docker compose`**(app/postgres/redis) + 앞단 nginx. 배포는 **서버가 끌어온다** —
-  `ssh root@<서버>` → `prod`(`deploy` 유저로 `~/backend/scripts/deploy.sh`를 돌리는 래퍼). 절차·필수 env·운영 명령어·메모리
+  `ssh root@<서버>` → `deploy`(`deploy` 유저로 `~/backend/scripts/deploy.sh`를 돌리는 래퍼). 절차·필수 env·운영 명령어·메모리
   배분은 [`DEPLOY.md`](DEPLOY.md), 서버 `.env` 템플릿은 `deploy.env.example`.
 - **GitHub Actions로 배포하지 않는다** — 저장소가 public이라 self-hosted runner를 붙이면 fork의 PR이
   배포 호스트에서 코드를 실행할 수 있다(근거는 DEPLOY.md). CI의 `build` job은 PR·push마다 계속 돈다.
