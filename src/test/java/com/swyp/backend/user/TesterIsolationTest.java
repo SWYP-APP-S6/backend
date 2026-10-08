@@ -1,6 +1,7 @@
 package com.swyp.backend.user;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.contains;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -36,6 +37,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -178,43 +180,98 @@ class TesterIsolationTest {
 	}
 
 	@Test
-	void anAdminTurnsATeammateIntoATester() throws Exception {
-		mockMvc.perform(testerChange(consumer, true).header("Authorization", admin()))
+	void anAdminAllowsATeammateWhoThenSwitchesTestModeInTheApp() throws Exception {
+		mockMvc.perform(permission(consumer, true).header("Authorization", admin()))
 			.andExpect(status().isOk());
 
 		mockMvc.perform(get("/admin/users/" + consumer.getId()).header("Authorization", admin()))
 			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.testerAllowed").value(true))
+			.andExpect(jsonPath("$.data.tester").value(false));
+		mockMvc.perform(nearbyStores().header("Authorization", bearer(consumer)))
+			.andExpect(jsonPath("$.data.stores[*].storeId").value(contains(realStore.getId().intValue())));
+
+		mockMvc.perform(mySwitch(true).header("Authorization", bearer(consumer)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.testerAllowed").value(true))
 			.andExpect(jsonPath("$.data.tester").value(true));
 		mockMvc.perform(nearbyStores().header("Authorization", bearer(consumer)))
-			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.stores[*].storeId").value(contains(testStore.getId().intValue())));
+
+		mockMvc.perform(mySwitch(false).header("Authorization", bearer(consumer)))
+			.andExpect(status().isOk());
+		mockMvc.perform(get("/users/me").header("Authorization", bearer(consumer)))
+			.andExpect(jsonPath("$.data.testerAllowed").value(true))
+			.andExpect(jsonPath("$.data.tester").value(false));
+		mockMvc.perform(nearbyStores().header("Authorization", bearer(consumer)))
+			.andExpect(jsonPath("$.data.stores[*].storeId").value(contains(realStore.getId().intValue())));
+	}
+
+	@Test
+	void testModeNeedsThePermission() throws Exception {
+		mockMvc.perform(mySwitch(true).header("Authorization", bearer(consumer)))
+			.andExpect(status().isForbidden())
+			.andExpect(jsonPath("$.code").value("TESTER_NOT_ALLOWED"));
+		mockMvc.perform(mySwitch(false).header("Authorization", bearer(consumer)))
+			.andExpect(status().isOk());
+
+		assertThat(userRepository.findById(consumer.getId()).orElseThrow().isTester()).isFalse();
+	}
+
+	@Test
+	void theDatabaseRefusesTestModeWithoutThePermission() {
+		User user = new User(UserRole.CONSUMER, "허가 없음", null, false, Instant.now());
+		user.changeTester(true);
+
+		assertThatThrownBy(() -> userRepository.saveAndFlush(user))
+			.isInstanceOf(DataIntegrityViolationException.class);
+	}
+
+	@Test
+	void revokingThePermissionTurnsTestModeOff() throws Exception {
+		mockMvc.perform(permission(testerConsumer, false).header("Authorization", admin()))
+			.andExpect(status().isOk());
+
+		User revoked = userRepository.findById(testerConsumer.getId()).orElseThrow();
+		assertThat(revoked.isTesterAllowed()).isFalse();
+		assertThat(revoked.isTester()).isFalse();
+		mockMvc.perform(nearbyStores().header("Authorization", bearer(testerConsumer)))
+			.andExpect(jsonPath("$.data.stores[*].storeId").value(contains(realStore.getId().intValue())));
 	}
 
 	@Test
 	void anAccountWithAnOpenHoldKeepsItsSide() throws Exception {
 		User realOwner = realStore.getOwner();
+		mockMvc.perform(permission(consumer, true).header("Authorization", admin()))
+			.andExpect(status().isOk());
+		mockMvc.perform(permission(realOwner, true).header("Authorization", admin()))
+			.andExpect(status().isOk());
 		mockMvc.perform(holdOf(realProduct).header("Authorization", bearer(consumer)))
 			.andExpect(status().isCreated());
+		mockMvc.perform(holdOf(testProduct).header("Authorization", bearer(testerConsumer)))
+			.andExpect(status().isCreated());
 
-		mockMvc.perform(testerChange(consumer, true).header("Authorization", admin()))
+		mockMvc.perform(mySwitch(true).header("Authorization", bearer(consumer)))
 			.andExpect(status().isConflict())
 			.andExpect(jsonPath("$.code").value("TESTER_CHANGE_BLOCKED_BY_HOLDS"));
-		mockMvc.perform(testerChange(realOwner, true).header("Authorization", admin()))
+		mockMvc.perform(mySwitch(true).header("Authorization", bearer(realOwner)))
 			.andExpect(status().isConflict())
 			.andExpect(jsonPath("$.code").value("TESTER_CHANGE_BLOCKED_BY_HOLDS"));
-		mockMvc.perform(testerChange(consumer, false).header("Authorization", admin()))
-			.andExpect(status().isOk());
+		mockMvc.perform(permission(testerConsumer, false).header("Authorization", admin()))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("TESTER_CHANGE_BLOCKED_BY_HOLDS"));
 
 		assertThat(userRepository.findById(consumer.getId()).orElseThrow().isTester()).isFalse();
 		assertThat(userRepository.findById(realOwner.getId()).orElseThrow().isTester()).isFalse();
+		assertThat(userRepository.findById(testerConsumer.getId()).orElseThrow().isTester()).isTrue();
 	}
 
 	@Test
-	void onlyAnAdminCanTurnSomeoneIntoATester() throws Exception {
-		mockMvc.perform(testerChange(consumer, true).header("Authorization", bearer(consumer)))
+	void onlyAnAdminCanGrantThePermission() throws Exception {
+		mockMvc.perform(permission(consumer, true).header("Authorization", bearer(consumer)))
 			.andExpect(status().isForbidden());
 
-		assertThat(userRepository.findById(consumer.getId()).orElseThrow().isTester()).isFalse();
+		assertThat(userRepository.findById(consumer.getId()).orElseThrow().isTesterAllowed()).isFalse();
 	}
 
 	private MockHttpServletRequestBuilder nearbyStores() {
@@ -233,8 +290,14 @@ class TesterIsolationTest {
 			.content("{\"productId\":" + product.getId() + ",\"qty\":1}");
 	}
 
-	private MockHttpServletRequestBuilder testerChange(User user, boolean tester) {
-		return patch("/admin/users/" + user.getId() + "/tester")
+	private MockHttpServletRequestBuilder permission(User user, boolean allowed) {
+		return patch("/admin/users/" + user.getId() + "/tester-permission")
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("{\"allowed\":" + allowed + "}");
+	}
+
+	private MockHttpServletRequestBuilder mySwitch(boolean tester) {
+		return patch("/users/me/tester")
 			.contentType(MediaType.APPLICATION_JSON)
 			.content("{\"tester\":" + tester + "}");
 	}
@@ -254,7 +317,10 @@ class TesterIsolationTest {
 
 	private User user(UserRole role, String nickname, boolean tester) {
 		User user = new User(role, nickname, null, false, Instant.now());
-		user.changeTester(tester);
+		if (tester) {
+			user.allowTesting();
+			user.changeTester(true);
+		}
 		return userRepository.saveAndFlush(user);
 	}
 
